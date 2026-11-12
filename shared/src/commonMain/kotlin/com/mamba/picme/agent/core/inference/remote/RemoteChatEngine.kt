@@ -313,6 +313,8 @@ class RemoteChatEngine internal constructor(
         }
 
         agent.setSessionId(sessionId)
+        // recall_chat_history 的检索范围与 agent 记忆会话同源同步（单点，防两处 session 漂移）
+        ChatToolService.getInstance().chatSessionId = sessionId
         // skill 资产同步（2026-11-08）：TTL 到期才打网，短超时包裹——慢网放弃本次同步、
         // 下轮再试，stale 缓存照常服务；同步完成后技能清单段经 AIAgent 重建键生效。
         skillRepository?.let { repo ->

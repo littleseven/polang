@@ -26,16 +26,14 @@
 - `python3 scripts/gen-design-tokens.py --check` —— ✅ 生成物与 SSOT 一致（7 个文件）
 - 新增在树单测：`ChatListFlattenerTest` 15 例（拍平规则全枚举：USER 整颗单 item / claude/COMMAND/PLAN_PREVIEW/AGENT_IMAGE/AGENT_EDIT_RESULT legacy 直通 / 流式卡 part 三分流——review 🟡3 后口径为 OUTPUT_AVAILABLE **且产物行在场**才跳过、窗口期原位渲染、旧 turn 历史卡行不误判 / INPUT_* 占位 / OUTPUT_ERROR 错误态 / 流式开放 Text 块 textOverride 保留打字机节拍 / key 与 turn 标记）；块1 streaming 包 4 例（adapter 3 + reducer 1）
 
-## 3. 真机冒烟与实测数据（⏳ 待补）
+## 3. 真机冒烟与实测数据（2026-11-12 补测，设备 92a0cfb8；详见 `2026-11-12-chat-openui-gap-closure-batch.md`）
 
-> 2026-09-27 收尾时设备（R5CXB29ZY3F）未连接，`adb devices` 为空、无模拟器。以下验收项代码侧就绪，待设备可用后补测并回填：
-
-- [ ] 装包冒烟：发消息触流式回复（打字机节拍 / RoundStarted 轮边界闭合 pre-tool 文本）、`/html`、`/chart`、长列表滚动、任务卡（`/task`）
-- [ ] spec §10 M4 验收项「流式期间重组范围实测收窄」：Layout Inspector / 重组计数对比（stability 白名单生效的实测证据，目前为语义推断）
-- [ ] 截图基线对比：`scripts/screenshot-diff.py` 对 `scripts/screenshot-baseline/chat/` 更新/确认 M4 基线（Turn 聚合间距阶梯为首帧视觉变化点）
-- [ ] 🔵4（M4 review，不修登记）：新轮首拍状态文案残留（≤50ms）——真机流式期观察首拍帧是否有可感知的文案闪烁
-- [ ] 🔵5（M4 review，不修登记）：`isListScrolling` 读取点可再收窄（当前列表层单次读取已可接受）——真机滚动 + HTML 卡同屏时确认无抖动即可，不追求进一步收窄
-- [ ] 🔵6（M4 review，不修登记）：`TYPE_TOOL_ERROR` 通用文案未消费 `toolErrors.errorText`（低优先；直显前需过 DiagSanitizer 口径）——真机触发一次 OUTPUT_ERROR（如断网跑 `/chart`）确认通用失败文案展示正常
+- [x] 装包冒烟：流式回复（打字机+markdown 正常）、`/html`（media:// 引用卡 fullpage 预览 + ECharts inline 双形态）、图表卡（自然语言触发——`/chart` 非注册 DEV 捷径，协议 §1.1 仅登记 `/html` `/task`，按自然语言口径验证通过）、长列表滚动；任务卡（`/task`）未触发（避免真机启动真实工程师隧道任务，留待）
+- [ ] spec §10 M4 验收项「流式期间重组范围实测收窄」：Layout Inspector / 重组计数对比（需交互式工具，无人值守不可执行，保持待补）
+- [x] 截图基线：`scripts/screenshot-baseline/chat/` 更新 `agent_text_streaming.png` / `agent_text_body.png` 两帧（Turn 聚合间距为首帧视觉变化点）；`agent_code_collapsed.png` 保留旧帧待含代码块回复时更新
+- [ ] 🔵4（M4 review，不修登记）：新轮首拍状态文案残留（≤50ms）——静态截图无法判定，保持待补
+- [x] 🔵5（M4 review，不修登记）：真机滚动（两轮快速上下）+ HTML 卡同屏确认无抖动
+- [ ] 🔵6（M4 review，不修登记）：未构造出真实 OUTPUT_ERROR 场景（DEV 捷径本地直出不依赖网络），保持待补
 
 ## 4. 已知瞬态行为与保留项
 

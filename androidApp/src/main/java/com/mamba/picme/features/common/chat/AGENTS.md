@@ -96,50 +96,50 @@ fun getDefaultModel(): ChatModelOption {
 
 ## 4. 对话持久化 (Message Persistence)
 
-### 4.1 数据库 Schema
+### 4.1 数据库 Schema（Room v28，2026-11-08 值域终态 parts-first）
 
 ```kotlin
 @Entity(tableName = "chat_messages")
 data class ChatMessageEntity(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    @PrimaryKey val id: String,
     val sessionId: String = "default", // 后续支持多会话
-    val type: String, // 新分类法 10 值：text, image, tool_chart, tool_html, tool_task, tool_image_edit, tool_browser, data_media_results, data_optimize_candidates, data_ui_openui（2026-09-28 重构；tool_browser 2026-10-06、data_ui/data_ui_openui 2026-10 GenUI 扩值；2026-11-05 A2UI 退役删 data_ui，存量消息墓碑兜底为 Text）
-    val role: String = "agent", // 消息角色 "user"/"agent"（Room v26 新列，取代 user_/agent_ type 前缀）
-    val content: String, // 文本内容或图片路径
+    val type: String,       // kind 投影列（派生，权威源 = partsJson）：首个 content/tool/data 类 part 鉴别值
+    val role: String = "agent", // 消息角色 "user"/"agent"（消息级独立列，纯 kind 化后无 role 前缀类型值）
+    val content: String,    // 正文/图片 ref 投影列（派生）
     val timestamp: Long = System.currentTimeMillis(),
     val modelUsed: String? = null, // 生成该消息的模型标识
-    val metadata: String? = null, // JSON 扩展字段
-    val partsJson: String? = null // parts 数组 JSON（读面权威源）
+    val metadata: String? = null,  // 负载投影列（parts 派生 + 随行键 performance/claude_agent_state）
+    val partsJson: String   // 权威列（NOT NULL，D1a）：MessagePart 13 值线格式 JSON
 )
 ```
 
+- **part 鉴别值 13 值（4+1 分类）**：content `text`/`image` · reasoning `reasoning` · tool `tool_chart`/`tool_html`/`tool_task`/`tool_image_edit`/`tool_browser` · data `data_optimize_candidates`/`data_genui_program` · source `source_url`/`source_document` · tombstone `tombstone`（未知/退役 part 前向兼容占位）。
+- **写路径统一** `insertPartsMessage`/`insertPartsMessages`/`replacePartsMessage`（`data/local/ChatMessageParts.kt`），运行时禁直写投影列；读侧 `decodeParts` 损坏行降级原文 Text part（不丢消息）。
+- **Room v28 迁移** = chat 两表 DROP+重建（聊天历史重置，用户批准）；`LegacyChatTypeMigration`/`MessagePartsConverter` 等兼容机器已全删（v5 备份恢复粗映射只活在备份模块）。
+
 ### 4.2 存储策略
 
-- **自动保存**: 每条消息发送/接收后立即插入数据库
-- **加载恢复**: ChatScreen 进入时异步加载最近 100 条消息
-- **清理策略**: 单会话超过 1000 条时，自动删除最早 100 条
+- **落库时点**: 产物 emit* / 回合收尾 / 用户停止半截落库三时点（流式消息纯内存不落 Room）
+- **加载恢复**: `getMessagesBySession` 全量加载（无分页——显式决策，见 `docs/08-UI-SPECS/screens/chat.yaml`）
+- **清理策略**: 单会话超过 MAX_MESSAGES=500 条时自动删最早（`ChatViewModel.cleanupIfNeeded`）
 - **手动清空**: 顶部栏菜单提供"清空对话"选项，清空后保留空会话
 
-### 4.3 消息类型映射
+### 4.3 消息类型映射（ChatMessageType 9 值纯 kind ↔ type 投影）
 
-| UI 消息类型（ChatMessageType） | 数据库 type（+ role） | 内容格式 |
+| ChatMessageType | type 投影（+ role 列） | 说明 |
 |-------------|-------------|----------|
-| USER_TEXT | `text`（role=user） | 纯文本 |
-| AGENT_TEXT | `text`（role=agent） | 纯文本 |
-| USER_IMAGE | `image`（role=user） | 图片文件路径 |
-| USER_IMAGE_TEXT | `image`（role=user） | 图片路径 + 图文双 part（Image+Text） |
-| AGENT_IMAGE | `image`（role=agent） | 图片文件路径 |
-| CHART | `tool_chart` | SVG 产物 |
-| HTML_CARD | `tool_html` | HTML 产物 |
-| TASK_CARD | `tool_task` | 工程任务卡（metadata.engineer_task） |
-| AGENT_EDIT_RESULT | `tool_image_edit` | 编辑结果图 |
-| MEDIA_RESULTS | `data_media_results` | 媒体检索结果 |
+| TEXT | `text`（role=user/agent） | 纯文本 / 图文消息正文 |
+| IMAGE | `image`（role=user/agent） | 图片 ref（agent 结果图 = IMAGE + role 守卫） |
+| IMAGE_TEXT | `image`（role=user） | 图文双 part（Image+Text，投影取首 part） |
+| EDIT_RESULT | `tool_image_edit` | 编辑结果卡 |
+| CHART | `tool_chart` | 图表卡（SVG；Chart.echarts 产物走 `tool_html` 信封管线） |
+| HTML_CARD | `tool_html` | HTML 卡（双形态） |
+| TASK_CARD | `tool_task` | 工程师任务卡（metadata.engineer_task） |
 | OPTIMIZE_CANDIDATES | `data_optimize_candidates` | 优化候选卡组 |
-| BROWSER_LIVE | `tool_browser` | 云端浏览器直播/定格卡（BrowserLive 整颗 JSON，2026-10-06） |
-| OPENUI_CARD | `data_ui_openui` | OpenUI GenUI 卡（OpenUiCard 整颗 part JSON，2026-10-24；流式预览帧不落库） |
+| OPENUI_CARD | `data_genui_program` | OpenUI GenUI 卡（OpenUiCard part 整颗，2026-11-08 自 `data_ui_openui` 改名；2026-11-11 起带 `langVersion` 版本协商；流式预览帧不落库） |
 
-> 2026-09-28 分类法重构：`command`/`plan_preview` 已删除（并入 `text`，存量行经 Room MIGRATION_25_26 转正）；浮动面板 sealed AgentMessage 平行体系不受影响。详见 spec `docs/superpowers/specs/2026-09-28-chat-type-taxonomy-design.md`。
-> 2026-11-05 A2UI 退役：`A2UI_CARD`（`data_ui`）行已随退役删除——`ChatMessageType.A2UI_CARD` 与 `MessagePart.A2uiCard` 物理删除，存量 `data_ui` 消息经 codec/converter 墓碑兜底为可读 Text（不丢消息，详见 CHAT_CARD_CATALOG data_ui 节退役标注）。
+> `reasoning`/`source_url`/`source_document`/`tombstone` 为伴随载荷，不产生独立 type 投影（见 §4.1 投影规则）；`tool_browser` 投影行走 Flattener `TYPE_BROWSER_LIVE` 渲染桶（非 ChatMessageType 值）。
+> 演进史（2026-09-28 分类法重构 → 2026-11-05 A2UI 退役 → 2026-11-08 值域终态）：见 `shared/AGENTS.md` 消息模型终态节与 `CHAT_CARD_CATALOG.md` §0，git 历史可查。
 
 ## 5. 快捷入口实现 (QuickActionBar)
 

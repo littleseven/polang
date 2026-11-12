@@ -1100,6 +1100,8 @@
     <string name="chat_unsupported_part_title">Contenu non pris en charge</string>
     <string name="chat_unsupported_part_upgrade">Mettez à jour vers la dernière version pour voir ce contenu</string>
     <string name="openui_action_failed">Échec de l\'action</string>
+    <string name="openui_unknown_component_hint">Mettez à jour l\'appli pour voir ce contenu</string>
+    <string name="openui_lang_newer_hint">Un nouveau format de contenu est disponible. Mettez à jour l\'appli pour tout voir.</string>
     <string name="chat_example_group_search">Trouver des photos</string>
     <string name="chat_example_group_ask">Questions sur votre galerie</string>
     <string-array name="chat_example_prompts_search">
@@ -1728,6 +1730,7 @@
     <string name="chat_cmd_remember_fact">Mémoriser le fait</string>
     <string name="chat_cmd_forget_fact">Oublier le fait</string>
     <string name="chat_cmd_recall_memory">Rappeler le souvenir</string>
+    <string name="chat_cmd_recall_chat_history">Rappeler l\'historique</string>
     <string name="chat_cmd_detail_smoothing">Lissage %1$d%%</string>
     <string name="chat_cmd_detail_whitening">Éclaircissement %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">Amincissement du visage %1$d%%</string>

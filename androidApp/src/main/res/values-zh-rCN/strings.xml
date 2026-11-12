@@ -1130,6 +1130,8 @@
     <string name="chat_unsupported_part_title">此内容暂不支持显示</string>
     <string name="chat_unsupported_part_upgrade">升级到最新版本后可查看完整内容</string>
     <string name="openui_action_failed">操作失败</string>
+    <string name="openui_unknown_component_hint">此内容需更新应用后查看</string>
+    <string name="openui_lang_newer_hint">已推出新版内容格式，升级应用后可完整查看</string>
     <string name="chat_example_group_search">找照片</string>
     <string name="chat_example_group_ask">问相册</string>
     <string-array name="chat_example_prompts_search">
@@ -1768,6 +1770,7 @@
     <string name="chat_cmd_remember_fact">记住事实</string>
     <string name="chat_cmd_forget_fact">遗忘事实</string>
     <string name="chat_cmd_recall_memory">检索记忆</string>
+    <string name="chat_cmd_recall_chat_history">召回聊天历史</string>
     <string name="chat_cmd_detail_smoothing">磨皮 %1$d%%</string>
     <string name="chat_cmd_detail_whitening">美白 %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">瘦脸 %1$d%%</string>

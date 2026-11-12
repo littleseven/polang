@@ -1139,6 +1139,8 @@
     <string name="chat_unsupported_part_title">Content not supported</string>
     <string name="chat_unsupported_part_upgrade">Update to the latest version to view this content</string>
     <string name="openui_action_failed">Action failed</string>
+    <string name="openui_unknown_component_hint">Update the app to view this content</string>
+    <string name="openui_lang_newer_hint">A new content format is available. Update the app to view it in full.</string>
     <string name="chat_example_group_search">Find photos</string>
     <string name="chat_example_group_ask">Ask about your gallery</string>
     <string-array name="chat_example_prompts_search">
@@ -1777,6 +1779,7 @@
     <string name="chat_cmd_remember_fact">Remember fact</string>
     <string name="chat_cmd_forget_fact">Forget fact</string>
     <string name="chat_cmd_recall_memory">Recall memory</string>
+    <string name="chat_cmd_recall_chat_history">Recall chat history</string>
     <string name="chat_cmd_detail_smoothing">Smoothing %1$d%%</string>
     <string name="chat_cmd_detail_whitening">Whitening %1$d%%</string>
     <string name="chat_cmd_detail_slim_face">Face slimming %1$d%%</string>

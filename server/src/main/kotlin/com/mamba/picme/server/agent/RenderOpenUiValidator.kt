@@ -216,6 +216,10 @@ object RenderOpenUiValidator {
 
     private val BUTTON_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Button\s*\(""")
 
+    /** Html 调用（lint：逃生舱治理——目录组件组合优先，Html 仅目录无法表达时落，
+     *  2026-11-12 组合方案吸收；观测用软警告不触发纠正回环）。 */
+    private val HTML_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])Html\s*\(""")
+
     /** CardHeader 调用（lint：actionLabel 无 action 配对 → 引导补 @ToAssistant，2026-10-31 真机回归）。 */
     private val CARD_HEADER_CALL = Regex("""(?<![@${'$'}A-Za-z0-9_])CardHeader\s*\(""")
 
@@ -241,7 +245,9 @@ object RenderOpenUiValidator {
      * lint 管美观下限。规则来源：
      * - DISPLAY ≤4（规范 §4.1 stat tile：一屏大数字过多 = 没有重点）；
      * - Button ≤3（规范 §1.1 行为色面积：Button 是 primary 大色块面积的主要代理
-     *   分量——Tabs 选中胶囊/Slider/Switch/图表选中高亮不在 lint 面内）。
+     *   分量——Tabs 选中胶囊/Slider/Switch/图表选中高亮不在 lint 面内）；
+     * - Html 逃生舱在场提示（2026-11-12 组合谱系治理：目录组件组合是默认路径，
+     *   Html 仅目录无法表达的一次性交互/可视化才落——对齐报告 GeneratedView 模式）。
      * （2026-10-31 布局可控性批次收编：stat 居中/图文 Row weights/Grid 照片墙三条软警告
      * 退役——前两条由 OpenUiLayoutNormalizer（N4/N1）无声矫正吸收，第三条升硬为
      * OpenUiLayoutValidator R4 门禁；本函数保留 DISPLAY≤4 与 Button≤3 两条计数软建议
@@ -257,6 +263,12 @@ object RenderOpenUiValidator {
         val buttonCount = BUTTON_CALL.findAll(stripped).count()
         if (buttonCount > MAX_BUTTONS) {
             warnings += "Button $buttonCount 个超建议上限（一卡 primary 大色块 ≤$MAX_BUTTONS 处，行为色面积收敛；次要动作并入一个主 Button 或改 Markdown 文本链接）"
+        }
+        // 组合谱系治理（2026-11-12 组合方案吸收）：Declarative 目录组件是默认路径，
+        // Html 是组件级 Open-Ended 逃生舱——在场即提示「确认目录无法表达」。
+        // 软警告：不拒卡、不落违规、不触发纠正回环，仅工具体 Observation 观测。
+        if (HTML_CALL.containsMatchIn(stripped)) {
+            warnings += "Html escape-hatch used——确认目录组件无法表达（Card/图表/表单族能组合出来的布局与交互不要落 Html 沙箱；Html 仅用于目录无法表达的一次性交互/可视化，内容清洗契约不变）"
         }
         callArgSpans(stripped, CARD_HEADER_CALL).forEach { args ->
             // 2026-10-31 真机回归「查看全部点击无效」：只传 actionLabel 不传 action 时端侧

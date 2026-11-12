@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * 远程 LLM 调用日志 + tool 执行指标**独立数据库**。
@@ -18,7 +20,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [LlmCallLogEntity::class, ToolCallLogEntity::class, JsRunLogEntity::class, RoutingAuditLogEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class LlmLogDatabase : RoomDatabase() {
@@ -32,6 +34,17 @@ abstract class LlmLogDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: LlmLogDatabase? = null
 
+        /**
+         * v5→v6（2026-11-12）：llm_call_log 加 `cachedTokens` 列（SSE usage 帧 cached_tokens
+         * 端侧采集，LlmWireTap）。纯增量 ALTER，保留既有诊断历史；
+         * fallbackToDestructiveMigration 仍作兜底（诊断数据可丢）。
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE llm_call_log ADD COLUMN cachedTokens INTEGER")
+            }
+        }
+
         fun getDatabase(context: Context): LlmLogDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -39,6 +52,7 @@ abstract class LlmLogDatabase : RoomDatabase() {
                     LlmLogDatabase::class.java,
                     "polang_llm_log.db"
                 )
+                    .addMigrations(MIGRATION_5_6)
                     .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance

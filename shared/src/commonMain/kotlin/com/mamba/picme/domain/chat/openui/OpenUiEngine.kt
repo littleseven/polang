@@ -38,6 +38,15 @@ class OpenUiSession(
     private val program: String,
     private val tools: OpenUiToolResolver,
     initialState: Map<String, OpenUiValue> = emptyMap(),
+    /**
+     * 流式预览 partial 模式（2026-11-12 前向引用骨架流式）：被引用但尚未流到的语句名
+     * 产出 [OpenUiValue.Skeleton] 骨架占位（top-down reveal，定义流入后下一帧重解析
+     * 自然消失），渲染层显示骨架块。默认 false = 完整程序语义（未解析引用照旧 dropped
+     * + unresolved 记录，终态校验/ProgramGuard 语义零变化）；开启方仅限双端流式预览
+     * 路径（Android OpenUiStreamingCard / iOS IosOpenUiPreviewFactory），Skeleton
+     * 永不进正式卡与 partsJson 持久化。
+     */
+    private val forwardRefSkeletons: Boolean = false,
 ) {
     private val store = mutableMapOf<String, OpenUiValue>()
     private val queryResults = mutableMapOf<String, OpenUiValue>()
@@ -155,16 +164,18 @@ class OpenUiSession(
         statements = byName
         orderedStatements = byName.values.toList()
 
-        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
+        val runtime = newRuntime()
 
-        // state 声明默认值：仅当变量还没有值（宿主持久化 state 已先入 store）
+        // state 声明默认值：仅当变量还没有值（宿主持久化 state 已先入 store）。
+        // collapse：skeletons 模式下默认值表达式的前向引用占位收口 Null（瞬态节点不进 store）
         orderedStatements
             .filter { statement -> statement.kind == OpenUiStatementKind.STATE }
             .forEach { statement ->
                 if (!store.containsKey(statement.name)) {
                     store[statement.name] =
-                        runtime.evalExpr(statement.expr, setOf(statement.name), statement.name, valuePosition = false)
-                            ?: OpenUiValue.Null
+                        collapseEvalSkeleton(
+                            runtime.evalExpr(statement.expr, setOf(statement.name), statement.name, valuePosition = false),
+                        )
                 }
             }
 
@@ -257,7 +268,7 @@ class OpenUiSession(
         return when (statement.kind) {
             OpenUiStatementKind.MUTATION -> runMutation(statement)
             OpenUiStatementKind.QUERY -> {
-                val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
+                val runtime = newRuntime()
                 runQuery(statement, runtime)
                 runtime.errors.forEach { error -> appendActionError(error) }
                 reevaluateSafely()
@@ -280,7 +291,7 @@ class OpenUiSession(
             )
             return false
         }
-        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
+        val runtime = newRuntime()
         val stack = setOf(statement.name)
         val toolName =
             (call.args.getOrNull(0)?.let { expr ->
@@ -392,7 +403,7 @@ class OpenUiSession(
         val argsMap = (argsValue as? OpenUiValue.Obj)?.v ?: emptyMap()
         val defaults = call.args.getOrNull(2)?.let { expr ->
             runtime.evalExpr(expr, stack, statement.name, valuePosition = false)
-        } ?: OpenUiValue.Null
+        }?.let(::collapseEvalSkeleton) ?: OpenUiValue.Null
         queryResults[statement.name] = try {
             tools.call(toolName, argsMap)
         } catch (e: OpenUiToolNotFoundException) {
@@ -419,13 +430,18 @@ class OpenUiSession(
     private fun declaredDefault(name: String): OpenUiValue {
         val statement = statements[name] ?: return OpenUiValue.Null
         if (statement.kind != OpenUiStatementKind.STATE) return OpenUiValue.Null
-        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
-        return runtime.evalExpr(statement.expr, setOf(name), name, valuePosition = false) ?: OpenUiValue.Null
+        val runtime = newRuntime()
+        return collapseEvalSkeleton(
+            runtime.evalExpr(statement.expr, setOf(name), name, valuePosition = false),
+        )
     }
+
+    /** 求值运行时工厂：skeletons 模式随会话 [forwardRefSkeletons]（流式预览专用，默认关）。 */
+    private fun newRuntime() = OpenUiRuntime(statements, store, queryResults, mutationResults, skeletons = forwardRefSkeletons)
 
     private fun reevaluate() {
         val entry = entryName ?: return
-        val runtime = OpenUiRuntime(statements, store, queryResults, mutationResults)
+        val runtime = newRuntime()
         val rootValue = runtime.evalStatement(entry)
         unresolved = runtime.unresolved
         // action 期错误史回填：@Run 工具失败等不被重求值重建冲掉（重复条目 distinct 收敛）

@@ -265,7 +265,9 @@ struct ChatView: View {
     /// TYPE_TOOL_STATUS item。
     private var flattenedItems: [ChatListItem] {
         ChatListFlattenerKt.flattenChatItems(
-            messages: viewModel.messages,
+            // 主聊天云端回合 OpenUI 流式预览：displayMessages = messages + 预览合成消息
+            //（Android displayMessages 同构；空态判定仍用 messages）
+            messages: viewModel.displayMessages,
             pendingToolName: viewModel.pendingToolName,
             // browser-vnc 直播卡 Task 13 新增参数（ObjC 导出不支持 Kotlin 默认值）；
             // iOS 直播卡未落地（M1 Android-only），传空集合，正式组装随 iOS 跟随任务
@@ -321,6 +323,23 @@ struct ChatView: View {
                                     messageId: messageId,
                                     displayMode: mode,
                                     measuredHeightPx: measured)
+                            },
+                            onOpenUiViewStateChange: { messageId, viewState in
+                                viewModel.persistOpenUiViewState(
+                                    messageId: messageId, viewState: viewState)
+                            },
+                            onOpenUiPhotoTap: { localIdentifier in
+                                // OpenUI 卡照片点击看大图：localIdentifier → 大图解码 →
+                                // 复用 chat 全屏预览（单页形态——Android 多页横滑翻页预览
+                                // 为 iOS 后续项，平台差异台账登记）
+                                Task { @MainActor in
+                                    let image = await ThumbnailLoader.shared.thumbnail(
+                                        for: localIdentifier, size: CGSize(width: 1800, height: 1800))
+                                    if let image { previewImage = image }
+                                }
+                            },
+                            onOpenUiToAssistant: { text in
+                                viewModel.send(text)
                             }
                         )
                         .id(item.key)
@@ -342,7 +361,9 @@ struct ChatView: View {
                 }
             }
             .onChange(of: viewModel.messages.count) { _ in scrollToBottom(proxy) }
-            .onChange(of: viewModel.messages.last?.content) { _ in scrollToBottom(proxy) }
+            .onChange(of: viewModel.displayMessages.count) { _ in scrollToBottom(proxy) }
+            .onChange(of: viewModel.displayMessages.last?.content) { _ in scrollToBottom(proxy) }
+            .onChange(of: viewModel.openUiStreamProgram) { _ in scrollToBottom(proxy) }
             #if DEBUG
             // -chatMdDemo：配置在布局前完成导致 onChange 滚动落空，延迟补滚到底；
             // -chatMdDemoTop：锚定 torture 消息顶部（截标题/段落区验证图）
@@ -771,6 +792,12 @@ private struct ChatListItemView: View {
     var onOpenHtmlLink: (URL) -> Void = { _ in }
     /// INLINE/FULLPAGE 终判回写（测高完成或首测超一屏；persist 到消息 metadata）
     var onHtmlDisplayFinalized: (String, HtmlCardDisplayMode, Int32?) -> Void = { _, _, _ in }
+    /// OpenUI 卡（2026-11-12 云端回合批次）：viewState 持久化（messageId + viewState）
+    var onOpenUiViewStateChange: (String, String) -> Void = { _, _ in }
+    /// OpenUI 卡照片点击看大图（localIdentifier）
+    var onOpenUiPhotoTap: (String) -> Void = { _ in }
+    /// OpenUI 卡内回话入口（@ToAssistant 以用户消息发进会话）
+    var onOpenUiToAssistant: (String) -> Void = { _ in }
 
     var body: some View {
         if item.part == nil {
@@ -792,9 +819,36 @@ private struct ChatListItemView: View {
         case t.TYPE_TASK_CARD: taskCardItem
         case t.TYPE_TOOL_PLACEHOLDER, t.TYPE_TOOL_ERROR, t.TYPE_TOOL_STATUS: toolStatusItem
         case t.TYPE_TOMBSTONE: tombstoneItem
-        // TYPE_BROWSER_LIVE / TYPE_OPENUI_CARD：iOS 渲染未落地（值域终态 D3 边界——
-        // 降级缺口维持独立跟踪于 PARITY 台账，本批不补渲染），落 default 空渲染
+        case t.TYPE_OPENUI_CARD: openUiCardItem
+        // TYPE_BROWSER_LIVE：iOS 直播卡未落地（browser-vnc M1 Android-only，明确不在本批），
+        // 维持空渲染 + PARITY 台账独立跟踪
         default: EmptyView()
+        }
+    }
+
+    /// OPENUI_CARD part（openui P2）：data_genui_program 卡——流式预览合成消息只读渲染
+    /// （24k 预算渐进）；正式卡 OpenUiCardView 全量渲染（session 求值 + 交互态持久化 +
+    /// 副作用出口）；消息尾附性能指标行（云端 done 帧回补，usage 全 0 不渲染）。
+    @ViewBuilder private var openUiCardItem: some View {
+        if let part = item.part as? MessagePartOpenUiCard {
+            VStack(alignment: .leading, spacing: 4) {
+                if item.message.id == ChatViewModel.openUiStreamPreviewId {
+                    OpenUiStreamingCardView(program: part.program)
+                } else {
+                    OpenUiCardView(
+                        part: part,
+                        onViewStateChange: { viewState in
+                            onOpenUiViewStateChange(item.message.id, viewState)
+                        },
+                        onPhotoTap: onOpenUiPhotoTap,
+                        onToAssistant: onOpenUiToAssistant)
+                }
+                if item.isLastPartOfMessage, let perf = item.message.performance {
+                    OpenUiPerformanceRow(performance: perf)
+                }
+            }
+            .padding(.vertical, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

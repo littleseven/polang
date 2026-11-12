@@ -43,6 +43,15 @@ object RemoteModelFactory {
     var captureContent: Boolean = true
 
     /**
+     * LLM 线路窃听器（可空，默认 null = 工厂零包装零开销）。由平台组合根注入：
+     * Android 注入 [LatestLlmWireTap]（DEBUG 保留请求体 / release 仅 SSE 指标扫描）；
+     * iOS / server 不注入（诊断走各自既有通道）。注入后 [createKoogExecutor] 默认工厂
+     * 路径包 [WireTapHttpClientFactory]——出站请求体与 SSE 逐帧 data 旁路给 tap。
+     */
+    @Volatile
+    var wireTap: LlmWireTap? = null
+
+    /**
      * 根据模型 ID 获取合法 temperature 值。
      *
      * 某些模型对 temperature 有特殊约束（如 Kimi K2.6 仅接受 1.0），
@@ -107,7 +116,10 @@ object RemoteModelFactory {
         // createKoogHttpClientFactory（同包）内部显式构造 KtorKoogHttpClient.Factory()
         // 绕过（显式构造也更利于 R8：无需为 ServiceLoader provider 加 keep），并按需包
         // HeaderInjectingHttpClientFactory 注入网关 header。Anthropic client 同理必须显式传工厂。
-        val factory = httpClientFactory ?: createKoogHttpClientFactory(extraHeaders)
+        // wire tap（2026-11-12 可观测性缺口清偿）：tap 非空时最外层再包 WireTapHttpClientFactory
+        //（请求体 / SSE 帧旁路）；null 时零包装，语义与此前逐字节一致。
+        val baseFactory = httpClientFactory ?: createKoogHttpClientFactory(extraHeaders)
+        val factory = wireTap?.let { WireTapHttpClientFactory(baseFactory, it) } ?: baseFactory
         val model: LLModel
         val client = when (config.protocol) {
             RemoteProtocol.CLAUDE -> {
@@ -211,6 +223,22 @@ object RemoteModelFactory {
     // object 内可直接声明 const val（companion 仅在 class 内需要；standalone object 内
     // 嵌套 companion 非法——曾踩此编译错）。createKoogExecutor 引用此常量。
     private const val MAX_TOKENS: Int = 4096
+
+    /**
+     * 自 wire tap 取最近请求体作 `LlmCallRecord.requestJson`（KoogChatAgent /
+     * KoogReActAgent / IntentRouter 三个组装点共用）：仅 `captureContent=true`（DEBUG
+     * 全文）时截取，上限 [REQUEST_JSON_MAX_CHARS]；tap 未注入 / 未保留请求体（release）
+     * 时返回空串——隐私口径与 responseJson 一致，release 绝不落消息内容。
+     */
+    internal fun capturedRequestBody(tap: LlmWireTap?): String =
+        if (captureContent) {
+            tap?.latestRequest()?.bodyJson?.take(REQUEST_JSON_MAX_CHARS) ?: ""
+        } else {
+            ""
+        }
+
+    /** requestJson 落 record 的字符上限（16KB，防超大 prompt 撑爆本地调试库）。 */
+    internal const val REQUEST_JSON_MAX_CHARS: Int = 16 * 1024
 }
 
 // 注：私有 `HeaderInjectingHttpClientFactory` 与本类同模块同包（KoogHttpClientFactoryProvider.kt，

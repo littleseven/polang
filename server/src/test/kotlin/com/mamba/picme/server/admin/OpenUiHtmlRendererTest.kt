@@ -171,12 +171,14 @@ class OpenUiHtmlRendererTest {
     }
 
     @Test
-    fun `unknown component is dropped by validation, siblings still render, errors recorded`() {
-        // §8.4 组件校验恢复：未知组件在求值期被剔除（不是渲染期占位），错误入 errors 不炸树
+    fun `unknown component renders placeholder, siblings still render, errors recorded`() {
+        // 前向兼容（协议版本协商，OpenUiContract.LANG_VERSION）：未知组件求值产出占位节点
+        // 不剔除（2026-11-11 起不再静默丢），渲染期落带组件名的虚线占位框，错误入 errors 不炸树
         val result = preview("""root = Card([FancyWidget(foo = 1), Text("ok")])""")
         val rendered = result as OpenUiTreePreview.Rendered
         assertTrue(rendered.bodyHtml.contains("ok"))
-        assertTrue(!rendered.bodyHtml.contains("FancyWidget"))
+        assertTrue(rendered.bodyHtml.contains("FancyWidget"))
+        assertTrue(rendered.bodyHtml.contains("border:1px dashed"))
         assertTrue(rendered.errors.isNotEmpty())
     }
 

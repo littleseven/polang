@@ -1,4 +1,4 @@
-可用工具（40）：
+可用工具（41）：
 - adjust_image: 按显式参数调整图片亮度/对比度/饱和度/色温，返回调整后的图片。
 - ai_optimize: AI 一键优化图片。
 - browser_click: 点击云端浏览器当前页面中的元素。
@@ -27,6 +27,7 @@
 - navigate_to: 导航到页面。
 - open_system_settings: 打开系统设置页。
 - query_tag_scan_status: 查询 TAG 扫描状态（人脸/标签/语义索引进度）。
+- recall_chat_history: 召回当前会话更早的聊天历史原文（对话长了之后早期内容会被压缩摘要，摘要没细节时用它找回原文）。
 - recall_memory: system prompt【关于用户】段已含常见记忆，优先直接引用；本工具仅在该段未列全（被截断）或需拿 factId 删除时调用。
 - refine_media_search: 在上一轮搜索结果内细化过滤，返回命中总数与媒体 id 列表（并更新搜索基数；展示用 render_html 重出图集卡）。
 - remember_fact: 记住一条事实，如用户说「帮我记住小宝对花粉过敏」「记住我喜欢低饱和度滤镜」。

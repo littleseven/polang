@@ -1,7 +1,9 @@
 package com.mamba.picme.agent.core.remote.config
 
 import ai.koog.http.client.KoogHttpClient
+import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
+import kotlin.reflect.KClass
 
 /**
  * 创建 Koog HTTP 客户端工厂。双端均显式构造（绕开 Koog 1.1.1 ServiceLoader 缺陷：
@@ -54,4 +56,97 @@ internal class HeaderInjectingHttpClientFactory(
         requestTimeoutMs,
         json,
     )
+}
+
+/**
+ * [LlmWireTap] 注入的工厂装饰器（[RemoteModelFactory.createKoogExecutor] 默认路径按需包装）：
+ * 把委托工厂产物再包一层 [WireTapKoogHttpClient] 旁路观测。tap 未注入（null）时工厂层
+ * 零包装零开销，语义与装饰前逐字节一致。
+ */
+internal class WireTapHttpClientFactory(
+    private val delegate: KoogHttpClient.Factory,
+    private val tap: LlmWireTap,
+) : KoogHttpClient.Factory {
+    override fun create(
+        baseURL: String,
+        authHeaderValue: String,
+        headers: Map<String, String>,
+        queryParams: Map<String, String>,
+        connectTimeoutMs: Long,
+        socketTimeoutMs: Long,
+        requestTimeoutMs: Long,
+        json: Json,
+    ): KoogHttpClient = WireTapKoogHttpClient(
+        delegate.create(
+            baseURL,
+            authHeaderValue,
+            headers,
+            queryParams,
+            connectTimeoutMs,
+            socketTimeoutMs,
+            requestTimeoutMs,
+            json,
+        ),
+        tap,
+    )
+}
+
+/**
+ * [LlmWireTap] 的客户端装饰器：`post`/`sse` 出站请求体（Koog JSON 请求体恒为 String，
+ * 非文本体跳过）旁路给 [LlmWireTap.onRequest]；`sse` 的逐帧原始 data 行在 Koog 自己的
+ * decode lambda **前**同步旁路给 [LlmWireTap.onSseDataLine]。
+ *
+ * 设计约束（生产路径硬红线）：
+ * - **不包装 Flow、不引入协程/取消/异常透明性变化**——只在 decode lambda 外再套一层
+ *   同步函数（tap 调用 runCatching 包裹，异常绝不上抛），Koog 消费侧时序语义不变；
+ * - 每帧开销 = 一次子串扫描（O(帧长)，远小于 Koog 随后的 JSON 反序列化）；
+ * - `lines`（非 LLM 推理路径）不包装。
+ */
+internal class WireTapKoogHttpClient(
+    private val delegate: KoogHttpClient,
+    private val tap: LlmWireTap,
+) : KoogHttpClient by delegate {
+
+    override suspend fun <T : Any, R : Any> post(
+        path: String,
+        requestBody: T,
+        requestBodyType: KClass<T>,
+        responseType: KClass<R>,
+        parameters: Map<String, String>,
+        headers: Map<String, String>,
+    ): R {
+        captureRequest(path, requestBody)
+        return delegate.post(path, requestBody, requestBodyType, responseType, parameters, headers)
+    }
+
+    override fun <T : Any, R : Any, O : Any> sse(
+        path: String,
+        requestBody: T,
+        requestBodyType: KClass<T>,
+        dataFilter: (String?) -> Boolean,
+        decodeStreamingResponse: (String) -> R,
+        processStreamingChunk: (R) -> O?,
+        parameters: Map<String, String>,
+        headers: Map<String, String>,
+    ): Flow<O> {
+        captureRequest(path, requestBody)
+        return delegate.sse(
+            path,
+            requestBody,
+            requestBodyType,
+            dataFilter,
+            { line ->
+                runCatching { tap.onSseDataLine(line) }
+                decodeStreamingResponse(line)
+            },
+            processStreamingChunk,
+            parameters,
+            headers,
+        )
+    }
+
+    private fun captureRequest(path: String, body: Any?) {
+        val bodyJson = body as? String ?: return
+        runCatching { tap.onRequest(path, bodyJson) }
+    }
 }

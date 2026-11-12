@@ -149,6 +149,9 @@ object OpenUiHtmlRenderer {
                         else -> "flex:${trimNum(grow)} 1 0;min-width:0"
                     }
                     "<div style=\"$style\">${render(child)}</div>"
+                } else if (child is OpenUiValue.UnknownComponent) {
+                    // 未知组件占位（前向兼容）：占等宽栏渲染可见占位框
+                    "<div style=\"flex:1 1 0;min-width:0\">${renderChild(child)}</div>"
                 } else {
                     "<div style=\"flex:1 1 0;min-width:0\"></div>"
                 }
@@ -169,14 +172,14 @@ object OpenUiHtmlRenderer {
             val columns = ((node.props["columns"] as? OpenUiValue.Num)?.v ?: 2.0).toInt().coerceIn(1, 4)
             val gap = spacingPx(node)
             val cells = childrenOf(node).joinToString("") { child ->
-                "<div style=\"min-width:0\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                "<div style=\"min-width:0\">${renderChild(child)}</div>"
             }
             return "<div style=\"display:grid;grid-template-columns:repeat($columns,1fr);gap:${gap}px\">$cells</div>"
         }
 
         private fun renderBox(node: OpenUiValue.ComponentVal): String {
             val layers = childrenOf(node).joinToString("") { child ->
-                "<div style=\"grid-area:1/1;min-width:0\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                "<div style=\"grid-area:1/1;min-width:0\">${renderChild(child)}</div>"
             }
             return "<div style=\"display:grid\">$layers</div>"
         }
@@ -188,7 +191,7 @@ object OpenUiHtmlRenderer {
             val direction = if (row) "row" else "column"
             val wrapStyle = if (wrap) ";flex-wrap:wrap" else ""
             val items = childrenOf(node).joinToString("") { child ->
-                "<div style=\"min-width:0\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                "<div style=\"min-width:0\">${renderChild(child)}</div>"
             }
             return "<div style=\"display:flex;flex-direction:$direction;gap:${gap}px$wrapStyle\">$items</div>"
         }
@@ -202,7 +205,7 @@ object OpenUiHtmlRenderer {
             val gap = spacingPx(node)
             return if (strProp(node, "direction") == "HORIZONTAL") {
                 val items = childrenOf(node).joinToString("") { child ->
-                    "<div style=\"flex:0 0 auto;max-width:240px\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                    "<div style=\"flex:0 0 auto;max-width:240px\">${renderChild(child)}</div>"
                 }
                 "<div style=\"display:flex;gap:${gap}px;overflow-x:auto\">$items</div>"
             } else {
@@ -418,6 +421,8 @@ object OpenUiHtmlRenderer {
             val slides = items.take(10).joinToString("") { item ->
                 when (item) {
                     is OpenUiValue.ComponentVal -> "<div style=\"flex:0 0 200px;min-width:0\">${render(item)}</div>"
+                    is OpenUiValue.UnknownComponent ->
+                        "<div style=\"flex:0 0 200px;min-width:0\">${renderChild(item)}</div>"
                     is OpenUiValue.Obj -> {
                         val src = (item.v["src"] as? OpenUiValue.Str)?.v?.takeIf { it.startsWith("https://") }
                         if (src != null) {
@@ -594,7 +599,7 @@ object OpenUiHtmlRenderer {
                 "<span style=\"$style;border-radius:14px;padding:5px 14px;font-size:12px\">${esc(title)}</span>"
             }.joinToString("")
             val content = tabs.first().second.take(12).joinToString("") { child ->
-                "<div style=\"margin-top:8px\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                "<div style=\"margin-top:8px\">${renderChild(child)}</div>"
             }
             return "<div><div style=\"display:flex;gap:4px;background:#eef2f7;border-radius:16px;padding:3px;" +
                 "flex-wrap:wrap\">$capsules</div>$content</div>"
@@ -606,7 +611,7 @@ object OpenUiHtmlRenderer {
             // 预览取「全部展开」静态形态（端上默认全收起；调试场景看内容优先）
             return items.take(12).joinToString("") { (title, children) ->
                 val body = children.take(12).joinToString("") { child ->
-                    "<div style=\"margin-top:6px\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                    "<div style=\"margin-top:6px\">${renderChild(child)}</div>"
                 }
                 "<div style=\"border-bottom:1px solid #f0f0f2;padding:8px 0\">" +
                     "<div style=\"font-size:14px;font-weight:500\">▾ ${esc(title)}</div>$body</div>"
@@ -760,6 +765,16 @@ object OpenUiHtmlRenderer {
 
         // ── 占位与工具 ────────────────────────────────────────────────────
 
+        /**
+         * 子元素渲染分流：组件递归；未知组件占位节点（前向兼容，求值期产出）渲染带
+         * 组件名的虚线占位框；null 字面量/被剔除元素空串。
+         */
+        private fun renderChild(child: OpenUiValue): String = when (child) {
+            is OpenUiValue.ComponentVal -> render(child)
+            is OpenUiValue.UnknownComponent -> placeholder(child.type, null)
+            else -> ""
+        }
+
         /** 未覆盖/无数据组件：虚线占位框带组件名（用户痛点是「未显示」，近似也要显示）。 */
         private fun placeholder(type: String, detail: String?): String {
             val detailHtml = detail?.let { "<div style=\"font-size:11px;color:#9aa0a6;margin-top:2px\">${esc(it)}</div>" } ?: ""
@@ -804,7 +819,7 @@ object OpenUiHtmlRenderer {
             align: String = "stretch",
         ): String {
             val items = childrenOf(node).joinToString("") { child ->
-                "<div style=\"min-width:0\">${(child as? OpenUiValue.ComponentVal)?.let { render(it) } ?: ""}</div>"
+                "<div style=\"min-width:0\">${renderChild(child)}</div>"
             }
             return "<div style=\"display:flex;flex-direction:column;gap:${gap}px;align-items:$align\">$items</div>"
         }

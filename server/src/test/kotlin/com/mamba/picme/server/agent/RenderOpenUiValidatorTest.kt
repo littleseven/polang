@@ -615,6 +615,29 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         )
     }
 
+    // ── Html 逃生舱治理（2026-11-12 组合方案吸收：目录组件优先，Html 谱系降档） ──
+
+    @Test
+    fun `lint hints escape hatch when Html component present`() {
+        // 软警告：不拒卡（硬校验照常放行），仅提示「确认目录组件无法表达」
+        val program = "root = Card([Html(\"<p>hi</p>\")])"
+        val warnings = RenderOpenUiValidator.lintComposition(program)
+        assertEquals(1, warnings.size)
+        assertTrue(warnings[0].contains("Html escape-hatch used"))
+        assertNull(RenderOpenUiValidator.validateToError(program))
+    }
+
+    @Test
+    fun `lint stays silent without Html and ignores Html mentions inside literals`() {
+        assertEquals(
+            emptyList<String>(),
+            RenderOpenUiValidator.lintComposition("root = Card([Text(\"标题\", \"HEADLINE\")])"),
+        )
+        // 文案里出现 Html( 字样不计入（字符串剥离后扫描，同 Button/DISPLAY 口径）
+        val mention = """root = Card([Text("Html( 是沙箱逃生舱组件")])"""
+        assertEquals(emptyList<String>(), RenderOpenUiValidator.lintComposition(mention))
+    }
+
     // ── 图文组合固化（2026-10-30）：photo 键计数 ─────────────────
 
     @Test

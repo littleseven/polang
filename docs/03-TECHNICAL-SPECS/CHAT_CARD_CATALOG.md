@@ -359,7 +359,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | Agent 文本流（markdown） | `text`（+ role=agent） | `ChatAgentTextPart`（M4 拍平 item）→ `AgentMarkdown`（M3）+ AgentTable/CodeBlock | 原生（AST 管线） | chat-conversation 帧 | ✅ |
 | 图表卡 | `tool_chart` | `ChartSvgCard` / `ChartSvgImage` | SVG 栅格化 | —（生成物无固定帧） | ✅ |
 | HTML 卡（双形态） | `tool_html` | `HtmlCard` / `HtmlFullpageViewer` | WebView | `htmlcard/inline` 438:3 · `preview` 438:60 · `fullpage` 438:98 | ✅ |
-| 云端 Agent H5 卡 | `tool_html`（主聊天云端回合）/ 调试页内存消息（不落 Room） | `HtmlCard`（复用 §4.2 同族） | WebView | —（同 HTML 卡族） | ✅ Android（2026-10-22）；iOS 挂账（§4.9） |
+| 云端 Agent H5 卡 | `tool_html`（主聊天云端回合）/ 调试页内存消息（不落 Room） | `HtmlCard`（复用 §4.2 同族） | WebView | —（同 HTML 卡族） | ✅ Android（2026-10-22）；iOS 调试页 2026-11-10 / 主聊天云端回合 2026-11-12 接线（§4.9） |
 | 工程师任务卡 | `tool_task` | `EngineerTaskCard` + 原生动作条 | OpenUI 端侧合成 + 原生渲染（H3；回滚闸可退 WebView L1 模板，iOS 双轨仍走 HTML） | `taskcard/*` 438:181/208/264/444:31 | ✅（两分区改版待实现迁移） |
 | ~~搜索结果卡~~（已退役 2026-11-08） | `data_media_results`（已退役） | ~~`MediaResultsCarousel`~~（已拆除） | 原生 | — | ❌ 已退役（2026-11-08 横滑图集卡退役：search_media/refine 回执改 TextReply 计数文本，图集展示走技能出卡；v28 重置后运行时零存量行，v5 备份恢复落 Tombstone，详见 §4.4 墓碑） |
 | 抽卡候选条 | `data_optimize_candidates` | `GachaCandidateStrip` | 原生 | —（设计稿已随交付清理） | ✅ |
@@ -367,7 +367,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
 | 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
 | ~~A2UI GenUI 卡~~（已退役 2026-11-05） | `data_ui`（已退役） | ~~`A2uiCardHost`~~（androidx.a2ui 官方渲染器，polang catalog = material + BarChart；已随退役拆除） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ❌ 已退役（2026-11-05 OpenUI 唯一化；v28 重置后运行时零存量行，v5 备份恢复落 Tombstone，详见 data_ui 节） |
-| OpenUI GenUI 卡 | `data_genui_program` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生；2026-11-05 起唯一 GenUI 线；2026-11-08 值语义化改名 `data_genui_program`） |
+| OpenUI GenUI 卡 | `data_genui_program` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生；2026-11-05 起唯一 GenUI 线；2026-11-08 值语义化改名 `data_genui_program`）；iOS ✅ 2026-11-12（SwiftUI 原生渲染 + 云端回合接线，见 data_genui_program 节 iOS 渲染 bullet） |
 | 思考过程折叠块 | `reasoning`（bare；永不作 type 投影源） | `ReasoningPartBlock`（Android）/ iOS `reasoningItem` | 原生 | —（跟随会话帧） | ✅（2026-11-08；默认折叠，生产开关默认关，§4.10） |
 | 引用 chips 行 | `source_url` / `source_document`（连续聚合单 item） | `SourceChipsRow`（Android）/ iOS `sourceChipsItem` | 原生 | —（跟随会话帧） | ✅（2026-11-08；web_search 结果 ≤5 条，§4.10） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
@@ -830,7 +830,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 ```
 
 **回灌**：summary-only——LLM 只见 `render_html → <summary>` 回执，HTML 本体不入上下文（token 保护，同 §4.2 口径）；超限 128_000 字符回 `error: html_too_large` 且 sink 不触发（与端侧 `HtmlCardSanitizer` 128KB 口径对齐）。
-**渲染**：Android ✅——`CloudAgentTurnRunner` 新增 `CloudTurnEvent.HtmlCard`；调试页（CloudAgentChatScreen）插 `Role.HTML_CARD` 内存消息，复用主聊天 `HtmlCard` 组件 + `HtmlCardSanitizer` 清洗（Rejected 降级纯文本）；主聊天云端回合复用 `emitHtmlCardMessage` 落 Room（tool_html，走 §4.2 双形态全链路）。iOS ✅ 调试页（2026-11-10 ios-follow：`CloudAgentChatStore` html_card 事件解码 + 信封出卡，`CloudAgentChatView` 复用 `HtmlCardView` 双形态 + FULLPAGE/外链浮层；sanitize 走 shared `HtmlCardSanitizer` 同源）。主聊天云端回合（M2.5 runCloudTurn）iOS 未接线——挂账保留，含 OpenUI 卡喂卡路径。
+**渲染**：Android ✅——`CloudAgentTurnRunner` 新增 `CloudTurnEvent.HtmlCard`；调试页（CloudAgentChatScreen）插 `Role.HTML_CARD` 内存消息，复用主聊天 `HtmlCard` 组件 + `HtmlCardSanitizer` 清洗（Rejected 降级纯文本）；主聊天云端回合复用 `emitHtmlCardMessage` 落 Room（tool_html，走 §4.2 双形态全链路）。iOS ✅ 调试页（2026-11-10 ios-follow：`CloudAgentChatStore` html_card 事件解码 + 信封出卡，`CloudAgentChatView` 复用 `HtmlCardView` 双形态 + FULLPAGE/外链浮层；sanitize 走 shared `HtmlCardSanitizer` 同源）。主聊天云端回合（M2.5 runCloudTurn）iOS 已接线（2026-11-12 云端回合批次：`CloudAgentClient` SSE 帧全解析 + ChatViewModel `runCloudTurn` 镜像 Android 语义——会话懒建/409 互斥/404 重建一次/HtmlCard 清洗落卡/done 性能装配；含 OpenUI 卡喂卡路径，渲染登记见 §4.x data_genui_program 节）。
 **pending 重放**：断线重连/重放路径经 `ServerToolDispatcher.withHtmlCardSink` 派生 run 级 sink 副本，卡片重新出现在事件流。
 **测试**：server `ServerRenderHtmlToolTest` / `AgentRunnerTest` / `AgentEventPayloadTest`；Android `CloudAgentTurnRunnerTest` / `CloudAgentChatViewModelTest`。
 
@@ -941,8 +941,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   调 `onRoundStart` 轮次重置——回合内多轮 LLM 输出（工具调用后的中间轮 → 终结整树）各自
   从空累计，端上覆盖式替换预览；端侧合成瞬态预览消息（`OPENUI_STREAM_PREVIEW_ID`）挂
   列表尾，ChatScreen 分流 `OpenUiStreamingCard`——每帧前缀新建 session 解析（parser
-  autoClose 流末规则 + dropped 哨兵剔除未到位引用，卡片随流生长，引擎零改动），空
-  resolver 不取数（Query 组件先渲 defaults 空态），只读不交互；终结 Message 落库后预览让位。
+  autoClose 流末规则 + forwardRefSkeletons 模式：未到位引用产 Skeleton 骨架占位
+  top-down reveal，卡片骨架先立随流补位，引擎终态语义零改动，见下方组合谱系 bullet），
+  空 resolver 不取数（Query 组件先渲 defaults 空态），只读不交互；终结 Message 落库后预览让位。
   **服务端双保险**（端上永远收到合法树）：① `ProgramGuard` 策略层守卫——终结文本经
   `RenderOpenUiValidator.validateProgramToError`（结构校验 + 布局门禁，turn-native 口径
   文案「重新输出完整程序」）判定非法 → cloudAgentStrategy `correctInvalidProgram` 节点
@@ -951,8 +952,48 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   normalize 后原样放行 / 非法包成 `root = Markdown("…")` 程序（复验再失败硬编码错误卡）。
   turn-native 线假发卡守卫（CardClaimGuard）已随 2026-11-06 唯一化与发卡工具一并物理删除
   （该线无发卡工具，纠正文案指向不存在的工具会误导——此前经 `programGuard == null &&` 门控旁路）。
-- **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState)`，
-  category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）。
+- **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState, langVersion)`，
+  category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）；`langVersion`（2026-11-11）
+  = 服务端 OpenUI 语言协议版本（server done 帧 `lang_version` 真引用 shared
+  `OpenUiContract.LANG_VERSION`），旧 server 无字段/旧 partsJson 解码均落 null（默认值双向兼容）。
+- **协议版本协商 + 未知组件可见降级（2026-11-11）**：服务端先部署新组件而 App 未发包时的
+  前向兼容双保险（chat parts 层 Tombstone 口径在 OpenUI 程序层的对偶）——① done 帧
+  `lang_version`（server `AgentRoutes` 真引用 shared 常量）→ 端侧 `CloudFrame.Done.langVersion`
+  （缺省容忍）→ 落 OpenUiCard part；卡渲染时 `langVersion > OpenUiContract.LANG_VERSION` →
+  `OpenUiCardHost` 卡顶部细提示行（五语 `openui_lang_newer_hint`）引导升级；② shared
+  `OpenUiEval` 遇未知组件名不再记 `unknown-component` 后静默丢弃，产出
+  `OpenUiValue.UnknownComponent(type, statementId)` 占位节点（错误照记）——COMPONENT_LIST
+  槽位（含 Tabs.tabs.children 递归校验）同组件口径放行；Android 渲染器（Node/Content/Form/
+  CardBlock 四文件的组件槽递归点）渲染可见占位块（五语 `openui_unknown_component_hint`，
+  contentDescription 带原始组件名），server `OpenUiHtmlRenderer` 组件树预览落带组件名虚线
+  占位框；根本身未知仍走致命 no-root → 可见降级卡（不静默）。bump 规则见
+  `OpenUiContract.LANG_VERSION` KDoc（OpenUiLibrary 组件集扩容时 +1）。
+- **前向引用骨架流式 + Html 逃生舱治理（2026-11-12，组合方案吸收）**：吸收
+  《State of Generative UI Report》（2026-06，
+  https://www.openui.com/blog/state-of-generative-ui-report ）两项关键方案——
+  ① **前向引用骨架流式（top-down reveal）**：流式预览 partial 前缀解析中「被引用但
+  尚未流到的语句名」不再丢弃（原 dropped 哨兵在数组处剔除，Card children 随帧膨胀
+  收缩），改产 `OpenUiValue.Skeleton(refName, statementId)` 瞬态占位节点——`OpenUiSession`
+  增 `forwardRefSkeletons` 开关（仅 Android `OpenUiStreamingCard` 与 iOS
+  `IosOpenUiPreviewFactory` 双端流式预览路径开启），定义语句流入后下一帧重解析原位
+  替换；双端渲染骨架 pulse 占位块（Android `OpenUiSkeletonPlaceholder`/iOS
+  `OpenUiSkeletonPlaceholderView`，视觉对齐 UnknownComponent 占位语言，
+  contentDescription/accessibilityLabel = 引用名，无文案 [I18N] 零面）；Skeleton 只在
+  children/数组槽存活，标量消费点（运算符/对象值/state 默认值/Query defaults）收口
+  Null，**永不持久化**（默认模式零产出，正式卡/partsJson 零污染，LANG_VERSION 不
+  bump——纯端侧瞬态节点无线格式变更）；children 槽位数跨帧恒定，dropped→resolved
+  的布局跳变收敛为原位内容替换（槽内高度仍随真实内容变化，非完全消除）。
+  ② **Html 逃生舱治理（谱系按组件级降档）**：`OpenUiPromptAssets.DSL_RULES` Html
+  条目重写为组合谱系引导——优先目录组件组合（Card/图表/表单族能组合出来的不落
+  Html），仅目录无法表达的交互/一次性可视化才用，内容清洗契约不变；server
+  `RenderOpenUiValidator.lintComposition` 增软警告（Html 在场提示「确认目录组件无法
+  表达」，不拒卡不触发纠正回环，仅观测）。
+  **组合谱系定位**：PoLang OpenUI = 该报告 **Declarative 档**（turn-native 行式 DSL，
+  组件目录内组合；token 效率对 JSON 补丁流约 2x 优势引自该报告基准）；`Html` 组件 =
+  组件级 **Open-Ended 逃生舱**（对齐文中 GeneratedView 模式——谱系按组件级而非应用级
+  降档，Open-Ended 的代价只付那个子树）；transport 轴 = 自有 SSE（AG-UI 槽位对等）。
+  Static/Declarative/Open-Ended 三档中 PoLang 无独立 Static 档（选组件即写程序，同一
+  语言面）。
 - **回灌**：不回灌 LLM（data part 分支 emptyList）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
@@ -961,7 +1002,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   同步（`syncWith`），per-key 读追踪使 action 后仅订阅变更键的节点重组；root 树 data class
   相等门控——绑定全保留的卡在纯交互后零树级重组（真机验证：勾选 CheckBox 时焦点中的
   Input 文本与焦点均不丢）；
-  polang OpenUI 组件库二十一组件（M2+M3，2026-10-24）：
+  polang OpenUI 组件库（SSOT = shared `OpenUiLibrary.componentNames`，server 白名单
+  真引用同一清单，**现 103 项** = 官方全量适配 + 本仓扩展件；2026-10-24 M2+M3 时为
+  二十一组件，早期核心：
   Card/Row/Column/Text/Button/BarChart/Image + Icon/Divider/List/Tabs/CheckBox/ChoicePicker/Slider
   + Table/PieChart/LineChart/Callout/Markdown/Accordion/Switch（M3 新增 prop 类型 PRIMITIVE_ARRAY：
   元素限 Str/Num/Bool 或一层嵌套 Arr，两层嵌套/类型混杂 → 必填丢组件；可嵌套进 OBJECT_ARRAY
@@ -1110,6 +1153,27 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   调用区间分流视频/图片文案 + 规则 8 Video 二缺一与位置参数 src https（与
   Image 同构，位置序同为 photo, aspect, src）；DSL_RULES 增 Video 签名 +
   §4 增 `#videos` 取数写法段。
+  性能收口（2026-11-11，fix/openui-photo-parallel-resolve）：①会话照片全量解析改有界并行——
+  OpenUiCardHost 会话 Ready 后对 handle 全量 entries（实测 ~300 张）的 photoResolver
+  串行解析改 `resolveAllUrisInOrder`（并行 launch + Semaphore(8) 限界，结果顺序对齐
+  allIds、失败跳过语义不变），2026-11-09 PhotoGrid 串行灰格（resolveAllProgressively）
+  同病灶收口；②流式预览客户端预算——OpenUiStreamingCard 逐帧前缀重解析加
+  `PREVIEW_PARSE_BUDGET_CHARS=24k` 字符预算，超限停帧解析、清旧帧落既有 indeterminate
+  占位、等终结 Message 落库后正式卡接管（此前仅 server 侧 48 字符/80ms 发帧节流，
+  客户端每帧全量重解析无预算，低端机大程序开销不可控）。
+- **渲染（iOS，2026-11-12 云端回合批次落地）**：ChatView TYPE_OPENUI_CARD → `OpenUiCardView`
+  （iosMain `IosOpenUiCardController` 组合 session prepare/local_handle 三 fragment 投影/
+  viewState 恢复/动作链串行 dispatch——引擎动作即时执行，OpenUrl/OpenPhoto/ToAssistant/
+  RunFailed 收集副作用交宿主落地；渲染树经镜像 DTO（Map→List）出 Swift，`OpenUiNodeRenderer`
+  覆盖 OpenUiLibrary 组件全集）；UnknownComponent 占位块 + `openui.unknown_component_hint`
+  五语；langVersion > LANG_VERSION 卡顶提示行（`openui.lang_newer_hint`）；降级卡
+  （`openui.card_unavailable`/`openui.card_data_elsewhere`）；流式预览
+  `OpenUiStreamingCardView`（24k 预算同值，forwardRefSkeletons 骨架占位对等——
+  `OpenUiSkeletonPlaceholderView`，Android 同指标）；photoId→localIdentifier 经
+  `IosOpenUiMediaSeam` 单 fetch 快照解析（Android 双 id 命名空间在 iOS 单 id 空间退化），
+  faceFocusY/aspectRatio 元数据 iOS 媒体桥不携带（回落组件缺省）；性能行
+  `OpenUiPerformanceRow`（done 帧回补）。残余登记 PARITY 台账：Navigate 自定义动作路由、
+  Html 叶 WebView 网络未关死（外链导航已拦截）、照片多页翻页预览（现为单页）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
@@ -1118,7 +1182,10 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   （选择态与表单文本同径恢复；Bool/Num 不持久化回声明默认值），恢复路径经 initialState
   种 `$name`；宿主 produceState 键收窄为 partId+program，viewState 回流不再重建 session
   （指纹比对防重复写与回流循环）；@OpenUrl 端侧 scheme 闸只放行 http/https（server 对
-  字面量首参另有 https 同轮纠错）；@Run M1 未实施，宿主显式识别并告警（不静默吞）；
+  字面量首参另有 https 同轮纠错）；@Run 已于 2026-11-01 动作三通道批次实装
+  （`OpenUiSession.runToolAction`：MUTATION 语句经宿主 `OpenUiToolResolver` 执行
+  白名单写工具、结果入 `mutationResults` 缓存可绑定 UI，QUERY 按当前 store 重取，
+  详见 `shared/AGENTS.md` §openui）；
   @ToAssistant 自 2026-10-31 起上行——以用户消息发进会话（CardHeader/ListItem/ListBlock
   的 actionLabel 缺省动作由 labeledActionsOrDefault 兜底合成同文案），M1 及之前仅记日志
   不路由。

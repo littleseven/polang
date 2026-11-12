@@ -9,13 +9,23 @@ import Foundation
 // 🔴 BYOK 零留存红线：apiKey 只出现在 `postMessage` 的 X-User-Api-Key 头——
 // 不进 URL、不进 body、不进日志、不进任何持久化；其余方法连参数都没有。
 
-/// SSE 下行帧（kind 四型闭集；未知 kind 容错忽略不产生帧）。
+/// SSE 下行帧（kind 闭集，语义对齐 Android CloudFrame；未知 kind 容错忽略不产生帧）。
 enum CloudAgentFrame {
-    /// event 帧：agent_event 行 JSON（id/type/source/role/payload/created_at）。
+    /// event 帧：agent_event 行 JSON（id/type/source/role/payload/created_at；
+    /// message/html_card/action/observation 型由消费方分派，历史 action 型可解析忽略）。
     case event([String: Any])
     /// 工具桥下行帧（传输层信号，不落事件流）。
     case toolRequest(requestId: String, tool: String, args: [String: String], timeoutMs: Int)
-    case done(sessionStatus: String)
+    /// OpenUI program 流式预览帧（openui P2；瞬态传输信号，不落事件流，同 tool_request 口径）。
+    case openUiDelta(program: String)
+    /// done 帧（带回合性能数据与 OpenUI 语言协议版本；旧服务端无字段 = nil 容错）。
+    case done(
+        sessionStatus: String,
+        promptTokens: Int64?,
+        completionTokens: Int64?,
+        elapsedMs: Int64?,
+        langVersion: Int?
+    )
     case error(message: String)
 }
 
@@ -64,8 +74,19 @@ enum CloudAgentSseParser {
                                 tool: json["tool"] as? String ?? "",
                                 args: args,
                                 timeoutMs: timeoutMs)
+        case "openui_delta":
+            // OpenUI 流式预览帧；空前缀无意义直接忽略（对齐 Android CloudSseParser）
+            guard let program = json["program"] as? String, !program.isEmpty else { return nil }
+            return .openUiDelta(program: program)
         case "done":
-            return .done(sessionStatus: json["session_status"] as? String ?? "")
+            let usage = json["usage"] as? [String: Any]
+            return .done(
+                sessionStatus: json["session_status"] as? String ?? "",
+                promptTokens: (usage?["prompt_tokens"] as? NSNumber)?.int64Value,
+                completionTokens: (usage?["completion_tokens"] as? NSNumber)?.int64Value,
+                elapsedMs: (json["elapsed_ms"] as? NSNumber)?.int64Value,
+                langVersion: (json["lang_version"] as? NSNumber)?.intValue
+            )
         case "error":
             return .error(message: json["message"] as? String ?? "")
         default:

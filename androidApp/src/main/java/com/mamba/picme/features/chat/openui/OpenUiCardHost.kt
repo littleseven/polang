@@ -2,7 +2,15 @@ package com.mamba.picme.features.chat.openui
 
 import android.util.LruCache
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -19,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.mamba.picme.BuildConfig
 import com.mamba.picme.R
 import com.mamba.picme.core.common.Logger
@@ -30,6 +39,7 @@ import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.domain.chat.openui.OpenUiLibrary
 import com.mamba.picme.domain.chat.openui.OpenUiResult
 import com.mamba.picme.domain.chat.openui.OpenUiSession
+import com.mamba.picme.domain.chat.openui.OpenUiTextRole
 import com.mamba.picme.domain.chat.openui.OpenUiToolNotFoundException
 import com.mamba.picme.domain.chat.openui.OpenUiToolResolver
 import com.mamba.picme.domain.chat.openui.OpenUiValue
@@ -141,47 +151,75 @@ fun OpenUiCardHost(
             if (resolved is OpenUiResolution.Ready) preparedCardCache.put(cacheKey, resolved)
         }
     }
-    when (val current = resolution) {
-        null -> OpenUiCardLoading()
-        OpenUiResolution.Degraded -> OpenUiCardDegraded(part.fallbackSummary, modifier)
-        is OpenUiResolution.Ready -> key(part.partId) {
-            if (BuildConfig.DEBUG) {
-                // debug 徽标 overlay：显性标注此卡由 OpenUI 协议驱动，
-                // 点击开程序原文查看器
-                Box(modifier = modifier) {
+    // 协议版本协商（OpenUiContract.LANG_VERSION）：服务端程序语言版本高于本端 → 卡顶部
+    // 细提示行（旧 server 无字段 = null 不提示）；非 OpenUI 回合零影响（仅本卡消费方）
+    val newerLang = (part.langVersion ?: OpenUiContract.LANG_VERSION) > OpenUiContract.LANG_VERSION
+    Column(modifier = modifier) {
+        if (newerLang) {
+            OpenUiLangNewerHintRow()
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        when (val current = resolution) {
+            null -> OpenUiCardLoading()
+            OpenUiResolution.Degraded -> OpenUiCardDegraded(part.fallbackSummary)
+            is OpenUiResolution.Ready -> key(part.partId) {
+                if (BuildConfig.DEBUG) {
+                    // debug 徽标 overlay：显性标注此卡由 OpenUI 协议驱动，
+                    // 点击开程序原文查看器
+                    Box {
+                        OpenUiReadyContent(
+                            session = current.session,
+                            photoResolver = photoResolver,
+                            handleLookup = handleLookup,
+                            programText = part.program,
+                            onViewStateChange = onViewStateChange,
+                            onPhotoClick = onPhotoClick,
+                            onToAssistant = onToAssistant,
+                            onCustomAction = onCustomAction,
+                            initialViewState = part.viewState,
+                        )
+                        OpenUiDebugBadge(
+                            partId = part.partId,
+                            program = part.program,
+                            modifier = Modifier.align(Alignment.BottomEnd),
+                        )
+                    }
+                } else {
                     OpenUiReadyContent(
                         session = current.session,
                         photoResolver = photoResolver,
                         handleLookup = handleLookup,
                         programText = part.program,
                         onViewStateChange = onViewStateChange,
+                        modifier = Modifier,
                         onPhotoClick = onPhotoClick,
                         onToAssistant = onToAssistant,
                         onCustomAction = onCustomAction,
                         initialViewState = part.viewState,
                     )
-                    OpenUiDebugBadge(
-                        partId = part.partId,
-                        program = part.program,
-                        modifier = Modifier.align(Alignment.BottomEnd),
-                    )
                 }
-            } else {
-                OpenUiReadyContent(
-                    session = current.session,
-                    photoResolver = photoResolver,
-                    handleLookup = handleLookup,
-                    programText = part.program,
-                    onViewStateChange = onViewStateChange,
-                    modifier = modifier,
-                    onPhotoClick = onPhotoClick,
-                    onToAssistant = onToAssistant,
-                    onCustomAction = onCustomAction,
-                    initialViewState = part.viewState,
-                )
             }
         }
     }
+}
+
+/**
+ * 「新版内容格式」细提示行（协议版本协商）：卡片携带 langVersion 高于端侧
+ * [OpenUiContract.LANG_VERSION] 时置卡顶，引导升级后完整查看；语义色弱提示不抢卡内容。
+ */
+@Composable
+private fun OpenUiLangNewerHintRow(modifier: Modifier = Modifier) {
+    Text(
+        text = stringResource(R.string.openui_lang_newer_hint),
+        style = OpenUiCardTokens.textStyle(OpenUiTextRole.CAPTION),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier
+            .background(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(8.dp),
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
 }
 
 private sealed interface OpenUiResolution {
@@ -340,7 +378,10 @@ private fun OpenUiReadyContent(
             entries.map { entry -> entry.id }
         }
         val allIds = (fullIds + projectedIds).distinct()
-        value = allIds.mapNotNull { photoId -> photoResolver.resolve(photoId)?.uri }
+        // 有界并行解析（2026-11-11 性能收口）：串行 mapNotNull ~300 张在扫描负载下秒级
+        // 白付；对齐 resolveAllProgressively 并行模式 + Semaphore 限界，结果顺序对齐
+        // allIds、解析失败跳过（mapNotNull 语义不变）
+        value = photoResolver.resolveAllUrisInOrder(allIds)
     }
     // 已发射 viewState 指纹（归一化后比对，同值不重复持久化；初值取 part 携带态的归一化，
     // 避免冷启动首轮 Set 同值时多写一次 Room）

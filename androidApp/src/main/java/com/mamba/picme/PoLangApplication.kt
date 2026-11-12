@@ -35,6 +35,7 @@ import com.mamba.picme.data.remote.picme.WebSearchClient
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
 import com.mamba.picme.domain.memory.MemoryContextProviderImpl
+import com.mamba.picme.agent.core.remote.config.LatestLlmWireTap
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.agent.core.remote.config.RemoteModelFactory
@@ -326,6 +327,10 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         // CommandExecutor 汇聚全部 tool 执行并上报指标，均落库到独立 DB（polang_llm_log）。
         RemoteModelFactory.captureContent = BuildConfig.DEBUG
         RemoteModelFactory.recorder = RoomLlmCallRecorder(this)
+        // LLM 线路窃听（2026-11-12 缺口清偿）：HttpClient 装饰层旁路——
+        // DEBUG 保留最近请求体（LlmCallRecord.requestJson 录制）；release 不保留请求体
+        //（隐私红线），仅保留 SSE usage 帧扫描（cached_tokens 纯指标，对标 server 侧采集）。
+        RemoteModelFactory.wireTap = LatestLlmWireTap(captureRequests = BuildConfig.DEBUG)
         CommandExecutor.recorder = RoomToolCallRecorder(this)
         // Agent 终端运行感知层·端侧执行层：JS 沙盒运行事件（js_run_log）。
         // 与上面同一约定：release 仅落指标，DEBUG 额外记录脚本文本与结果预览。
@@ -846,6 +851,8 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         Logger.i(TAG, "- PersonRelationCapability: CHAT-scoped person relation declaration")
         orchestrator.registerCapability(container.memoryCapability)
         Logger.i(TAG, "- MemoryCapability: CHAT-scoped fact memory (chat tool + JS dispatch)")
+        orchestrator.registerCapability(container.chatHistoryRecallCapability)
+        Logger.i(TAG, "- ChatHistoryRecallCapability: CHAT-scoped chat history recall tool")
         val memoryContextProvider = MemoryContextProviderImpl(
             memoryRepository = container.memoryRepository,
             personRepository = container.personRepository,

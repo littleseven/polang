@@ -2,6 +2,7 @@ package com.mamba.picme.server.agent
 
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.reflect.asToolsByClass
+import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.admin.SKILL_DEBUG_MODEL
 import com.mamba.picme.server.llm.ChannelRegistry
@@ -352,6 +353,10 @@ fun Route.agentRoute(
                                     put("prompt_tokens", turnUsage.promptTokens)
                                     put("completion_tokens", turnUsage.completionTokens)
                                 })
+                                // OpenUI 语言协议版本（版本协商，shared 常量同源）：端侧落
+                                // MessagePart.OpenUiCard.langVersion，高于端侧版本时卡顶部
+                                // 提示升级；旧端忽略未知字段
+                                put("lang_version", OpenUiContract.LANG_VERSION)
                             })
                         } else {
                             // 超时取消：会话仍可用（不置 ERROR），配额已消耗（LLM 调用已发生，不回退）

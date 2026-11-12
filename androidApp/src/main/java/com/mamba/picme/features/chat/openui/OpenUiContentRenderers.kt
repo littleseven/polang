@@ -565,6 +565,10 @@ private fun OpenUiContentChildren(
     for (child in children) {
         if (child is OpenUiValue.ComponentVal) {
             OpenUiNodeRenderer(child, state, photoResolver, onAction, childModifier)
+        } else if (child is OpenUiValue.UnknownComponent) {
+            OpenUiUnknownComponentPlaceholder(child.type, childModifier)
+        } else if (child is OpenUiValue.Skeleton) {
+            OpenUiSkeletonPlaceholder(child.refName, childModifier)
         } else {
             Box(modifier = Modifier)
         }
@@ -1408,6 +1412,15 @@ private fun OpenUiContentCarousel(
                 Box(modifier = Modifier.width(OpenUiCardTokens.horizontalImageWidth)) {
                     OpenUiNodeRenderer(child, state, photoResolver, onAction)
                 }
+            } else if (child is OpenUiValue.UnknownComponent) {
+                Box(modifier = Modifier.width(OpenUiCardTokens.horizontalImageWidth)) {
+                    OpenUiUnknownComponentPlaceholder(child.type)
+                }
+            } else if (child is OpenUiValue.Skeleton) {
+                OpenUiSkeletonPlaceholder(
+                    child.refName,
+                    modifier = Modifier.width(OpenUiCardTokens.horizontalImageWidth),
+                )
             }
         }
     }
