@@ -1124,6 +1124,14 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   调用区间分流视频/图片文案 + 规则 8 Video 二缺一与位置参数 src https（与
   Image 同构，位置序同为 photo, aspect, src）；DSL_RULES 增 Video 签名 +
   §4 增 `#videos` 取数写法段。
+  性能收口（2026-11-11，fix/openui-photo-parallel-resolve）：①会话照片全量解析改有界并行——
+  OpenUiCardHost 会话 Ready 后对 handle 全量 entries（实测 ~300 张）的 photoResolver
+  串行解析改 `resolveAllUrisInOrder`（并行 launch + Semaphore(8) 限界，结果顺序对齐
+  allIds、失败跳过语义不变），2026-11-09 PhotoGrid 串行灰格（resolveAllProgressively）
+  同病灶收口；②流式预览客户端预算——OpenUiStreamingCard 逐帧前缀重解析加
+  `PREVIEW_PARSE_BUDGET_CHARS=24k` 字符预算，超限停帧解析、清旧帧落既有 indeterminate
+  占位、等终结 Message 落库后正式卡接管（此前仅 server 侧 48 字符/80ms 发帧节流，
+  客户端每帧全量重解析无预算，低端机大程序开销不可控）。
 - **交互态**：BarChart 点柱 → @Set($selected, label) 本地消费（不上行，§3.4 不变式对偶）→
   session 重求值高亮 + viewState 持久化；M2 起 CheckBox 勾选/ChoicePicker 点选/Slider 拖值
   同机制写各自绑定变量（渲染期构造 OpenUiAction Set，Binding 缺失的裸字面量只读不写入）；
