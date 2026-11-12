@@ -91,17 +91,21 @@ object IosAgentComposition {
     /**
      * OpenUI 卡端支持件（2026-11-12 主聊天云端回合）：local:// 句柄存储（云端相册工具
      * 注册 / 卡端 Query 补全共用）+ photoId 解析缝。Swift 侧 OpenUiCardHost 经
-     * [newOpenUiCardController] 组装每卡控制器。
+     * [createOpenUiCardController] 组装每卡控制器。
      */
     val openUiHandleStore: IosLocalHandleStore = IosLocalHandleStore()
 
-    private var openUiMediaSeam: IosOpenUiMediaSeam? = null
+    private var openUiMediaSeamImpl: IosOpenUiMediaSeam? = null
+
+    /** photoId 解析缝（[initialize] 后可用；卡片视图直用）。 */
+    val openUiMediaSeam: IosOpenUiMediaSeam?
+        get() = openUiMediaSeamImpl
 
     /**
      * OpenUI 卡控制器工厂（每卡一颗：session + 动作链 + 句柄/媒体缝全注入）；
      * [initialize] 前调用返回 null（Swift 侧落降级卡）。
      */
-    fun newOpenUiCardController(
+    fun createOpenUiCardController(
         program: String,
         viewState: String?,
     ): IosOpenUiCardController? {
@@ -219,7 +223,7 @@ object IosAgentComposition {
 
         // OpenUI photoId 解析缝（2026-11-12 主聊天云端回合）：MediaRepository 单实例共享，
         // 单卡 fetch 一次快照缓存
-        openUiMediaSeam = IosOpenUiMediaSeam(mediaRepository)
+        openUiMediaSeamImpl = IosOpenUiMediaSeam(mediaRepository)
 
         // 注册 iOS chat 图表能力（draw_chart 执行端 → ChartJsEngine 端侧渲染）
         orchestrator.registerCapability(IosChartCapability(chartBridge))
