@@ -1,4 +1,4 @@
-package com.mamba.picme.features.chat.openui
+package com.mamba.picme.domain.chat.openui
 
 /**
  * 回合原生（turn-native，spec§3.4/§3.7）：响应程序的程序嗅探与 fallbackSummary 提取。
@@ -11,6 +11,9 @@ package com.mamba.picme.features.chat.openui
  * 同宗字面量副本）——旧 `"([^"\\]|\\.)*"` 交替-星号正则的 GroupCurly 对每个字符
  * 递归一层栈帧，512KB 栈实测 2288 字符字面量即 StackOverflowError；turn-native 线
  * `Html("…")` 内嵌整页 HTML（数千字符转义密集字面量）到达本嗅探必崩。
+ *
+ * 2026-11-12 自 androidApp `features/chat/openui` 迁入 commonMain（iOS 主聊天云端
+ * 回合同源消费；纯 Kotlin 零平台依赖，迁移零改动）。
  */
 object OpenUiProgramSummary {
 

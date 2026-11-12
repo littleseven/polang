@@ -7,11 +7,19 @@ import com.mamba.picme.agent.core.inference.remote.tool.CloudToolProjectionGate
 import com.mamba.picme.agent.core.model.command.AgentCommand
 import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
+import com.mamba.picme.agent.core.model.context.AgentIdGenerator
 import com.mamba.picme.agent.core.model.context.AgentScene
+import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.data.IosChatSearchBridge
+import com.mamba.picme.data.IosLocalHandleStore
 import com.mamba.picme.data.IosMediaRepositoryBridge
+import com.mamba.picme.domain.chat.openui.OpenUiToolNotFoundException
+import com.mamba.picme.domain.chat.openui.OpenUiToolResolver
+import com.mamba.picme.domain.chat.openui.OpenUiValue
+import com.mamba.picme.domain.chat.openui.ScanPhotoEntry
 import com.mamba.picme.domain.repository.MediaRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.builtins.ListSerializer
 
 /**
  * 云端 Agent 工具桥（ADR-018 M2，iOS 对等端）—— tool_request 帧的端侧执行器。
@@ -27,7 +35,9 @@ import kotlinx.coroutines.CancellationException
  * - 文本结果；失败以 `error: <message>` 前缀判定 ok=false（[AgentAction.Error] → error 前缀）；
  * - 超 [CloudAgentToolContract.MAX_RESULT_CHARS] **字符**截断 + `\n…[truncated]`（字符非字节——不切半 UTF-8）；
  * - 未知工具 → `error: unknown_tool:<tool>`；
- * - 写类工具（delete/share/select 等）不在映射表——云端会话里即未知工具（M2 只读三件套）。
+ * - search/refine（2026-11-12 重写）：mediaType 维度过滤 + 命中集注册 local://scan 句柄
+ *   （[IosLocalHandleStore]），回执 = 纯文本计数 + 数据句柄 token（对齐 Android
+ *   CloudAgentGalleryTools）；写类工具（delete/share 等）仍不在映射表（云端会话只读问答）。
  *
  * 工具名/错误前缀/截断常量的 SSOT = commonMain [CloudAgentToolContract]（M3 收口，
  * Android DeviceToolExecutor 与 server DeviceToolService（分层 runtime M1，composite
@@ -40,7 +50,9 @@ import kotlinx.coroutines.CancellationException
 class IosCloudAgentToolBridge(
     repository: MediaRepository,
     bridge: IosMediaRepositoryBridge,
-    searchBridge: IosChatSearchBridge? = null
+    searchBridge: IosChatSearchBridge? = null,
+    /** OpenUI 云端回合 local:// 句柄存储（命中集注册 / 卡端补全共用同一实例）。 */
+    private val handleStore: IosLocalHandleStore? = null
 ) {
 
     /**
@@ -49,15 +61,56 @@ class IosCloudAgentToolBridge(
      */
     private val capability = IosChatGalleryCapability(repository, bridge, searchBridge)
 
+    private val handleJson = kotlinx.serialization.json.Json { encodeDefaults = true }
+
+    /** OpenUI 动作三通道之访问 API：Mutation 写工具白名单（favorite_media/unfavorite_media，
+     * 对齐 Android ChatScreen openUiWriteTools 接线集）；经自有能力直执（Photos 桥收藏）。 */
+    val openUiWriteTools: OpenUiToolResolver = OpenUiToolResolver { name, args ->
+        when (name) {
+            OpenUiWriteToolsNames.FAVORITE_MEDIA, OpenUiWriteToolsNames.UNFAVORITE_MEDIA -> {
+                val mediaId = (args["id"] as? OpenUiValue.Num)?.v?.toLong()
+                    ?: throw IllegalArgumentException("$name 缺 id 参数")
+                val favorite = name == OpenUiWriteToolsNames.FAVORITE_MEDIA
+                val message = favoriteMediaForOpenUi(mediaId, favorite)
+                OpenUiValue.Obj(
+                    mapOf(
+                        "ok" to OpenUiValue.Bool(true),
+                        "favorite" to OpenUiValue.Bool(favorite),
+                        "text" to OpenUiValue.Str(message),
+                    )
+                )
+            }
+            else -> throw OpenUiToolNotFoundException(name)
+        }
+    }
+
+    /** 工具名白名单（对齐 androidApp OpenUiWriteTools 常量；shared 目录无此常量，此处收口）。 */
+    private object OpenUiWriteToolsNames {
+        const val FAVORITE_MEDIA = "favorite_media"
+        const val UNFAVORITE_MEDIA = "unfavorite_media"
+    }
+
+    /** 收藏直执（[openUiWriteTools] 内部）：经 AgentCommand.FavoriteMedia → Photos 桥。 */
+    private suspend fun favoriteMediaForOpenUi(mediaId: Long, favorite: Boolean): String {
+        val result = capability.execute(
+            AgentCommand.FavoriteMedia(commandId = AgentIdGenerator.nextId(), mediaId = mediaId.toString(), favorite = favorite),
+            AgentContext(scene = AgentScene.CHAT, memorySessionId = "cloud_agent"),
+            null
+        )
+        return result.fold(
+            onSuccess = { action -> (action as? AgentAction.TextReply)?.message ?: "ok" },
+            onFailure = { "收藏操作失败" }
+        )
+    }
+
     /** 工具分发入口（Swift 侧逐帧调用）。args 全 String 空容忍（对齐 SKIE 契约形态）。 */
     suspend fun execute(tool: String, args: Map<String, String>): String {
         val result = try {
             when (tool) {
                 CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY -> getGallerySummary()
                 CloudAgentToolContract.TOOL_SEARCH_MEDIA -> {
-                    // 参数名自 shared 目录读取（分层 runtime M2；键序 = 目录声明序，
-                    // CloudAgentToolCatalogTest 钉住）。iOS 只消费前 5 参——
-                    // mediaType 过滤维度 iOS 搜索桥未接线，暂不读。
+                    // 参数名自 shared 目录读取（分层 runtime M2；键序 = 目录声明序）。
+                    // mediaType（第 6 参，2026-11-12 接线）：目录缺省 "photo"。
                     val names = CloudAgentToolCatalog.paramNames(tool)
                     searchMedia(
                         query = args[names[0]].orEmpty(),
@@ -65,6 +118,8 @@ class IosCloudAgentToolBridge(
                         fromMs = args[names[2]].orEmpty(),
                         toMs = args[names[3]].orEmpty(),
                         hasFace = args[names[4]].orEmpty(),
+                        mediaType = names.getOrNull(5)?.let { args[it] }?.ifEmpty { null }
+                            ?: CloudAgentToolCatalog.defaultFor(tool, names.getOrNull(5) ?: "").ifEmpty { "photo" },
                     )
                 }
                 CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH -> {
@@ -89,27 +144,81 @@ class IosCloudAgentToolBridge(
     suspend fun getGallerySummary(): String =
         executeCommand(AgentCommand.GetGallerySummary(includeDetails = false))
 
-    /** @Tool search_media 对等：intent 组装同源复用 [ChatToolService.structuredSearchIntent]。 */
+    /**
+     * @Tool search_media 对等（2026-11-12 重写为 mediaType 维度 + 句柄注册）：
+     * intent 组装同源 [ChatToolService.structuredSearchIntent]；回执 = 纯文本计数 +
+     * 数据句柄 token（对齐 Android CloudAgentGalleryTools——命中集注册 local://scan
+     * 句柄供 OpenUI 卡取数，uri 不出端）。
+     */
     suspend fun searchMedia(
         query: String,
         person: String,
         fromMs: String,
         toMs: String,
-        hasFace: String
+        hasFace: String,
+        mediaType: String = "photo"
     ): String {
         val intent = ChatToolService.getInstance()
             .structuredSearchIntent(query, person, fromMs, toMs, hasFace)
-        return executeCommand(AgentCommand.SearchMedia(query = query, intent = intent))
+        val assets = capability.searchMediaForCloud(query, intent, mediaType)
+        val (unit, noun) = unitNounOf(mediaType)
+        val displayQuery = query.ifBlank { "全部" }
+        if (assets.isEmpty()) return "找到 0 $unit「$displayQuery」的$noun"
+        return appendHandleSuffix("找到 ${assets.size} $unit「$displayQuery」的$noun", assets)
     }
 
-    /** @Tool refine_media_search 对等：intent 组装同源复用 [ChatToolService.refineTimeIntent]。 */
+    /** @Tool refine_media_search 对等：无基数明确错误引导；类型过滤跟随基数；in-set 空保留基数。 */
     suspend fun refineMediaSearch(
         constraint: String,
         fromMs: String,
         toMs: String
     ): String {
         val intent = ChatToolService.getInstance().refineTimeIntent(fromMs, toMs)
-        return executeCommand(AgentCommand.RefineMediaSearch(constraint = constraint, intent = intent))
+        val prior = capability.lastSearchSnapshot()
+        if (prior.isEmpty()) {
+            return "${CloudAgentToolContract.ERROR_PREFIX} 没有上一轮搜索结果可细化：请改用 search_media 重新全局搜索" +
+                "（人物/时间用 person/fromMs/toMs 结构化参数）"
+        }
+        val baseMediaType = cloudSearchMediaType()
+        val (unit, noun) = unitNounOf(baseMediaType)
+        val refined = capability.refineMediaSearchForCloud(constraint, intent)
+            ?: return "在上一轮 ${prior.size} ${unit}结果内没有找到「$constraint」的$noun"
+        return appendHandleSuffix("在上一轮结果内找到 ${refined.size} $unit「$constraint」的$noun", refined)
+    }
+
+    /** 回执文案的量词与名词（照片=张/照片，视频=段/视频，混合=个/媒体；Android 同字面量）。 */
+    private fun unitNounOf(mediaType: String): Pair<String, String> = when (mediaType.lowercase()) {
+        "video" -> "段" to "视频"
+        "all" -> "个" to "媒体"
+        else -> "张" to "照片"
+    }
+
+    /** 最近一轮搜索的类型口径（供 refine 文案；capability 内存态）。 */
+    private fun cloudSearchMediaType(): String = capability.lastSearchMediaTypeIdiom()
+
+    /**
+     * 命中集注册 local://scan 句柄并拼 token 尾缀（`（数据句柄 handle: scan/<id>）`）；
+     * 句柄存储缺位 / 编码写失败降级为纯前缀（搜索本身已成功，不走 error: 协议——
+     * 对齐 Android CloudAgentGalleryTools.appendHandleSuffix）。mediaType 随 entry 落
+     * payload（#photos/#videos 投影按类型分流）。
+     */
+    private fun appendHandleSuffix(prefix: String, assets: List<MediaAsset>): String {
+        val store = handleStore ?: return prefix
+        return try {
+            val entries = assets.map { asset ->
+                ScanPhotoEntry(
+                    id = asset.id,
+                    captureDate = asset.captureDate,
+                    mediaType = asset.type.name
+                )
+            }
+            "$prefix（数据句柄 ${store.put(com.mamba.picme.domain.chat.openui.OpenUiContract.DOMAIN_SCAN, handleJson.encodeToString(ListSerializer(ScanPhotoEntry.serializer()), entries))}）"
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 注册失败只降级不带 token，不影响成功搜索的回执语义
+            prefix
+        }
     }
 
     /**
