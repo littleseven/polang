@@ -941,8 +941,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   调 `onRoundStart` 轮次重置——回合内多轮 LLM 输出（工具调用后的中间轮 → 终结整树）各自
   从空累计，端上覆盖式替换预览；端侧合成瞬态预览消息（`OPENUI_STREAM_PREVIEW_ID`）挂
   列表尾，ChatScreen 分流 `OpenUiStreamingCard`——每帧前缀新建 session 解析（parser
-  autoClose 流末规则 + dropped 哨兵剔除未到位引用，卡片随流生长，引擎零改动），空
-  resolver 不取数（Query 组件先渲 defaults 空态），只读不交互；终结 Message 落库后预览让位。
+  autoClose 流末规则 + forwardRefSkeletons 模式：未到位引用产 Skeleton 骨架占位
+  top-down reveal，卡片骨架先立随流补位，引擎终态语义零改动，见下方组合谱系 bullet），
+  空 resolver 不取数（Query 组件先渲 defaults 空态），只读不交互；终结 Message 落库后预览让位。
   **服务端双保险**（端上永远收到合法树）：① `ProgramGuard` 策略层守卫——终结文本经
   `RenderOpenUiValidator.validateProgramToError`（结构校验 + 布局门禁，turn-native 口径
   文案「重新输出完整程序」）判定非法 → cloudAgentStrategy `correctInvalidProgram` 节点
@@ -967,6 +968,32 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   contentDescription 带原始组件名），server `OpenUiHtmlRenderer` 组件树预览落带组件名虚线
   占位框；根本身未知仍走致命 no-root → 可见降级卡（不静默）。bump 规则见
   `OpenUiContract.LANG_VERSION` KDoc（OpenUiLibrary 组件集扩容时 +1）。
+- **前向引用骨架流式 + Html 逃生舱治理（2026-11-12，组合方案吸收）**：吸收
+  《State of Generative UI Report》（2026-06，
+  https://www.openui.com/blog/state-of-generative-ui-report ）两项关键方案——
+  ① **前向引用骨架流式（top-down reveal）**：流式预览 partial 前缀解析中「被引用但
+  尚未流到的语句名」不再丢弃（原 dropped 哨兵在数组处剔除，Card children 随帧膨胀
+  收缩），改产 `OpenUiValue.Skeleton(refName, statementId)` 瞬态占位节点——`OpenUiSession`
+  增 `forwardRefSkeletons` 开关（仅 Android `OpenUiStreamingCard` 与 iOS
+  `IosOpenUiPreviewFactory` 双端流式预览路径开启），定义语句流入后下一帧重解析原位
+  替换；双端渲染骨架 pulse 占位块（Android `OpenUiSkeletonPlaceholder`/iOS
+  `OpenUiSkeletonPlaceholderView`，视觉对齐 UnknownComponent 占位语言，
+  contentDescription/accessibilityLabel = 引用名，无文案 [I18N] 零面）；Skeleton 只在
+  children/数组槽存活，标量消费点（运算符/对象值/state 默认值/Query defaults）收口
+  Null，**永不持久化**（默认模式零产出，正式卡/partsJson 零污染，LANG_VERSION 不
+  bump——纯端侧瞬态节点无线格式变更）；children 槽位数跨帧恒定，dropped→resolved
+  的布局跳变收敛为原位内容替换（槽内高度仍随真实内容变化，非完全消除）。
+  ② **Html 逃生舱治理（谱系按组件级降档）**：`OpenUiPromptAssets.DSL_RULES` Html
+  条目重写为组合谱系引导——优先目录组件组合（Card/图表/表单族能组合出来的不落
+  Html），仅目录无法表达的交互/一次性可视化才用，内容清洗契约不变；server
+  `RenderOpenUiValidator.lintComposition` 增软警告（Html 在场提示「确认目录组件无法
+  表达」，不拒卡不触发纠正回环，仅观测）。
+  **组合谱系定位**：PoLang OpenUI = 该报告 **Declarative 档**（turn-native 行式 DSL，
+  组件目录内组合；token 效率对 JSON 补丁流约 2x 优势引自该报告基准）；`Html` 组件 =
+  组件级 **Open-Ended 逃生舱**（对齐文中 GeneratedView 模式——谱系按组件级而非应用级
+  降档，Open-Ended 的代价只付那个子树）；transport 轴 = 自有 SSE（AG-UI 槽位对等）。
+  Static/Declarative/Open-Ended 三档中 PoLang 无独立 Static 档（选组件即写程序，同一
+  语言面）。
 - **回灌**：不回灌 LLM（data part 分支 emptyList）；program 只含骨架 + Query
   local_handle 绑定，handle id 对云 opaque（D2 对偶）。
 - **渲染**：ChatScreen TYPE_OPENUI_CARD → OpenUiCardHost（shared OpenUiSession 批量求值，
@@ -1141,7 +1168,8 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   覆盖 OpenUiLibrary 组件全集）；UnknownComponent 占位块 + `openui.unknown_component_hint`
   五语；langVersion > LANG_VERSION 卡顶提示行（`openui.lang_newer_hint`）；降级卡
   （`openui.card_unavailable`/`openui.card_data_elsewhere`）；流式预览
-  `OpenUiStreamingCardView`（24k 预算同值）；photoId→localIdentifier 经
+  `OpenUiStreamingCardView`（24k 预算同值，forwardRefSkeletons 骨架占位对等——
+  `OpenUiSkeletonPlaceholderView`，Android 同指标）；photoId→localIdentifier 经
   `IosOpenUiMediaSeam` 单 fetch 快照解析（Android 双 id 命名空间在 iOS 单 id 空间退化），
   faceFocusY/aspectRatio 元数据 iOS 媒体桥不携带（回落组件缺省）；性能行
   `OpenUiPerformanceRow`（done 帧回补）。残余登记 PARITY 台账：Navigate 自定义动作路由、

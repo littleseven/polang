@@ -350,7 +350,7 @@ struct OpenUiCardBlockItemView: View {
     }
 
     @ViewBuilder private func childrenOf(_ key: String) -> some View {
-        let items = ouItems(obj[key]).filter { $0 is IosOpenUiValNodeVal || $0 is IosOpenUiValUnknownNodeVal }
+        let items = ouItems(obj[key]).filter { $0 is IosOpenUiValNodeVal || $0 is IosOpenUiValUnknownNodeVal || $0 is IosOpenUiValSkeletonNodeVal }
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 OpenUiChildren(items, ctx: ctx)

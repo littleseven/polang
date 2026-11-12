@@ -162,6 +162,31 @@ struct OpenUiUnknownComponentPlaceholder: View {
     }
 }
 
+// MARK: - 前向引用骨架占位（流式瞬态；Android OpenUiSkeletonPlaceholder 同指标）
+
+/// partial 前缀解析中「被引用但尚未流到」的语句槽（IosOpenUiValSkeletonNodeVal）：
+/// pulse 骨架块（secondarySystemFill 48pt 高圆角块，对齐未知组件占位的视觉语言），
+/// 定义流入后下一帧原位替换（top-down reveal）。瞬态无用户文案，accessibilityLabel = 引用名。
+struct OpenUiSkeletonPlaceholderView: View {
+    let refName: String
+
+    @State private var pulsing = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color(.secondarySystemFill))
+            .opacity(pulsing ? 1.0 : 0.45)
+            .frame(height: 48)
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel(Text(refName))
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                    pulsing = true
+                }
+            }
+    }
+}
+
 // MARK: - children 渲染便捷
 
 @ViewBuilder
@@ -171,7 +196,7 @@ func OpenUiChildren(_ children: [IosOpenUiVal], ctx: OpenUiRenderContext) -> som
     }
 }
 
-/// 单 child 分流：组件节点 → 渲染器；未知组件 → 占位；其余（数据形态混入）跳过。
+/// 单 child 分流：组件节点 → 渲染器；未知组件 → 占位；流式骨架占位 → 骨架块；其余（数据形态混入）跳过。
 struct OpenUiChildItem: View {
     let item: IosOpenUiVal
     let ctx: OpenUiRenderContext
@@ -182,6 +207,8 @@ struct OpenUiChildItem: View {
             OpenUiNodeRenderer(node: nodeVal.node, ctx: ctx)
         case let unknown as IosOpenUiValUnknownNodeVal:
             OpenUiUnknownComponentPlaceholder(typeName: unknown.type)
+        case let skeleton as IosOpenUiValSkeletonNodeVal:
+            OpenUiSkeletonPlaceholderView(refName: skeleton.refName)
         default:
             EmptyView()
         }

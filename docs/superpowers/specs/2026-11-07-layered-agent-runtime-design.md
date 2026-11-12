@@ -114,7 +114,7 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 | 序 | 期 | 内容与验收要点 | 依赖 | 预估规模 |
 |---|----|--------------|------|---------|
 | 1 | **M3 MemoryStore 抽象** | shared 立 `MemoryStore` 接口（load/append/replace/clear + 摘要），端侧 DataStore 实现与云侧 `agent_event`+`AgentProjection` 实现各理其身；组装/压缩算法（`KoogMessageMemory` 四步管线）保持 shared 单源。验收：两端行为零变化（既有记忆测试全绿 + server 回放测试绿），接口测试钉住契约 | 无（纯接口抽取，风险最低，先行铺路） | 中 |
-| 2 | **M4 流式协议合一** | 事件模型同源：端内 `ChatStreamEvent`/`TurnStreamEvent` 与 SSE `CloudFrame`/`AgentEvent` 收敛为同一 shared 事件族，传输（Flow vs SSE）只是封装差异；**纳入 2026-11-11 批次新增面**：`openui_delta`、done 帧 `usage/elapsed_ms/lang_version` 进同一事件模型。验收：双端消费方只换传输层不改事件语义；iOS 云端回合（feat/ios-cloud-turn-openui 批次）已把 CloudFrame 消费面铺到双端，合一的第二个消费端已就绪 | M3（记忆事件与流事件同轮改造可共用接缝）；iOS 云端回合批次 | 大 |
+| 2 | **M4 流式协议合一** | 事件模型同源：端内 `ChatStreamEvent`/`TurnStreamEvent` 与 SSE `CloudFrame`/`AgentEvent` 收敛为同一 shared 事件族，传输（Flow vs SSE）只是封装差异；**纳入 2026-11-11 批次新增面**：`openui_delta`、done 帧 `usage/elapsed_ms/lang_version` 进同一事件模型。验收：双端消费方只换传输层不改事件语义；iOS 云端回合（feat/ios-cloud-turn-openui 批次）已把 CloudFrame 消费面铺到双端，合一的第二个消费端已就绪。演进注记（2026-11-12 组合方案吸收）：目录协商（客户端经握手/首帧播报本端组件集，A2UI supportedCatalogIds 同构）为 LANG_VERSION 粗粒度版本协商的下一站，纳入 M4 事件模型设计考量——事件族预留 catalog 播报/差异应答槽位，避免合一后再开第二刀 | M3（记忆事件与流事件同轮改造可共用接缝）；iOS 云端回合批次 | 大 |
 | 3 | **M5 TurnRunner 合一** | `LocalTurnRunner`/`CloudTurnRunner` 同一接口 + 组合根开关（硬两态，决策 2 不变）——「一个开关」愿景兑现点；ViewModel 只面对 TurnRunner。验收：开关切换双态行为与现两条链路逐一对等（回灌/落库/错误降级矩阵测试） | M3 + M4 | 大 |
 | 4 | **M6 iOS SKIE 消费 AgentCore** | iOS 经 SKIE 直接消费 shared AgentCore（Flow→AsyncStream 等互操作铁律见 kmp-ios-interop skill）；前置：iOS 云端链路稳定运行一版 | M4 + iOS 云端回合批次实机验证 | 中 |
 

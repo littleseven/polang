@@ -95,10 +95,11 @@ func ouActions(_ v: IosOpenUiVal?) -> [OpenUiAction] {
     (v as? IosOpenUiValActionListVal)?.actions ?? []
 }
 
-/// children 提取：COMPONENT_LIST 槽（NodeVal / UnknownNodeVal 混排，渲染层逐项分流）。
+/// children 提取：COMPONENT_LIST 槽（NodeVal / UnknownNodeVal / SkeletonNodeVal 混排，渲染层逐项分流；
+/// Skeleton = 流式前向引用骨架占位，瞬态——partial 前缀解析独有，正式卡零产出）。
 func ouChildren(_ props: OpenUiPropsBag) -> [IosOpenUiVal] {
     ouItems(props.raw("children")).filter { item in
-        item is IosOpenUiValNodeVal || item is IosOpenUiValUnknownNodeVal
+        item is IosOpenUiValNodeVal || item is IosOpenUiValUnknownNodeVal || item is IosOpenUiValSkeletonNodeVal
     }
 }
 

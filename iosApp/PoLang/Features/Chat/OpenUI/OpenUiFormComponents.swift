@@ -985,7 +985,7 @@ struct OpenUiTabsComponent: View {
             .clipShape(Capsule())
             if tabs.indices.contains(selected) {
                 OpenUiChildren(
-                    ouItems(tabs[selected]["children"]).filter { $0 is IosOpenUiValNodeVal || $0 is IosOpenUiValUnknownNodeVal },
+                    ouItems(tabs[selected]["children"]).filter { $0 is IosOpenUiValNodeVal || $0 is IosOpenUiValUnknownNodeVal || $0 is IosOpenUiValSkeletonNodeVal },
                     ctx: ctx)
             }
         }
@@ -1023,7 +1023,7 @@ struct OpenUiAccordionComponent: View {
                     if expanded.contains(index) {
                         VStack(alignment: .leading, spacing: 8) {
                             OpenUiChildren(
-                                ouItems(obj["children"]).filter { $0 is IosOpenUiValNodeVal || $0 is IosOpenUiValUnknownNodeVal },
+                                ouItems(obj["children"]).filter { $0 is IosOpenUiValNodeVal || $0 is IosOpenUiValUnknownNodeVal || $0 is IosOpenUiValSkeletonNodeVal },
                                 ctx: ctx)
                         }
                         .padding(.bottom, 10)

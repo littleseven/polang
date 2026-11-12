@@ -156,6 +156,8 @@ private fun OpenUiCardBlockSlot(
             OpenUiNodeRenderer(child, state, photoResolver, onAction)
         } else if (child is OpenUiValue.UnknownComponent) {
             OpenUiUnknownComponentPlaceholder(child.type)
+        } else if (child is OpenUiValue.Skeleton) {
+            OpenUiSkeletonPlaceholder(child.refName)
         } else {
             Box(modifier = Modifier) // null 字面量/被剔除元素：空占位
         }
