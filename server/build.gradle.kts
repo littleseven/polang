@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.mamba.picme"
-version = "0.9.50"
+version = "0.9.51"
 
 repositories { mavenCentral() }
 
