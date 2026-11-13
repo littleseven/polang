@@ -66,7 +66,7 @@ object CloudAgentToolContract {
     // CloudAgentToolCatalog.projectionSchema 同源；改描述只改本区，禁止任何一侧持有字面量副本。
 
     const val DESC_GET_GALLERY_SUMMARY =
-        "获取用户手机相册摘要（照片/视频总数、人物聚类数、已打标数等）。工具在用户设备上执行，结果以文本摘要回传（投影：仅计数与文本元数据，不含文件路径与媒体清单）。"
+        "获取用户手机相册摘要（照片/视频总数、人物聚类数、已打标数等）。工具在用户设备上执行，结果以文本摘要回传，尾部附 opaque 数据句柄「handle: scan/<id>」（全库媒体集——供 OpenUI 卡数据绑定（Query local_handle）：#histogram 全库月度分布、#photos/#videos 清单；禁止臆造 handleId）（投影：仅计数与文本元数据 + 句柄，不含文件路径与媒体清单）。相册概况/月度统计卡用本工具的句柄；浏览照片的组织流程见 photo-browse 技能。"
 
     const val DESC_SEARCH_MEDIA =
         "在用户手机相册搜索照片/视频，结果以文本摘要回传（投影：仅数量+命中说明+尾部 opaque 数据句柄「handle: scan/<id>」（供 OpenUI 卡数据绑定（Query local_handle），禁止臆造 handleId），不含文件路径与媒体清单）。query 自然语言搜索词（留空=全相册所有媒体，统计全库时直接留空即可）；person 人物分组名或称谓（无则空串）；fromMs/toMs 毫秒时间串（query 含时间词时必须换算填入，空串=不限）；hasFace 传 'true'=只要含人脸照片（空串=不限）；mediaType 媒体类型：'photo'=只搜照片（默认）、'video'=只搜视频（用户提到视频/录像/vlog 时必传）、'all'=照片+视频。浏览照片的组织流程见 photo-browse 技能。"

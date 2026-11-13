@@ -89,6 +89,8 @@ class CloudAgentToolCatalogTest {
         for (tool in listOf(
             CloudAgentToolContract.TOOL_SEARCH_MEDIA,
             CloudAgentToolContract.TOOL_REFINE_MEDIA_SEARCH,
+            // 2026-11-13 起摘要回执尾部注册全库媒体句柄（placeholder 假句柄事故修复）
+            CloudAgentToolContract.TOOL_GET_GALLERY_SUMMARY,
         )) {
             val spec = CloudAgentToolCatalog.specFor(tool)!!
             assertTrue(spec.projectionSchema.contains("handle:"), "$tool 未声明 handle token")

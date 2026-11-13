@@ -105,6 +105,13 @@ class CloudAgentGalleryTools(
         }
     }
 
+    /**
+     * 相册摘要 + 全库数据句柄（2026-11-13 placeholder 假句柄事故修复）：此前回执只有
+     * 文本摘要无句柄，「我的个人相册」自然流程（摘要 → 画月度分布 BarChart）没有合法
+     * handle，模型被迫臆造 `local://scan/placeholder#histogram`，端侧 payloadOf 恒 null
+     * 整卡降级「卡片数据不可用」。现与 search_media 同口径注册全库媒体句柄，
+     * `#histogram` 全库月度分布 / `#photos`/`#videos` 清单均可绑定。
+     */
     suspend fun getGallerySummary(): String {
         val summary = try {
             gallerySummary(false)
@@ -114,7 +121,17 @@ class CloudAgentGalleryTools(
             Logger.w(tag, "getGallerySummary failed", e)
             return "error: ${e.message ?: "gallery summary failed"}"
         }
-        return summary?.let { formatGallerySummaryForReply(it) } ?: GALLERY_SUMMARY_UNAVAILABLE_HINT
+        val text = summary?.let { formatGallerySummaryForReply(it) } ?: GALLERY_SUMMARY_UNAVAILABLE_HINT
+        val media = try {
+            allPhotos()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.w(tag, "getGallerySummary all-media snapshot failed, degrading to plain text", e)
+            return text
+        }
+        if (media.isEmpty()) return text
+        return appendHandleSuffix(text, media)
     }
 
     /**

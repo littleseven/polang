@@ -145,9 +145,17 @@ object RenderOpenUiValidator {
         OpenUiContract.FRAGMENT_VIDEOS,
     )
 
+    /** handleId 收紧为 12 位小写 hex（2026-11-13 placeholder 假句柄事故修复）：端侧
+     *  `LocalHandleStore`（随机 12-hex）与 iOS `IosLocalHandleStore`（UUID 前 12 位 hex）
+     *  的生成格式闭集——宽口径 `[0-9A-Za-z]+` 放行过 "placeholder" 臆造句柄，端侧
+     *  payloadOf 恒 null 整卡降级「卡片数据不可用」；收紧后服务端同轮纠正回环拦截。 */
     private val LOCAL_HANDLE_FORM =
-        Regex("""local://scan/[0-9A-Za-z]+(#(${LOCAL_HANDLE_FRAGMENTS.joinToString("|")}))?""")
-    private val MEDIA_PATH = Regex("""content://|file://|/storage/""")
+        Regex("""local://scan/[0-9a-f]{12}(#(${LOCAL_HANDLE_FRAGMENTS.joinToString("|")}))?""")
+
+    /** 本地媒体/路径禁令（2026-11-13 +media://：云端 LLM 拿不到真实媒体 id（隐私投影
+     *  只回计数+句柄），Html 逃生舱里拼 media:// 必为臆造 id——端侧开流失败即「内嵌
+     *  H5 相册空内容/id 找不到」事故形态；相册照片只能走句柄投影 PhotoGrid/Image(photo=…)）。 */
+    private val MEDIA_PATH = Regex("""media://|content://|file://|/storage/""")
 
     /** QUOTED_ACTION 词表（顺序钉住 = 历史正则逐字节等价）：官方可 dispatch 动作
      *  （`OpenUiContract.Actions`，OPEN_PHOTO 为宿主合成不入 program 故不在列）
@@ -355,7 +363,7 @@ object RenderOpenUiValidator {
             violations += "program 超长（${program.length} > $MAX_PROGRAM_LENGTH 字符上限，对齐 render_html 先例）"
         }
         if (MEDIA_PATH.containsMatchIn(program)) {
-            violations += "禁止把媒体路径/uri 写进 program（隐私投影契约），相册数据一律走 Query(\"local_handle\", …) 绑定"
+            violations += "禁止把媒体路径/uri 写进 program（隐私投影契约，media:///content:///file:// 本地引用含 Html 内一律禁止——云端拿不到真实媒体 id，臆造 id 端侧必然解析失败），相册照片/视频一律走 Query(\"local_handle\", …) 句柄投影 + PhotoGrid/Image(photo = photos[i].id)/Video(photo = videos[i].id) 展示"
         }
         QUOTED_ACTION.findAll(program).forEach { match ->
             violations += "动作表达式被包成了字符串（${match.value}…）：Button 的 action 是裸动作表达式，去掉最外层那对引号——写 Button(\"查看\", @OpenUrl(\"https://…\"))，不要 Button(\"查看\", \"@OpenUrl(…)\")"
@@ -402,7 +410,7 @@ object RenderOpenUiValidator {
         }
         LOCAL_HANDLE_REF.findAll(program).forEach { match ->
             if (!LOCAL_HANDLE_FORM.matches(match.value)) {
-                violations += "handle \"${match.value}\" 必须是 local://scan/<handleId> 形态（fragment 只许 #histogram/#photos/#videos 或省略）；handleId 只许来自 search_media/refine_media_search 结果尾部，禁止臆造"
+                violations += "handle \"${match.value}\" 必须是 local://scan/<12位hex>(#fragment) 形态（fragment 只许 #histogram/#photos/#videos 或省略）；handleId 只许来自 search_media/refine_media_search/get_gallery_summary 结果尾部「handle: scan/<id>」，禁止臆造——没有合法 handle 就先调工具拿，或改用字面量数据（图表 labels/series）"
             }
         }
         if (hasLocalHandleQuery && !program.contains("local://scan/")) {

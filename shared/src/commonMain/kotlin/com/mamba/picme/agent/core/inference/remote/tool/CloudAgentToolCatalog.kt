@@ -69,7 +69,7 @@ object CloudAgentToolCatalog {
             executor = ToolExecutor.LOCAL,
             description = CloudAgentToolContract.DESC_GET_GALLERY_SUMMARY,
             resultSchema = "GallerySummary 结构（照片/视频总数、人物聚类数、已打标数等）",
-            projectionSchema = "纯文本摘要：仅计数与文本元数据，不含文件路径/uri/媒体清单",
+            projectionSchema = "纯文本摘要 + 尾部 opaque 数据句柄「handle: scan/<id>」（全库媒体集，2026-11-13 起）：仅计数与文本元数据+句柄 id，不含文件路径/uri/媒体清单",
         ),
         CloudToolSpec(
             name = CloudAgentToolContract.TOOL_SEARCH_MEDIA,

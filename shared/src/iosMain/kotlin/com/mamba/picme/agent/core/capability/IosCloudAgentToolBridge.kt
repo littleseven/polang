@@ -140,9 +140,25 @@ class IosCloudAgentToolBridge(
         return CloudAgentToolContract.truncate(CloudToolProjectionGate.gate(tool, result))
     }
 
-    /** @Tool get_gallery_summary 对等：相册摘要。 */
-    suspend fun getGallerySummary(): String =
-        executeCommand(AgentCommand.GetGallerySummary(includeDetails = false))
+    /**
+     * @Tool get_gallery_summary 对等：相册摘要 + 全库数据句柄（2026-11-13 placeholder
+     * 假句柄事故修复，对齐 Android CloudAgentGalleryTools）——摘要回执尾部注册全库
+     * 媒体 local://scan 句柄，OpenUI 卡 `#histogram` 全库月度分布/#photos/#videos
+     * 清单有合法绑定源，模型不再臆造 handleId。快照取数失败降级为纯文本摘要。
+     */
+    suspend fun getGallerySummary(): String {
+        val text = executeCommand(AgentCommand.GetGallerySummary(includeDetails = false))
+        if (text.startsWith(CloudAgentToolContract.ERROR_PREFIX)) return text
+        val media = try {
+            capability.allMediaForCloud()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return text
+        }
+        if (media.isEmpty()) return text
+        return appendHandleSuffix(text, media)
+    }
 
     /**
      * @Tool search_media 对等（2026-11-12 重写为 mediaType 维度 + 句柄注册）：

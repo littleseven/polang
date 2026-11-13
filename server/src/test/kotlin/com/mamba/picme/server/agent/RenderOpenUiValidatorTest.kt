@@ -254,6 +254,48 @@ root = Card([Image(photos[0].id, 1.5)])""",
     }
 
     @Test
+    fun `hallucinated placeholder handle is rejected`() {
+        // 2026-11-13 真机事故回归：get_gallery_summary 无句柄时模型臆造
+        // local://scan/placeholder#histogram，宽口径 [0-9A-Za-z]+ 放行 → 端侧整卡降级；
+        // 收紧 12 位 hex 后服务端同轮纠正回环拦截
+        val error = RenderOpenUiValidator.validateToError(
+            "root = Card([BarChart(\"t\", buckets)])\nbuckets = Query(\"local_handle\", { handle: \"local://scan/placeholder#histogram\" }, [])",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("local://scan/placeholder#histogram"))
+    }
+
+    @Test
+    fun `short or non-hex handle id is rejected`() {
+        listOf("local://scan/7f3a#photos", "local://scan/ZZZ33db29ed6#photos").forEach { handle ->
+            val error = RenderOpenUiValidator.validateToError(
+                "photos = Query(\"local_handle\", { handle: \"$handle\" }, [])\nroot = Card([Text(\"x\")])",
+            )
+            assertNotNull("应拒绝: $handle", error)
+        }
+    }
+
+    @Test
+    fun `media scheme reference in html escape hatch is rejected`() {
+        // 2026-11-13 内嵌 H5 相册事故回归：Html 内拼 media:// 臆造 id → 端侧开流失败空内容；
+        // media:// 与 content:///file:// 同列本地媒体禁令
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([Html("<div><img src=\"media://12345\"></div>")])""",
+        )
+        assertNotNull(error)
+        assertTrue(error!!.contains("media"))
+    }
+
+    @Test
+    fun `https image in html escape hatch passes media gate`() {
+        // 公网 https 图是 Html 合法内容，不被本地媒体禁令误伤
+        val error = RenderOpenUiValidator.validateToError(
+            """root = Card([Html("<div><img src=\"https://polang.net/x.png\"></div>")])""",
+        )
+        assertNull(error)
+    }
+
+    @Test
     fun `inline query inside component args passes`() {
         // 2026-10-24 合并决议：端侧引擎已支持内联 Query 提升（fix/a2ui 0e5856b10），
         // 服务端不再禁内联（原 inline-reserved 根因已根治），钉住防禁令回潮。
@@ -846,7 +888,7 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         assertNull(
             RenderOpenUiValidator.validateToError(
                 """
-                photos = Query("local_handle", { handle: "local://scan/7f3a#photos" }, [])
+                photos = Query("local_handle", { handle: "local://scan/7f3a9b1c2d3e#photos" }, [])
                 fav = Mutation("favorite_media", { id: photos[0].id })
                 root = Card([Button("收藏并逛相册", Action([@Run(fav), @Navigate("gallery")]))])
                 """.trimIndent(),

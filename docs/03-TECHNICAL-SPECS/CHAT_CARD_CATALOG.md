@@ -1189,6 +1189,17 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   @ToAssistant 自 2026-10-31 起上行——以用户消息发进会话（CardHeader/ListItem/ListBlock
   的 actionLabel 缺省动作由 labeledActionsOrDefault 兜底合成同文案），M1 及之前仅记日志
   不路由。
+- **句柄防伪三件套（2026-11-13，「我的个人相册」事故批次）**：① `get_gallery_summary`
+  回执尾部注册全库媒体句柄（此前只回文本摘要——「个人相册」自然流程（摘要→月度分布
+  BarChart）无合法 handle，模型臆造 `local://scan/placeholder#histogram`，端侧 payloadOf
+  恒 null 整卡降级「卡片数据不可用」；Android `CloudAgentGalleryTools` / iOS
+  `IosCloudAgentToolBridge` 同口径，iOS 快照走 `allMediaForCloud` 不动 refine 基数）；
+  ② 服务端 `LOCAL_HANDLE_FORM` 收紧为 `local://scan/[0-9a-f]{12}`（双端句柄生成格式
+  闭集——宽口径 `[0-9A-Za-z]+` 放行过 "placeholder"），假句柄同轮纠正回环拦截不再下发；
+  ③ 本地媒体禁令补 `media://`（MEDIA_PATH 原仅 content:///file:////storage/）——Html
+  逃生舱拼 media:// 臆造 id（云端拿不到真实媒体 id）即「内嵌 H5 相册空内容」事故形态，
+  现与路径禁令同规拒掉（校验文案指明走句柄投影）；DSL_RULES 规则 4 句柄来源补
+  get_gallery_summary + Html 条目补本地媒体禁令。
 - **端到端例子（turn-native 时序，2026-11-01 起）**：「统计我今年的照片」→ 云端回合
   search_media 取数（display=false）命中注册 handle → LLM 终结回复直接输出整颗
   BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"})；流式

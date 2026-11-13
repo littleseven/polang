@@ -141,6 +141,14 @@ class IosChatGalleryCapability(
     // ── 搜索 / 细化 ─────────────────────────────────────────────────────────
 
     /**
+     * 全库媒体快照（云端 get_gallery_summary 数据句柄注册用，2026-11-13 placeholder
+     * 假句柄事故修复——对齐 Android CloudAgentGalleryTools.getGallerySummary 的
+     * allPhotos 通道）：直读 repository 快照，**不动 refine 基数**（lastSearchAssets
+     * 只跟随 search/refine，全库句柄不劫持细化语义）。
+     */
+    suspend fun allMediaForCloud(): List<MediaAsset> = repository.allMedia.first()
+
+    /**
      * 云端 Agent 搜索（2026-11-12 主聊天云端回合接线）：mediaType 维度过滤——
      * "video"=只视频 / "all"=全部 / 其余=只照片（对齐 Android CloudAgentGalleryTools
      * .typeFilterOf 口径，chat 链路 search_media 无此参数不受影响）。

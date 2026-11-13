@@ -319,6 +319,9 @@ object OpenUiPromptAssets {
      交互/一次性可视化才用，不要用 Html 包纯文本；html 是完整自包含 HTML 字符串：
      样式内联 <style>，可用内联 <script> 做卡内交互，禁远程 <script src>（端侧清洗剔除）、
      禁 iframe/object/embed/form 标签；单卡 ≤128KB；
+     ⚠️ Html 内禁止引用相册本地媒体（media:///content:///file:// 一律被服务端校验拒掉）——
+     你看不到也拿不到真实媒体 id，臆造 id 端侧必解析失败；相册照片/视频只能用
+     PhotoGrid / Image(photo = photos[i].id) / Video(photo = videos[i].id) 句柄投影展示；
    - 元素形状（仅作父组件数组元素的对象形状，不独立使用——优先用上面对象数组写法，
      组件形仅保底；ListItem 已升格为经典列表行见上方列表段）：TabItem / AccordionItem /
      StepsItem / SelectItem /
@@ -328,7 +331,9 @@ object OpenUiPromptAssets {
 4. 数据禁令：相册数据一律经查询绑定，写法逐字为
    `buckets = Query("local_handle", { handle: "local://scan/<id>#histogram" }, [])`
    （第三个参数 [] 是数据缺失时的降级默认值），其中 handleId 只许来自
-   search_media/refine_media_search 结果尾部的「handle: scan/<id>」；
+   search_media/refine_media_search/get_gallery_summary 结果尾部的「handle: scan/<id>」
+   （get_gallery_summary 尾部句柄 = 全库媒体集，全库月度分布/相册概况卡用它；
+   没有句柄就先调工具拿，绝不许编造 placeholder 之类的假 id——假 id 过不了服务端校验）；
    照片清单取数写法逐字为
    `photos = Query("local_handle", { handle: "local://scan/<id>#photos" }, [])`，
    得到 [{id, date}]（按搜索相关度排序，最多 60 张，date 是 "yyyy-MM-dd"

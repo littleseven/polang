@@ -62,6 +62,47 @@ class CloudAgentGalleryToolsTest {
     }
 
     @Test
+    fun `summary reply carries all-media scan handle when library non-empty`() = runTest {
+        // 2026-11-13 placeholder 假句柄事故修复：摘要回执尾部注册全库句柄，
+        // 月度分布/清单绑定有合法 handle，模型不再臆造 local://scan/placeholder
+        val s = GallerySummary(
+            totalPhotos = 10, totalVideos = 2, totalMedia = 12, hasFaceCount = 3,
+            personClusterCount = 1, namedPersonCount = 1, labeledCount = 8, unlabeledCount = 4,
+            semanticEncodedCount = 5, remainingPass1 = 0, remainingPass3 = 4,
+            isScanning = false, recommendation = GallerySummary.ScanRecommendation.INCREMENTAL,
+        )
+        val store = LocalHandleStore(FakeLocalHandleDao())
+        val out = tools(
+            summary = { s },
+            handleStore = store,
+            allPhotos = { listOf(asset(1), asset(2, MediaType.VIDEO), asset(3)) },
+        ).getGallerySummary()
+        assertTrue(out.contains("12 个媒体"))
+        assertTrue("摘要回执应携带全库数据句柄：$out", out.contains("（数据句柄 handle: scan/"))
+        // 句柄真实可查（端侧 payloadOf 语义：domain 匹配 + payload 为全量条目）
+        val handleId = Regex("handle: scan/([0-9a-f]{12})").find(out)!!.groupValues[1]
+        val payload = store.payloadOf("scan", handleId)
+        assertTrue("句柄 payload 应含全部 3 条条目：$payload", payload!!.split("\"id\"").size - 1 == 3)
+    }
+
+    @Test
+    fun `summary handle registration failure degrades to plain text`() = runTest {
+        val s = GallerySummary(
+            totalPhotos = 10, totalVideos = 2, totalMedia = 12, hasFaceCount = 3,
+            personClusterCount = 1, namedPersonCount = 1, labeledCount = 8, unlabeledCount = 4,
+            semanticEncodedCount = 5, remainingPass1 = 0, remainingPass3 = 4,
+            isScanning = false, recommendation = GallerySummary.ScanRecommendation.INCREMENTAL,
+        )
+        val out = tools(
+            summary = { s },
+            allPhotos = { error("allMedia unavailable") },
+        ).getGallerySummary()
+        assertTrue(out.contains("12 个媒体"))
+        assertTrue(!out.contains("数据句柄"))
+        assertTrue(!out.startsWith("error:"))
+    }
+
+    @Test
     fun `plain query goes to query path and reports photo count only`() = runTest {
         val t = tools(byQuery = { q, ids ->
             assertEquals("猫", q); assertEquals(null, ids)
