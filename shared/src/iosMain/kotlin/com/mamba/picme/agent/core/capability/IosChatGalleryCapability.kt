@@ -32,9 +32,10 @@ import kotlin.coroutines.resume
  * - [searchBridge] 为 null（引擎未接线，防御路径）→ 保持原有文件名匹配降级
  *   （查不到返回 0 结果，不做「返回最新 N 张」的误导兜底）。
  *
- * 横滑卡退役（2026-11）：search/refine 回执 = [AgentAction.TextReply] 纯计数文案
- * （逐字对齐 Android `SearchOutcome.toTextReply`）；命中 id 清单由 [lastSearchAssets]
- * 搜索基数快照承载，LLM 出图集卡经 render_html + media:// 引用。
+ * 横滑卡退役（2026-11）：search/refine 回执 = [AgentAction.TextReply] 计数 +
+ * 前 24 个媒体 id 文案（2026-11-14 id 下发兑现工具描述契约，逐字对齐 Android
+ * `SearchOutcome.toTextReply`/`buildCountWithIds`）；全量命中 id 清单由
+ * [lastSearchAssets] 搜索基数快照承载，LLM 出图集卡经 render_html + media://{id} 引用。
  * feedback/more/exclude 三命令随横滑卡交互一并下线。
  *
  * 其余命令与 Android 三件套（ChatGallerySummaryCapability / ChatSearchCapability /
@@ -43,7 +44,8 @@ import kotlin.coroutines.resume
  * - view/select/share 为 UI 直通命令：此处只校验参数并返回 [AgentAction.Success]，
  *   实际跳转/选中/分享由 Swift 侧消费 uiActions 完成。
  *
- * [PRIVACY]：TextReply 只含计数与固定文案，不输出路径/GPS/base64。
+ * [PRIVACY]：TextReply 只含计数、opaque 媒体 id（数字，无路径/元数据）与固定文案，
+ * 不输出路径/GPS/base64；id 暴露面与 run_gallery_script gallery.query 的 {ids,total} 同级。
  */
 class IosChatGalleryCapability(
     private val repository: MediaRepository,
@@ -211,8 +213,29 @@ class IosChatGalleryCapability(
         val assets = items.map(::toDomain).filter { it.type == MediaType.PHOTO }
         recordRound(assets)
         return Result.success(
-            AgentAction.TextReply(command.commandId, "找到 ${assets.size} 张「${command.query}」的照片")
+            AgentAction.TextReply(
+                command.commandId,
+                countWithIds("找到 ${assets.size} 张「${command.query}」的照片", assets)
+            )
         )
+    }
+
+    /**
+     * 计数前缀 + 有界 id 尾缀（逐字对齐 Android `SearchOutcome.buildCountWithIds`）：
+     * 回执附前 24 个媒体 id 供 LLM 经 render_html + media://{id} 出图集卡；
+     * 更多 id 引导走 run_gallery_script 的 gallery.query。
+     */
+    private fun countWithIds(prefix: String, assets: List<MediaAsset>): String {
+        if (assets.isEmpty()) return prefix
+        val ids = assets.map { it.id }
+        val shown = ids.take(MAX_OBSERVATION_IDS)
+        val suffix = shown.joinToString(",")
+        return if (ids.size <= MAX_OBSERVATION_IDS) {
+            "$prefix，媒体 id：$suffix"
+        } else {
+            "$prefix，前 $MAX_OBSERVATION_IDS 个媒体 id：$suffix" +
+                "（共 ${ids.size} 个，更多 id 用 run_gallery_script 的 gallery.query 获取）"
+        }
     }
 
     private suspend fun handleRefine(command: AgentCommand.RefineMediaSearch): Result<AgentAction> {
@@ -239,7 +262,10 @@ class IosChatGalleryCapability(
         }
         recordRound(refined)
         return Result.success(
-            AgentAction.TextReply(command.commandId, "在上一轮结果内找到 ${refined.size} 张「${command.constraint}」的照片")
+            AgentAction.TextReply(
+                command.commandId,
+                countWithIds("在上一轮结果内找到 ${refined.size} 张「${command.constraint}」的照片", refined)
+            )
         )
     }
 
@@ -321,7 +347,10 @@ class IosChatGalleryCapability(
         val results = if (command.query.isBlank()) hits.take(MAX_RECENT_RESULTS) else hits
         recordRound(results)
         return Result.success(
-            AgentAction.TextReply(command.commandId, "找到 ${results.size} 张「${command.query}」的照片")
+            AgentAction.TextReply(
+                command.commandId,
+                countWithIds("找到 ${results.size} 张「${command.query}」的照片", results)
+            )
         )
     }
 
@@ -336,12 +365,12 @@ class IosChatGalleryCapability(
             )
         }
         recordRound(hits)
-        val message = if (base != null) {
+        val prefix = if (base != null) {
             "在上一轮结果内找到 ${hits.size} 张「${command.constraint}」的照片"
         } else {
             "找到 ${hits.size} 张「${command.constraint}」的照片"
         }
-        return Result.success(AgentAction.TextReply(command.commandId, message))
+        return Result.success(AgentAction.TextReply(command.commandId, countWithIds(prefix, hits)))
     }
 
     /**
@@ -421,6 +450,9 @@ class IosChatGalleryCapability(
     companion object {
         /** 空关键词搜索（「看看最近的」，降级路径）的返回上限。 */
         private const val MAX_RECENT_RESULTS = 50
+
+        /** 回执附带的媒体 id 上限（与 Android `SearchOutcome.MAX_OBSERVATION_IDS` 同值）。 */
+        private const val MAX_OBSERVATION_IDS = 24
 
         val SUPPORTED_COMMANDS: List<String> = listOf(
             "get_gallery_summary",

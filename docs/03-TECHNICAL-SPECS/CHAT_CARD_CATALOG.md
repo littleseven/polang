@@ -660,7 +660,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 横滑图集卡已整体退役拆除，本节保留墓碑备查（退役前协议/UI/测试全文见 git 历史）：
 
 - **删除面**：`MessagePart.MediaResults` / `MediaResultsUi` / Room 线值 `data_media_results`（活跃值域剔除）/ `MediaResultsCarousel` 组件 / `feedbackState` 👍/👎 反馈链路（`record_feedback`/`more_like_this`/`exclude_constraint` 三 @Tool + `media_feedback` 表写路径；读路径存量分数排序保留）/ 回合末 `settleScriptMediaIds` 脚本 ids 补卡机制 / 云端回合 `mediaResultsListener` 透出 + `display="true"` 意图门控。
-- **替代形态**：`search_media`/`refine_media_search` 回执 = TextReply 纯计数文案（「找到 N 张「q」的照片」），无卡落库；图集浏览展示一律走技能出卡（photo-browse 等，`render_html`/OpenUI 程序）。
+- **替代形态**：`search_media`/`refine_media_search` 回执 = TextReply 计数 + 前 24 个媒体 id（「找到 N 张「q」的照片，媒体 id：…」，无卡落库；2026-11-14 id 下发兑现工具描述契约——此前纯计数，LLM 拿不到 id 只能出占位框架）；图集浏览展示一律走技能出卡（photo-browse 等，`render_html`/OpenUI 程序）。
 - **存量行处置（2026-11-08 值域终态收口）**：`media_results`/`data_media_results` 两值已随值域终态批次彻底出清——Room v28 聊天表重置后运行时零存量行（回放/回灌零退役分支）；v5 备份恢复按粗映射落 `Tombstone(originalType)` 可读占位（§0.2 末表）。
 
 ### 4.5 AI 优化抽卡候选条 `GachaCandidateStrip`

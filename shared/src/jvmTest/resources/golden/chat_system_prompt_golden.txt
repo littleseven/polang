@@ -30,12 +30,12 @@
 - query_tag_scan_status: 查询 TAG 扫描状态（人脸/标签/语义索引进度）。
 - recall_chat_history: 召回当前会话更早的聊天历史原文（对话长了之后早期内容会被压缩摘要，摘要没细节时用它找回原文）。
 - recall_memory: system prompt【关于用户】段已含常见记忆，优先直接引用；本工具仅在该段未列全（被截断）或需拿 factId 删除时调用。
-- refine_media_search: 在上一轮搜索结果内细化过滤，返回命中总数与媒体 id 列表（并更新搜索基数；展示用 render_html 重出图集卡）。
+- refine_media_search: 在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数；展示用 render_html 重出图集卡）。
 - remember_fact: 记住一条事实，如用户说「帮我记住小宝对花粉过敏」「记住我喜欢低饱和度滤镜」。
 - remember_person_relation: 记住人物与「我」的关系，如用户说「小宝是我女儿」「大宝是我发小」。
 - render_html: 渲染一个 HTML 组件卡片插入聊天（端侧 WebView 渲染，支持内联 CSS/JS 动画与交互）。
 - run_gallery_script: 在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。
-- search_media: 搜索本地相册，返回命中总数与媒体 id 列表（结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡）。
+- search_media: 搜索本地相册，返回命中总数与前 24 个媒体 id（命中 ≤24 时全量返回；需要更多 id 用 run_gallery_script 的 gallery.query 获取）。
 - select_media: 选择/取消选择媒体。
 - share_media: 分享媒体。
 - switch_face_engine: 切换人脸检测引擎。

@@ -112,13 +112,13 @@ class IosChatGalleryCapabilityTest {
         assertTrue(reply.message.contains("1 个视频"), "应含视频数：${reply.message}")
     }
 
-    // ── 搜索 / 细化（降级路径；横滑卡退役后回执 = TextReply 计数文案）────────────
+    // ── 搜索 / 细化（降级路径；横滑卡退役后回执 = TextReply 计数 + 前 24 个媒体 id）────
 
     @Test
     fun searchMatchesFileNameIgnoreCase() = runTest {
         val (cap, _) = newCapability()
         val action = cap.execute(AgentCommand.SearchMedia(query = "CAT"), context, null).getOrThrow()
-        assertEquals("找到 1 张「CAT」的照片", assertIs<AgentAction.TextReply>(action).message)
+        assertEquals("找到 1 张「CAT」的照片，媒体 id：${idOf("L-1")}", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -136,7 +136,7 @@ class IosChatGalleryCapabilityTest {
             intent = SearchIntent(query = "", timeRange = TimeRange(1500L, 2500L))
         )
         val action = cap.execute(command, context, null).getOrThrow()
-        assertEquals("找到 1 张「」的照片", assertIs<AgentAction.TextReply>(action).message)
+        assertEquals("找到 1 张「」的照片，媒体 id：${idOf("L-2")}", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -145,14 +145,14 @@ class IosChatGalleryCapabilityTest {
         // 空关键词搜索 = 「看看最近的」，种子为全部 3 条
         cap.execute(AgentCommand.SearchMedia(query = ""), context, null).getOrThrow()
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "cat"), context, null).getOrThrow()
-        assertEquals("在上一轮结果内找到 1 张「cat」的照片", assertIs<AgentAction.TextReply>(action).message)
+        assertEquals("在上一轮结果内找到 1 张「cat」的照片，媒体 id：${idOf("L-1")}", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
     fun refineWithoutPreviousSearchFallsBackToGlobal() = runTest {
         val (cap, _) = newCapability()
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "dog"), context, null).getOrThrow()
-        assertEquals("找到 1 张「dog」的照片", assertIs<AgentAction.TextReply>(action).message)
+        assertEquals("找到 1 张「dog」的照片，媒体 id：${idOf("L-2")}", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -163,7 +163,7 @@ class IosChatGalleryCapabilityTest {
         val empty = cap.execute(AgentCommand.RefineMediaSearch(constraint = "不存在"), context, null).getOrThrow()
         assertEquals("在上一轮结果内找到 0 张「不存在」的照片", assertIs<AgentAction.TextReply>(empty).message)
         val again = cap.execute(AgentCommand.RefineMediaSearch(constraint = "dog"), context, null).getOrThrow()
-        assertEquals("在上一轮结果内找到 1 张「dog」的照片", assertIs<AgentAction.TextReply>(again).message)
+        assertEquals("在上一轮结果内找到 1 张「dog」的照片，媒体 id：${idOf("L-2")}", assertIs<AgentAction.TextReply>(again).message)
     }
 
     // ── 写命令 ──────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ class IosChatGalleryCapabilityTest {
         assertEquals(listOf("L-1"), bridge.deleted)
 
         val refine = cap.execute(AgentCommand.RefineMediaSearch(constraint = "dog"), context, null).getOrThrow()
-        assertEquals("找到 1 张「dog」的照片", assertIs<AgentAction.TextReply>(refine).message)
+        assertEquals("找到 1 张「dog」的照片，媒体 id：${idOf("L-2")}", assertIs<AgentAction.TextReply>(refine).message)
     }
 
     @Test
@@ -282,8 +282,11 @@ class IosChatGalleryCapabilityEngineTest {
         val search = FakeSearchBridge(twoPhotos + searchItem(103L, "S-3", mediaType = "VIDEO"))
         val cap = newCapability(search)
         val action = cap.execute(AgentCommand.SearchMedia(query = "海边"), context, null).getOrThrow()
-        // 回执 = TextReply 计数文案（横滑卡退役，逐字对齐 Android toTextReply）；VIDEO 已过滤
-        assertEquals("找到 2 张「海边」的照片", assertIs<AgentAction.TextReply>(action).message)
+        // 回执 = TextReply 计数 + 前 24 个媒体 id（横滑卡退役，逐字对齐 Android toTextReply）；VIDEO 已过滤
+        assertEquals(
+            "找到 2 张「海边」的照片，媒体 id：${idOf("S-1")},${idOf("S-2")}",
+            assertIs<AgentAction.TextReply>(action).message
+        )
         assertEquals(FakeSearchBridge.SearchCall("海边", null, null), search.searchCalls.single())
     }
 
@@ -292,8 +295,13 @@ class IosChatGalleryCapabilityEngineTest {
         val many = (1L..30L).map { searchItem(it, "S-$it") }
         val cap = newCapability(FakeSearchBridge(many))
         val action = cap.execute(AgentCommand.SearchMedia(query = "全部"), context, null).getOrThrow()
-        // 无卡片截断概念：回执文案承载全量命中数
-        assertEquals("找到 30 张「全部」的照片", assertIs<AgentAction.TextReply>(action).message)
+        // 无卡片截断概念：回执文案承载全量命中数；id 尾缀截前 24 个并指引 gallery.query
+        val expectedIds = (1L..24L).joinToString(",") { idOf("S-$it").toString() }
+        assertEquals(
+            "找到 30 张「全部」的照片，前 24 个媒体 id：$expectedIds" +
+                "（共 30 个，更多 id 用 run_gallery_script 的 gallery.query 获取）",
+            assertIs<AgentAction.TextReply>(action).message
+        )
     }
 
     // ── refine_media_search（契约 §9.2/§9.4）──────────────────────────────────
@@ -313,7 +321,7 @@ class IosChatGalleryCapabilityEngineTest {
             FakeSearchBridge.SearchCall("4月", intent, listOf(101L, 102L)),
             search.searchCalls.last()
         )
-        assertEquals("在上一轮结果内找到 1 张「4月」的照片", assertIs<AgentAction.TextReply>(action).message)
+        assertEquals("在上一轮结果内找到 1 张「4月」的照片，媒体 id：${idOf("S-2")}", assertIs<AgentAction.TextReply>(action).message)
     }
 
     @Test
@@ -324,7 +332,7 @@ class IosChatGalleryCapabilityEngineTest {
 
         // 「只要夜景」→ 清洗为「夜景」；filterInSet 按 labels 命中 S-2（不走引擎语义并集）
         val action = cap.execute(AgentCommand.RefineMediaSearch(constraint = "只要夜景"), context, null).getOrThrow()
-        assertEquals("在上一轮结果内找到 1 张「只要夜景」的照片", assertIs<AgentAction.TextReply>(action).message)
+        assertEquals("在上一轮结果内找到 1 张「只要夜景」的照片，媒体 id：${idOf("S-2")}", assertIs<AgentAction.TextReply>(action).message)
         assertEquals("夜景", search.searchCalls.last().query, "constraint 应被清洗")
         assertEquals(listOf(101L, 102L), search.searchCalls.last().limitToDbIds)
     }
@@ -343,7 +351,7 @@ class IosChatGalleryCapabilityEngineTest {
         // 再细化仍基于上一轮 2 条（状态未被空结果覆盖）
         search.results = twoPhotos
         val again = cap.execute(AgentCommand.RefineMediaSearch(constraint = "夜景"), context, null).getOrThrow()
-        assertEquals("在上一轮结果内找到 1 张「夜景」的照片", assertIs<AgentAction.TextReply>(again).message)
+        assertEquals("在上一轮结果内找到 1 张「夜景」的照片，媒体 id：${idOf("S-2")}", assertIs<AgentAction.TextReply>(again).message)
     }
 
     @Test

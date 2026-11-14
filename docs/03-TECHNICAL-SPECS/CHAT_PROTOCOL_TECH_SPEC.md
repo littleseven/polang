@@ -189,7 +189,7 @@ TurnPartsReducer 规则：
 成功后**双通道**：
 
 1. `uiActions.tryEmit(action)` → ChatViewModel 产卡落库（§2.4）；
-2. 按 action 类型生成**硬编码中文模板 observation**（"找到 N 张…"）作 @Tool 返回值 → Koog 自动包成 tool result 回喂下一轮 ReAct。⚠️ observation 只进模型/记忆，**绝不直达用户气泡**（I18N）；失败/超时统一 `"Error: ..."` 文本回传。
+2. 按 action 类型生成**硬编码中文模板 observation**（"找到 N 张…，媒体 id：…"——search/refine 2026-11-14 起附前 24 个媒体 id，供 LLM render_html + media://{id} 出图集卡）作 @Tool 返回值 → Koog 自动包成 tool result 回喂下一轮 ReAct。⚠️ observation 只进模型/记忆，**绝不直达用户气泡**（I18N）；失败/超时统一 `"Error: ..."` 文本回传。
 
 ### 2.4 产物落库路径（emit* 全清单）
 
@@ -200,7 +200,7 @@ TurnPartsReducer 规则：
 | draw_chart | onDrawChart → QuickJS `Chart.bar/line/pie` 生成 SVG → `emitChartMessage` + feedToolOutput | `tool_chart`，content=SVG |
 | render_html | onRenderHtml → `HtmlCardSanitizer.sanitize` → `emitHtmlCardMessage` + feedToolOutput | `tool_html`，content=清洗后 HTML，metadata.html_card={display,summary} |
 | run_gallery_script 直出 | onRunScript 拦截 return：`{chart}`→emitChartMessage；`{html}`→sanitize→emitHtmlCardMessage | 同上 |
-| search_media / refine | uiActions(TextReply) → 纯文本回执落库（2026-11-08 横滑图集卡退役：不再产 `data_media_results` 行） | `text`（role=agent），content=计数文案（如「找到 N 张「q」的照片」） |
+| search_media / refine | uiActions(TextReply) → 纯文本回执落库（2026-11-08 横滑图集卡退役：不再产 `data_media_results` 行） | `text`（role=agent），content=计数 + 前 24 个媒体 id 文案（如「找到 N 张「q」的照片，媒体 id：…」，2026-11-14 id 下发） |
 | edit_image | ImageEditCapability → uiActions → `insertEditResultMessage` | `tool_image_edit`，content=explanation，metadata={imageUri,saved,suggestions} |
 | ai_optimize | handleAiOptimize → `insertOptimizeCandidatesMessage`；换一组/落选同 id REPLACE | `data_optimize_candidates`，metadata=group JSON |
 | browser_* | 会话定格 `emitBrowserCardMessage`（turn 结束 `settleBrowserSessionsAtTurnEnd` 兜底强制 close+定格） | `tool_browser`，content 投影 = BrowserLive 整颗 part JSON（partId 归一 "p0"） |

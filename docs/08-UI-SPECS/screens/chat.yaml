@@ -541,7 +541,7 @@ input_bar:
 # ============================================================================
 # 原生横滑图集卡整体退役拆除（spec：2026-11-08-media-results-carousel-retirement-design.md，
 # 交付后 spec 本体按沉淀管线清理，结论已落 CHAT_CARD_CATALOG.md §4.4 墓碑与本文各处注记）：
-# - search_media / refine_media_search 回执 = agent 文本计数文案（「找到 N 张「q」的照片」），无卡落库；
+# - search_media / refine_media_search 回执 = agent 文本计数 + 前 24 个媒体 id（「找到 N 张「q」的照片，媒体 id：…」，2026-11-14 id 下发兑现工具描述契约），无卡落库；
 # - 图集浏览展示一律由 AI 走技能出卡（photo-browse 等，render_html / OpenUI 程序）；
 # - 卡面反馈三件套（👍👎🔄 = record_feedback / more_like_this / exclude_constraint）随卡删除；
 # - 回合内 upsert 去重、查看全部尾卡、全屏预览挂载、意图误拒补卡等机制全部下线；

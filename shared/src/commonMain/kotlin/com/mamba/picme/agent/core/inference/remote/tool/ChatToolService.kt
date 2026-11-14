@@ -156,7 +156,7 @@ class ChatToolService private constructor() : TraceIdAware {
         dispatchCommand(AgentCommand.GetGallerySummary(includeDetails = false))
 
     @Tool(customName = "search_media")
-    @LLMDescription("搜索本地相册，返回命中总数与媒体 id 列表（结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡）。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。")
+    @LLMDescription("搜索本地相册，返回命中总数与前 24 个媒体 id（命中 ≤24 时全量返回；需要更多 id 用 run_gallery_script 的 gallery.query 获取）。结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") person: String,
@@ -169,7 +169,7 @@ class ChatToolService private constructor() : TraceIdAware {
     }
 
     @Tool(customName = "refine_media_search")
-    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与媒体 id 列表（并更新搜索基数；展示用 render_html 重出图集卡）。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
+    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数；展示用 render_html 重出图集卡）。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
     suspend fun refineMediaSearch(
         @LLMDescription("细化条件") constraint: String,
         @LLMDescription("时间起点（毫秒），如某月起始；空串=不限") fromMs: String,

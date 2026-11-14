@@ -19,8 +19,9 @@ import java.lang.ref.WeakReference
  * 镜像 GalleryCapability 的 WeakReference Delegate 套路。
  *
  * 横滑卡退役（2026-11-08）：搜索/细化结果不再产出卡片 action，统一回 [AgentAction.TextReply]
- * 计数文本；展示由 LLM 经 render_html 图集卡完成。反馈三件套（record_feedback /
- * more_like_this / exclude_constraint）同步删除。
+ * 计数 + 前 24 个媒体 id 文本（2026-11-14 id 下发，兑现工具描述契约）；展示由 LLM 经
+ * render_html 图集卡完成。反馈三件套（record_feedback / more_like_this /
+ * exclude_constraint）同步删除。
  */
 class ChatSearchCapability private constructor() : BaseCapability() {
 
@@ -127,11 +128,14 @@ data class SearchOutcome(
     val errorMessage: String? = null
 ) {
     /**
-     * 横滑卡退役后的产出形态：计数文本（**仅 LLM 观测，不直达用户气泡**——Android
-     * uiActions 收集器与 iOS text_reply 均忽略 TextReply；中文硬编码文案若直达用户
-     * 会触 [I18N] 红线，复用者注意）。
-     * 命中 id 清单由 ChatViewModel 搜索基数（lastResultAssets / 快照）承载，
-     * LLM 出图集卡经 render_html + media://{id} 引用。
+     * 横滑卡退役后的产出形态：计数 + 前 [MAX_OBSERVATION_IDS] 个媒体 id
+     * （**仅 LLM 观测，不直达用户气泡**——Android uiActions 收集器与 iOS text_reply
+     * 均忽略 TextReply；中文硬编码文案若直达用户会触 [I18N] 红线，复用者注意）。
+     * 全量命中 id 清单由 ChatViewModel 搜索基数（lastResultAssets / 快照）承载；
+     * LLM 出图集卡经 render_html + media://{id} 引用——2026-11-14 起 id 随回执
+     * 下发兑现工具描述契约（此前只回计数，模型拿不到 id 只能出占位框架）。
+     * id 为 opaque 数字（无路径/元数据），与 run_gallery_script gallery.query 的
+     * {ids,total} 同一暴露面，[PRIVACY] 不新增暴露类。
      */
     fun toTextReply(commandId: Int): Result<AgentAction> {
         if (errorMessage != null) {
@@ -143,11 +147,29 @@ data class SearchOutcome(
                 )
             )
         }
-        val message = if (isRefinement) {
-            "在上一轮结果内找到 $totalCount 张「$query」的照片"
-        } else {
-            "找到 $totalCount 张「$query」的照片"
-        }
+        val message = buildCountWithIds(
+            if (isRefinement) "在上一轮结果内找到 $totalCount 张「$query」的照片"
+            else "找到 $totalCount 张「$query」的照片",
+            mediaIds
+        )
         return Result.success(AgentAction.TextReply(commandId = commandId, message = message))
+    }
+
+    companion object {
+        /** 回执附带的媒体 id 上限（图集卡一屏所需；更多 id 经 gallery.query 取）。 */
+        const val MAX_OBSERVATION_IDS = 24
+
+        /** 计数前缀 + 有界 id 尾缀（双端 chat 链路同一字面量，iOS 逐字对齐）。 */
+        fun buildCountWithIds(prefix: String, mediaIds: List<Long>): String {
+            if (mediaIds.isEmpty()) return prefix
+            val shown = mediaIds.take(MAX_OBSERVATION_IDS)
+            val suffix = shown.joinToString(",")
+            return if (mediaIds.size <= MAX_OBSERVATION_IDS) {
+                "$prefix，媒体 id：$suffix"
+            } else {
+                "$prefix，前 $MAX_OBSERVATION_IDS 个媒体 id：$suffix" +
+                    "（共 ${mediaIds.size} 个，更多 id 用 run_gallery_script 的 gallery.query 获取）"
+            }
+        }
     }
 }
