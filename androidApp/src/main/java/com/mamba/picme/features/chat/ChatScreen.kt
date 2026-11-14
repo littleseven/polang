@@ -373,6 +373,41 @@ fun ChatScreen(
     var isSidebarOpen by remember { mutableStateOf(false) }
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
+
+    /**
+     * Html 卡本地媒体缩略图点击 → 原生横滑预览（2026-11-15）：集合语义对齐
+     * OpenUI PhotoGrid（onPhotoClick）——卡内全部 media 引用为翻页集，点击项为初始页。
+     * id→uri 解析走 [LocalMediaWebViewAssets.mediaUriResolver]（组合根注入的真源），
+     * Room 主键查询下放 IO 线程（resolver 允许阻塞，主线程禁查）。
+     */
+    fun openHtmlMediaPreview(html: String, messageId: String, clickedId: Long) {
+        scope.launch(Dispatchers.IO) {
+            val ids = LocalMediaWebViewAssets.extractMediaIds(html).ifEmpty { listOf(clickedId) }
+            val uris = ids.mapNotNull { id ->
+                runCatching { LocalMediaWebViewAssets.mediaUriResolver?.invoke(id) }
+                    .getOrNull()?.toString()
+            }
+            if (uris.isEmpty()) return@launch
+            val initial = if (uris.size == ids.size) {
+                ids.indexOf(clickedId).coerceAtLeast(0)
+            } else {
+                0
+            }
+            withContext(Dispatchers.Main) {
+                imagePreview = ChatImagePreviewState(
+                    pages = uris.map { uri ->
+                        ImagePreviewPage(
+                            messageId = messageId,
+                            rawUri = uri,
+                            isEditableResult = false,
+                            isSaved = false,
+                        )
+                    },
+                    initialIndex = initial,
+                )
+            }
+        }
+    }
     var previewChartSvg by remember { mutableStateOf<String?>(null) }
     // 浏览器直播卡全屏交互接管状态（帧 + 会话上下文）
     var browserFramePreview by remember { mutableStateOf<BrowserFramePreviewState?>(null) }
@@ -686,10 +721,14 @@ fun ChatScreen(
                                         previewViewportHeightDp = listViewportHeightDp,
                                         isListScrolling = isListScrolling,
                                         onOpenLink = { url -> previewLinkUrl = url },
+                                        onOpenMedia = { id ->
+                                            openHtmlMediaPreview(part.html, item.message.id, id)
+                                        },
                                         onOpenFullpage = {
                                             fullpageHtmlCard = HtmlFullpageContent(
                                                 html = part.html,
-                                                title = part.meta.summary
+                                                title = part.meta.summary,
+                                                messageId = item.message.id
                                             )
                                         },
                                         onDisplayModeResolved = { mode, measuredPx ->
@@ -980,29 +1019,6 @@ fun ChatScreen(
                 onDismiss = { isSidebarOpen = false }
             )
 
-            // 图片全屏预览（横滑翻页）
-            ChatImagePreviewOverlay(
-                state = imagePreview,
-                onSave = { messageId, onDone ->
-                    viewModel.saveEditResult(messageId) { ok ->
-                        if (ok) {
-                            imagePreview = imagePreview?.let { s ->
-                                s.copy(
-                                    pages = s.pages.map { p ->
-                                        if (p.messageId == messageId) p.copy(isSaved = true) else p
-                                    }
-                                )
-                            }
-                        }
-                        onDone(ok)
-                    }
-                },
-                onPageChanged = { page ->
-                    if (page.isEditableResult) viewModel.touchEditImage(page.rawUri)
-                },
-                onDismiss = { imagePreview = null }
-            )
-
             // 图表全屏预览
             ChartPreviewOverlay(
                 svg = previewChartSvg,
@@ -1062,7 +1078,36 @@ fun ChatScreen(
             HtmlFullpageViewer(
                 content = fullpageHtmlCard,
                 onOpenLink = { url -> previewLinkUrl = url },
-                onDismiss = { fullpageHtmlCard = null }
+                onDismiss = { fullpageHtmlCard = null },
+                onOpenMedia = { id ->
+                    fullpageHtmlCard?.html?.let { html ->
+                        openHtmlMediaPreview(html, fullpageHtmlCard?.messageId ?: "", id)
+                    }
+                }
+            )
+
+            // 图片全屏预览（横滑翻页）——组合序在 HTML 卡全屏查看器之后（z 序置顶：
+            // 查看器内 media:// 缩略图点击进原生预览时叠在查看器之上，dismiss 回查看器）
+            ChatImagePreviewOverlay(
+                state = imagePreview,
+                onSave = { messageId, onDone ->
+                    viewModel.saveEditResult(messageId) { ok ->
+                        if (ok) {
+                            imagePreview = imagePreview?.let { s ->
+                                s.copy(
+                                    pages = s.pages.map { p ->
+                                        if (p.messageId == messageId) p.copy(isSaved = true) else p
+                                    }
+                                )
+                            }
+                        }
+                        onDone(ok)
+                    }
+                },
+                onPageChanged = { page ->
+                    if (page.isEditableResult) viewModel.touchEditImage(page.rawUri)
+                },
+                onDismiss = { imagePreview = null }
             )
 
             // 任务卡 OpenUI 全屏查看器（H3：升格预览态点击进入，同一展开程序原生渲染）

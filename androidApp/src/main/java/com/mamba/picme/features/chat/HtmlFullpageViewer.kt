@@ -60,7 +60,9 @@ import com.mamba.picme.R
 fun HtmlFullpageViewer(
     content: HtmlFullpageContent?,
     onOpenLink: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** 本地媒体缩略图点击 → 宿主开原生预览（与卡片沙箱同机制，2026-11-15）。 */
+    onOpenMedia: ((Long) -> Unit)? = null
 ) {
     if (content == null) return
     var loadFailed by remember(content) { mutableStateOf(false) }
@@ -121,7 +123,7 @@ fun HtmlFullpageViewer(
                 AndroidView(
                     factory = { context ->
                         WebView(context).apply {
-                            applyFullpageSandbox(onOpenLink) { loadFailed = true }
+                            applyFullpageSandbox(onOpenLink, onOpenMedia) { loadFailed = true }
                             tag = content.html.hashCode()
                             loadDataWithBaseURL(
                                 null,
@@ -164,10 +166,13 @@ fun HtmlFullpageViewer(
 /**
  * 全屏查看器沙箱：与卡片沙箱逐项对齐（零桥/禁文件/禁 DOM Storage/无缓存），
  * 差异仅竖滚放行 + 滚动条显示；不注入测高 JS/ResizeObserver；永不导航（`<a>` 回传 [onOpenLink]）。
+ * 缩略图点击预览（2026-11-15）与卡片同机制：注入 [MEDIA_VIEW_CLICK_JS] +
+ * `polang-media-view://{id}` 拦截回调 [onOpenMedia]。
  */
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.applyFullpageSandbox(
     onOpenLink: (String) -> Unit,
+    onOpenMedia: ((Long) -> Unit)?,
     onRenderFailed: () -> Unit
 ) {
     settings.javaScriptEnabled = true
@@ -186,8 +191,16 @@ private fun WebView.applyFullpageSandbox(
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url?.toString() ?: return true
             val scheme = request.url.scheme?.lowercase()
-            if (scheme == "http" || scheme == "https") onOpenLink(url)
+            when (scheme) {
+                "http", "https" -> onOpenLink(url)
+                LocalMediaWebViewAssets.MEDIA_VIEW_SCHEME ->
+                    LocalMediaWebViewAssets.parseMediaViewId(url)?.let { id -> onOpenMedia?.invoke(id) }
+            }
             return true
+        }
+
+        override fun onPageFinished(view: WebView, url: String?) {
+            view.evaluateJavascript(MEDIA_VIEW_CLICK_JS, null)
         }
 
         /** 本地白名单注入（同卡片沙箱）：预制 JS 库（[LocalWebViewLibs]）+ 本地媒体（[LocalMediaWebViewAssets]）；其余子资源放行。 */

@@ -66,11 +66,12 @@ class ChatToolService private constructor() : TraceIdAware {
         /**
          * dispatch 等待超时（毫秒）。原 5s 对齐旧 `future{}.get(5, SECONDS)`，但真机实测
          * 冷搜索（MediaStore 首查 + 索引冷启动）需 ~8s，5s 预算下冷启动搜索必超时
-         *（2026-11-08 循环事故一环）。
-         * 放宽到 15s：覆盖冷搜索预算，仍 < registry 内层 25s（层叠不变式不破，
-         * 与 WEB_SEARCH/SKILL 同量级），由 `CommandTimeoutLayeringTest` 钉住。
+         *（2026-11-08 循环事故一环）。15s 仍不够：2026-11-15 真机实测大库冷语义搜索
+         * 首查 13~16s（TagTranslator MT 回退 + 全库内容过滤），15s 档即误报「0 张」
+         * 诱发 LLM 重试。放宽到 20s，仍 < registry 内层 25s（层叠不变式不破），
+         * 由 `CommandTimeoutLayeringTest` 钉住。
          */
-        internal const val DISPATCH_TIMEOUT_MS = 15_000L
+        internal const val DISPATCH_TIMEOUT_MS = 20_000L
 
         /**
          * browser_* 工具族的外层 dispatch 等待超时（毫秒）：与 registry 内层命令执行超时同源

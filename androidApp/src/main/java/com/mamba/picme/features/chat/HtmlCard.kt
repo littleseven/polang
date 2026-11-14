@@ -167,6 +167,12 @@ fun HtmlCard(
     previewViewportHeightDp: Int = 0,
     isListScrolling: Boolean = false,
     onOpenLink: ((String) -> Unit)? = null,
+    /**
+     * 卡内本地媒体缩略图点击 → 宿主打开原生预览（2026-11-15）：宿主注入 JS 把点击转
+     * `polang-media-view://{id}` 导航，沙箱拦截后回调此（零 JS 桥接不变）。
+     * 仅 INLINE 态可达（预览卡触控层消费点击，进全屏查看器后由查看器侧同机制接管）。
+     */
+    onOpenMedia: ((Long) -> Unit)? = null,
     /** 预览卡点击 / 兜底封面点击 → 宿主打开全屏查看器（[HtmlFullpageViewer]）。 */
     onOpenFullpage: (() -> Unit)? = null,
     /** 端侧终判完成回调（宿主持久化 displayMode + 测高到消息 metadata）；仅在首次判定时触发。 */
@@ -316,6 +322,7 @@ fun HtmlCard(
                         }
                     },
                     onOpenLink = onOpenLink,
+                    onOpenMedia = onOpenMedia,
                     onRenderFailed = { renderFailed = true },
                     onPagerSwipeLock = onPagerSwipeLock
                 )
@@ -467,6 +474,7 @@ private fun HtmlWebView(
     previewMode: Boolean = false,
     onContentHeightCssPx: ((Int) -> Unit)? = null,
     onOpenLink: ((String) -> Unit)? = null,
+    onOpenMedia: ((Long) -> Unit)? = null,
     onRenderFailed: (() -> Unit)? = null,
     onPagerSwipeLock: ((Boolean) -> Unit)? = null
 ) {
@@ -480,6 +488,7 @@ private fun HtmlWebView(
     val currentMeasureEnabled by rememberUpdatedState(measureEnabled)
     val currentMeasureCallback by rememberUpdatedState(onContentHeightCssPx)
     val currentOpenLink by rememberUpdatedState(onOpenLink)
+    val currentOpenMedia by rememberUpdatedState(onOpenMedia)
     val currentRenderFailed by rememberUpdatedState(onRenderFailed)
 
     AndroidView(
@@ -517,6 +526,7 @@ private fun HtmlWebView(
                     measureEnabled = { currentMeasureEnabled },
                     onContentHeightCssPx = { px -> currentMeasureCallback?.invoke(px) },
                     onOpenLink = { url -> currentOpenLink?.invoke(url) },
+                    onOpenMedia = { id -> currentOpenMedia?.invoke(id) },
                     onRenderFailed = { currentRenderFailed?.invoke() },
                 )
                 loadHtmlOnce(html)
@@ -642,6 +652,28 @@ private const val MEASURE_HEIGHT_JS =
 private const val HEIGHT_CONSOLE_PREFIX = "__polang_card_height:"
 
 /**
+ * 缩略图点击预览 JS（2026-11-15，宿主注入——非 LLM 产物）：给白名单域本地媒体
+ * （`polang-media.invalid/media/{id}`，[LocalMediaWebViewAssets.rewriteMediaRefs] 重写产物）
+ * 的 img/video 绑 click → `location.href = polang-media-view://{id}`，原生
+ * `shouldOverrideUrlLoading` 拦截后回调宿主开原生预览。mutation 兜底覆盖 JS 动态
+ * 拼接的媒体节点；`data-polang-pv` 防重复绑定。经 `evaluateJavascript` 注入，
+ * 无任何原生对象暴露（零桥接不变）。卡片沙箱与全屏查看器共用。
+ */
+internal const val MEDIA_VIEW_CLICK_JS =
+    "(function(){function bind(){" +
+        "var n=document.querySelectorAll('img[src*=\"${LocalMediaWebViewAssets.MEDIA_HOST}/media/\"],video[src*=\"${LocalMediaWebViewAssets.MEDIA_HOST}/media/\"]');" +
+        "for(var i=0;i<n.length;i++){var el=n[i];" +
+        "if(el.getAttribute('data-polang-pv'))continue;" +
+        "el.setAttribute('data-polang-pv','1');el.style.cursor='zoom-in';" +
+        "el.addEventListener('click',function(e){" +
+        "e.preventDefault();e.stopPropagation();" +
+        "var m=(this.getAttribute('src')||'').match(/\\/media\\/(-?\\d+)/);" +
+        "if(m)window.location.href='${LocalMediaWebViewAssets.MEDIA_VIEW_SCHEME}://'+m[1];});}}" +
+        "bind();" +
+        "if(window.__polangPvMo)return;window.__polangPvMo=true;" +
+        "try{new MutationObserver(bind).observe(document.documentElement,{subtree:true,childList:true});}catch(e){}})()"
+
+/**
  * 高度监听 JS：ResizeObserver 观察 body，内容高度变化（手风琴展开/Tab 切换/JS 动态排版）时
  * 经 console.log 上报——`onConsoleMessage` 是 JS→原生的单向被动通道（JS 拿不到任何原生对象，
  * 不破坏零桥接红线）。经 `evaluateJavascript` 注入，片段/完整文档均生效；老内核无 ResizeObserver
@@ -671,6 +703,7 @@ private fun WebView.applyCardSandbox(
     measureEnabled: () -> Boolean,
     onContentHeightCssPx: ((Int) -> Unit)?,
     onOpenLink: ((String) -> Unit)?,
+    onOpenMedia: ((Long) -> Unit)?,
     onRenderFailed: (() -> Unit)?
 ) {
     settings.javaScriptEnabled = true
@@ -702,12 +735,17 @@ private fun WebView.applyCardSandbox(
     webViewClient = object : WebViewClient() {
         /**
          * 卡片自身永不导航（一律拦截）：http(s) 外链回调 [onOpenLink] 由宿主打开落地页；
+         * `polang-media-view://{id}`（卡内注入 JS 的缩略图点击）回调 [onOpenMedia] 开原生预览；
          * 其他协议（tel:/mailto:/intent: 等）静默吞掉。
          */
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val url = request.url?.toString() ?: return true
             val scheme = request.url.scheme?.lowercase()
-            if (scheme == "http" || scheme == "https") onOpenLink?.invoke(url)
+            when (scheme) {
+                "http", "https" -> onOpenLink?.invoke(url)
+                LocalMediaWebViewAssets.MEDIA_VIEW_SCHEME ->
+                    LocalMediaWebViewAssets.parseMediaViewId(url)?.let { id -> onOpenMedia?.invoke(id) }
+            }
             return true
         }
 
@@ -744,6 +782,8 @@ private fun WebView.applyCardSandbox(
         }
 
         override fun onPageFinished(view: WebView, url: String?) {
+            // 缩略图点击绑定先行注入（与测高无关，预览卡 WebView 不可触摸时为无害空跑）
+            view.evaluateJavascript(MEDIA_VIEW_CLICK_JS, null)
             if (!measureEnabled()) return
             // 高度 watcher 与布局无关（ResizeObserver 注册即生效），先行注入；
             // 上报侧已对「布局完成前虚高」做丢弃（见 onConsoleMessage）

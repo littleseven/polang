@@ -111,4 +111,35 @@ class LocalMediaWebViewAssetsTest {
         assertTrue(LocalMediaWebViewAssets.MEDIA_HOST.endsWith(".invalid"))
         assertEquals("https://" + LocalMediaWebViewAssets.MEDIA_HOST, LocalMediaWebViewAssets.MEDIA_URL_PREFIX)
     }
+
+    // ── 缩略图点击预览导航（polang-media-view://{id}，2026-11-15）──
+
+    @Test
+    fun `mediaViewUrl and parseMediaViewId round trip`() {
+        assertEquals(123L, LocalMediaWebViewAssets.parseMediaViewId(LocalMediaWebViewAssets.mediaViewUrl(123)))
+        assertEquals(
+            -10000211391L,
+            LocalMediaWebViewAssets.parseMediaViewId(LocalMediaWebViewAssets.mediaViewUrl(-10000211391))
+        )
+        assertEquals("polang-media-view://42", LocalMediaWebViewAssets.mediaViewUrl(42))
+    }
+
+    @Test
+    fun `parseMediaViewId rejects malformed urls`() {
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaViewId("polang-media-view://abc"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaViewId("polang-media-view://"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaViewId("https://polang-media.invalid/media/123"))
+        assertEquals(null, LocalMediaWebViewAssets.parseMediaViewId("media://123"))
+    }
+
+    @Test
+    fun `extractMediaIds collects distinct ids in order`() {
+        val html = """<img src="media://7"><img src="media://-3"><video src="media://7"></video><img src="media://12abc">"""
+        assertEquals(listOf(7L, -3L), LocalMediaWebViewAssets.extractMediaIds(html))
+    }
+
+    @Test
+    fun `extractMediaIds returns empty for html without refs`() {
+        assertEquals(emptyList<Long>(), LocalMediaWebViewAssets.extractMediaIds("<div>hello</div>"))
+    }
 }

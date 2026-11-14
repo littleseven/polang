@@ -41,6 +41,14 @@ object LocalMediaWebViewAssets {
     /** 白名单拦截域（拦截失效时 DNS 必失败，不会误触真实站点）。 */
     const val MEDIA_HOST = "polang-media.invalid"
 
+    /**
+     * 缩略图点击预览导航 scheme（2026-11-15）：卡内宿主注入 JS 点击 media 图 →
+     * `location.href = "$MEDIA_VIEW_SCHEME://{id}"`，[HtmlCard] 沙箱
+     * `shouldOverrideUrlLoading` 拦截后回调宿主开原生预览——不 addJavascriptInterface，
+     * 零桥接防线不动。
+     */
+    const val MEDIA_VIEW_SCHEME = "polang-media-view"
+
     /** 重写目标 URL 前缀（`<img src="$MEDIA_URL_PREFIX/media/{id}">`）。 */
     const val MEDIA_URL_PREFIX = "https://$MEDIA_HOST"
 
@@ -76,10 +84,29 @@ object LocalMediaWebViewAssets {
 
     /**
      * 完整 `media://{id}` URL → chat 媒体 id（纯函数，JS 运行时拼接场景：
-     * 入参形如 `media://123` / `media://-10000211391`）。契约外输入一律 null。
+     * 入参形如 `media://123` / `media://-3628631`）。契约外输入一律 null。
      */
     internal fun parseMediaRefId(url: String): Long? =
         MEDIA_REF_REGEX.find(url)?.groupValues?.get(1)?.toLongOrNull()
+
+    /** 预览导航 URL：`polang-media-view://{id}`（卡内注入 JS 构造）。 */
+    internal fun mediaViewUrl(id: Long): String = "$MEDIA_VIEW_SCHEME://$id"
+
+    /** 预览导航 URL → chat 媒体 id（契约外输入 null）。 */
+    internal fun parseMediaViewId(url: String): Long? =
+        url.removePrefix("$MEDIA_VIEW_SCHEME://").toLongOrNull()
+
+    /**
+     * 提取 html 中全部 `media://{id}` 引用（出现序、去重；预览多页集合用）。
+     * 无引用返回空表。纯函数，便于 JVM 单测。
+     */
+    internal fun extractMediaIds(html: String): List<Long> {
+        if (!html.contains(MEDIA_REF_SCHEME)) return emptyList()
+        return MEDIA_REF_REGEX.findAll(html)
+            .mapNotNull { it.groupValues.getOrNull(1)?.toLongOrNull() }
+            .distinct()
+            .toList()
+    }
 
     @Volatile
     private var assetLoader: WebViewAssetLoader? = null

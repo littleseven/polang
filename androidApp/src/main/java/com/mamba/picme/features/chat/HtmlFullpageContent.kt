@@ -4,5 +4,7 @@ package com.mamba.picme.features.chat
 data class HtmlFullpageContent(
     val html: String,
     /** 顶栏标题（render_html 的 summary，截断显示）；null 时用默认标题。 */
-    val title: String?
+    val title: String?,
+    /** 来源消息 id（缩略图预览翻页集的 messageId，2026-11-15）；查看器本身不消费。 */
+    val messageId: String = ""
 )
