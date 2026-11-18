@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.data.local.MediaDao
+import com.mamba.picme.data.local.MediaIdUri
 import com.mamba.picme.data.model.MediaEntity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -115,7 +116,7 @@ class MediaRepositoryImplTest {
     private fun repositoryWith(resolver: ContentResolver): MediaRepositoryImpl {
         val mediaDao = mockk<MediaDao>()
         every { mediaDao.getAllMedia() } returns flowOf(emptyList())
-        coEvery { mediaDao.getAllMediaNow() } returns emptyList()
+        coEvery { mediaDao.getAllMediaIdUris() } returns emptyList()
         coEvery { mediaDao.insertMedia(any()) } returns 1L
         val context = mockk<Context>()
         every { context.applicationContext } returns context
@@ -226,7 +227,9 @@ class MediaRepositoryImplTest {
     private fun daoBackedBy(dbFlow: MutableStateFlow<List<MediaEntity>>): MediaDao {
         val mediaDao = mockk<MediaDao>()
         every { mediaDao.getAllMedia() } returns dbFlow
-        coEvery { mediaDao.getAllMediaNow() } answers { dbFlow.value }
+        coEvery { mediaDao.getAllMediaIdUris() } answers {
+            dbFlow.value.map { entity -> MediaIdUri(entity.id, entity.uri) }
+        }
         coEvery { mediaDao.getMediaByUri(any()) } returns null
         coEvery { mediaDao.deleteMediaByIds(any()) } answers {
             val ids = firstArg<List<Long>>().toSet()

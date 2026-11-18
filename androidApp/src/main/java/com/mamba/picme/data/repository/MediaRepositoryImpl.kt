@@ -349,7 +349,8 @@ class MediaRepositoryImpl(
      * @param systemMedia 已从 MediaStore 查询的系统媒体列表（由调用方传入避免重复查询）
      */
     private suspend fun syncSystemMediaToDb(systemMedia: List<MediaAsset>) {
-        val dbMedia = mediaDao.getAllMediaNow()
+        // 轻量投影（id+uri）：全列 SELECT * 在万级媒体库直接 OOM（2026-11-19 真机 8148 行实证）
+        val dbMedia = mediaDao.getAllMediaIdUris()
         val dbUriSet = dbMedia.map { it.uri }.toSet()
         val systemUriSet = systemMedia.map { it.uri }.toHashSet()
 

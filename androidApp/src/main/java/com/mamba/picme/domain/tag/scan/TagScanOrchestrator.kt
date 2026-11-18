@@ -322,8 +322,16 @@ class TagScanOrchestrator(
                 DbscanRefinementPolicy.shouldRunRefinement(embeddingsSinceDbscan, isFinalBatch = true)
             ) {
                 logInfo(sessionId, "阶段末全量重聚类")
-                scheduler.executeDbscan(preserveNamedPersons = true, isFullRescan = true)
-                embeddingsSinceDbscan = 0
+                try {
+                    scheduler.executeDbscan(preserveNamedPersons = true, isFullRescan = true)
+                    embeddingsSinceDbscan = 0
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // 聚类失败（如 OOM 熔断）按会话级失败降级：保留 embeddingsSinceDbscan
+                    // 计数，下个 sweep 末批重试；绝不上抛杀死调用方协程（START_STICKY 崩溃循环）
+                    logError(sessionId, "阶段末全量重聚类失败（下轮重试）: ${e.message}")
+                }
             }
             // 第一阶段全量完成：若有延迟阶段，切换到第二阶段（递归一层，第二阶段 deferredPasses 已空 → 不会死循环）
             val nextPolicy = nextPhasePolicy(policy)

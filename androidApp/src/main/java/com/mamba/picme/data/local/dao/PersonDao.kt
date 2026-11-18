@@ -13,6 +13,15 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface PersonDao {
 
+    companion object {
+        /**
+         * face_embeddings 分块读取块大小（行/块）。
+         * 单行含 2KB embedding BLOB，200 行 ≈ 400KB/块，远低于单 CursorWindow 约 2MB 上限
+         * （真机实证：1417 行一次读取在第 328 行越界崩溃）。
+         */
+        const val EMBEDDING_CHUNK_SIZE = 200
+    }
+
     @Insert
     suspend fun insertPerson(person: PersonEntity): Long
 
@@ -141,14 +150,68 @@ interface PersonDao {
     @Insert
     suspend fun insertEmbeddings(embeddings: List<FaceEmbeddingEntity>): List<Long>
 
-    @Query("SELECT * FROM face_embeddings WHERE personId = :personId")
-    suspend fun getEmbeddingsByPerson(personId: Long): List<FaceEmbeddingEntity>
+    /** 按人物分页读取 embedding（窗口约束同 [getUnassignedEmbeddingsPage]） */
+    @Query("SELECT * FROM face_embeddings WHERE personId = :personId ORDER BY embeddingId LIMIT :limit OFFSET :offset")
+    suspend fun getEmbeddingsByPersonPage(personId: Long, limit: Int, offset: Int): List<FaceEmbeddingEntity>
 
-    @Query("SELECT * FROM face_embeddings WHERE personId IS NULL")
-    suspend fun getUnassignedEmbeddings(): List<FaceEmbeddingEntity>
+    /** 按人物全量读取 embedding（[EMBEDDING_CHUNK_SIZE] 行/块分块聚合，大簇规避 CursorWindow 上限） */
+    suspend fun getEmbeddingsByPerson(
+        personId: Long,
+        chunkSize: Int = EMBEDDING_CHUNK_SIZE
+    ): List<FaceEmbeddingEntity> {
+        val result = ArrayList<FaceEmbeddingEntity>()
+        var offset = 0
+        while (true) {
+            val page = getEmbeddingsByPersonPage(personId, chunkSize, offset)
+            result.addAll(page)
+            if (page.size < chunkSize) break
+            offset += page.size
+        }
+        return result
+    }
 
-    @Query("SELECT * FROM face_embeddings")
-    suspend fun getAllEmbeddings(): List<FaceEmbeddingEntity>
+    /**
+     * 未分配 embedding 分页读取。
+     * 单行含 2KB embedding BLOB，单 CursorWindow 上限约 2MB——千行级一次 SELECT *
+     * 会越界崩溃（Couldn't read row N from CursorWindow，真机 1417 行实证），
+     * 全量读取必须经 [getUnassignedEmbeddings] 分块聚合。
+     */
+    @Query("SELECT * FROM face_embeddings WHERE personId IS NULL ORDER BY embeddingId LIMIT :limit OFFSET :offset")
+    suspend fun getUnassignedEmbeddingsPage(limit: Int, offset: Int): List<FaceEmbeddingEntity>
+
+    /** 未分配 embedding 全量读取（[EMBEDDING_CHUNK_SIZE] 行/块分块聚合，规避 CursorWindow 上限） */
+    suspend fun getUnassignedEmbeddings(chunkSize: Int = EMBEDDING_CHUNK_SIZE): List<FaceEmbeddingEntity> {
+        val result = ArrayList<FaceEmbeddingEntity>()
+        var offset = 0
+        while (true) {
+            val page = getUnassignedEmbeddingsPage(chunkSize, offset)
+            result.addAll(page)
+            if (page.size < chunkSize) break
+            offset += page.size
+        }
+        return result
+    }
+
+    /** 全量 embedding 分页读取（窗口约束同 [getUnassignedEmbeddingsPage]） */
+    @Query("SELECT * FROM face_embeddings ORDER BY embeddingId LIMIT :limit OFFSET :offset")
+    suspend fun getAllEmbeddingsPage(limit: Int, offset: Int): List<FaceEmbeddingEntity>
+
+    /** 全量 embedding 读取（[EMBEDDING_CHUNK_SIZE] 行/块分块聚合，规避 CursorWindow 上限） */
+    suspend fun getAllEmbeddings(chunkSize: Int = EMBEDDING_CHUNK_SIZE): List<FaceEmbeddingEntity> {
+        val result = ArrayList<FaceEmbeddingEntity>()
+        var offset = 0
+        while (true) {
+            val page = getAllEmbeddingsPage(chunkSize, offset)
+            result.addAll(page)
+            if (page.size < chunkSize) break
+            offset += page.size
+        }
+        return result
+    }
+
+    /** 已有 embedding 的媒体 id 集合（轻量投影，无需加载 2KB BLOB 的场景专用） */
+    @Query("SELECT DISTINCT mediaId FROM face_embeddings")
+    suspend fun getAllEmbeddingMediaIds(): List<Long>
 
     @Query("UPDATE face_embeddings SET personId = :personId WHERE embeddingId = :embeddingId")
     suspend fun assignEmbedding(embeddingId: Long, personId: Long)

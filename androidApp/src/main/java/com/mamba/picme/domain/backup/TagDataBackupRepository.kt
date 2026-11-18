@@ -104,6 +104,11 @@ class TagDataBackupRepository(
 
     private val backupAdapter = moshi.adapter(TagDataBackup::class.java)
 
+    private companion object {
+        /** 导出时分页读取 media_assets 的页大小（全量一次性驻留会 OOM，真机 8148 行实证） */
+        const val EXPORT_MEDIA_PAGE_SIZE = 500
+    }
+
     data class ExportResult(
         val file: File,
         val tagCount: Int,
@@ -159,44 +164,27 @@ class TagDataBackupRepository(
             BackupTag(tagId = it.tagId, name = it.name, category = it.category)
         }
 
-        val allMedia = mediaDao.getAllMediaNow()
-        val mediaIdToUri = allMedia.associate { it.id to it.uri }
+        val mediaIdToUri = mediaDao.getAllMediaIdUris().associate { it.id to it.uri }
 
-        val metadataList = allMedia.mapNotNull { media ->
-            if (media.isTagRelatedEmpty()) return@mapNotNull null
-            BackupMediaTagMetadata(
-                uri = media.uri,
-                labels = media.labels,
-                labelsEn = media.labelsEn,
-                labelsZh = media.labelsZh,
-                mlKitLabels = media.mlKitLabels,
-                mlKitLabelsZh = media.mlKitLabelsZh,
-                ocrText = media.ocrText,
-                latitude = media.latitude,
-                longitude = media.longitude,
-                locationName = media.locationName,
-                faceRoiResult = media.faceRoiResult,
-                semanticEmbedding = media.semanticEmbedding,
-                lastTagScanAt = media.lastTagScanAt,
-                lastTagScanPasses = media.lastTagScanPasses,
-                hasFace = media.hasFace,
-                faceId = media.faceId,
-                city = media.city,
-                faceFocusY = media.faceFocusY,
-                aestheticScore = media.aestheticScore,
-                faceQualityScore = media.faceQualityScore,
-                blurScore = media.blurScore,
-                exposureScore = media.exposureScore,
-                lastViewedAt = media.lastViewedAt
-            )
+        // 分页读取 + 逐块转换：全量 MediaEntity 一次性驻留会 OOM（2026-11-19 真机 8148 行实证），
+        // 转换后只保留备份模型，实体对象逐块释放
+        val metadataList = mutableListOf<BackupMediaTagMetadata>()
+        var pageOffset = 0
+        while (true) {
+            val page = mediaDao.getMediaPaged(EXPORT_MEDIA_PAGE_SIZE, pageOffset)
+            page.mapNotNullTo(metadataList) { media ->
+                if (media.isTagRelatedEmpty()) null else media.toBackupMetadata()
+            }
+            if (page.size < EXPORT_MEDIA_PAGE_SIZE) break
+            pageOffset += page.size
         }
 
         val tagNameToId = tags.associate { it.tagId to it.name }
-        val crossRefs = allMedia.flatMap { media ->
-            tagDao.getTagsForMedia(media.id).mapNotNull { tag ->
+        val crossRefs = mediaIdToUri.entries.flatMap { (mediaId, uri) ->
+            tagDao.getTagsForMedia(mediaId).mapNotNull { tag ->
                 val tagName = tagNameToId[tag.tagId] ?: return@mapNotNull null
                 BackupMediaTagCrossRef(
-                    uri = media.uri,
+                    uri = uri,
                     tagName = tagName,
                     confidence = null
                 )
@@ -431,9 +419,8 @@ class TagDataBackupRepository(
             backupAdapter.fromJson(source)
         } ?: throw IOException("Failed to parse backup file: ${file.absolutePath}")
 
-        // 1. 建立 URI -> 本地 mediaId 映射（一次性加载全部媒体，避免 N 次单条查询）
-        val currentMedia = mediaDao.getAllMediaNow()
-        val uriToMediaId = currentMedia.associate { it.uri to it.id }
+        // 1. 建立 URI -> 本地 mediaId 映射（轻量投影：全列 SELECT * 在万级媒体库直接 OOM）
+        val uriToMediaId = mediaDao.getAllMediaIdUris().associate { it.uri to it.id }
 
         val allBackupUris = buildSet {
             backup.mediaTagMetadata.mapTo(this) { it.uri }
@@ -868,6 +855,33 @@ class TagDataBackupRepository(
 
     private fun coordinateLongitude(key: String): Double? =
         key.takeIf { it.isNotBlank() }?.substringAfter(",")?.toDoubleOrNull()
+
+    private fun com.mamba.picme.data.model.MediaEntity.toBackupMetadata(): BackupMediaTagMetadata =
+        BackupMediaTagMetadata(
+            uri = uri,
+            labels = labels,
+            labelsEn = labelsEn,
+            labelsZh = labelsZh,
+            mlKitLabels = mlKitLabels,
+            mlKitLabelsZh = mlKitLabelsZh,
+            ocrText = ocrText,
+            latitude = latitude,
+            longitude = longitude,
+            locationName = locationName,
+            faceRoiResult = faceRoiResult,
+            semanticEmbedding = semanticEmbedding,
+            lastTagScanAt = lastTagScanAt,
+            lastTagScanPasses = lastTagScanPasses,
+            hasFace = hasFace,
+            faceId = faceId,
+            city = city,
+            faceFocusY = faceFocusY,
+            aestheticScore = aestheticScore,
+            faceQualityScore = faceQualityScore,
+            blurScore = blurScore,
+            exposureScore = exposureScore,
+            lastViewedAt = lastViewedAt
+        )
 
     private fun com.mamba.picme.data.model.MediaEntity.isTagRelatedEmpty(): Boolean =
         labels.isNullOrBlank() &&

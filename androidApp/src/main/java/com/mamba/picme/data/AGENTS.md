@@ -46,6 +46,7 @@
 
 ## 4. 常见陷阱检查清单 (Checklist)
 
+- [ ] 读取含 BLOB/大字段的表是否做了分块或列投影？单 CursorWindow 上限约 2MB——`face_embeddings`（单行 2KB embedding）千行级全量 SELECT * 会越界崩溃（Couldn't read row N，2026-11-19 真机实证），`media_assets` 万级全列加载直接 Java Heap OOM；全量读取一律走分块聚合（`PersonDao.EMBEDDING_CHUNK_SIZE` 模式）或轻量投影（`getAllMediaIdUris`）
 - [ ] 是否在 Room 查询中使用了 `Flow` 以实现 UI 实时自动刷新？
 - [ ] DataStore 的 Key 命名是否符合规范（如 `PREF_BEAUTY_LEVEL`）？
 - [ ] 是否在 UI 线程中执行了数据库操作？（必须使用 Dispatchers.IO）
