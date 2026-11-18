@@ -1,3 +1,4 @@
-- Chat now renders rich AI-generated cards: photo grids, timelines, charts, comparisons, progress and video — streamed live and tappable
-- New web search in chat with illustrated answers
+- Photo cards and grids now fill in progressively as each image loads — no more blank placeholders
+- Chart cards render with built-in themes; HTML cards show live thumbnails and open the native viewer
+- Chat search replies now include tappable photos; tag scanning is more reliable with visible progress
 - Stability and performance improvements
