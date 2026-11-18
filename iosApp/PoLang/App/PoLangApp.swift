@@ -7,7 +7,8 @@ struct PoLangApp: App {
 
     init() {
         // -serverAuthToken <token>：测试注入登录态（DEBUG-only；邮箱验证码流程无法全自动，
-        // token 复用生产 account 表 token_plain——test@polang.net，Android 端 debug 同源）
+        // token 由测试方经启动参数传入、不入库——账号 test@polang.net，
+        // 本地 token 文件见 iosApp/.test-account-token，取用方式见 ChatSkillUITests 注释）
         #if DEBUG
         let launchArgs = ProcessInfo.processInfo.arguments
         if let idx = launchArgs.firstIndex(of: "-serverAuthToken"), idx + 1 < launchArgs.count {

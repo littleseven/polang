@@ -6,3 +6,5 @@ Frameworks/SharedKit.xcframework/
 !Frameworks/.gitkeep
 *.task
 Pods
+# UI 测试登录态 token（test@polang.net），本地私有不入库（取用见 ChatSkillUITests 注释）
+.test-account-token

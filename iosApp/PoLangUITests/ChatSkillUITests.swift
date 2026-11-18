@@ -10,10 +10,14 @@ import XCTest
 /// 环境前置：server 0.9.44+ 已放行 /v1/skills 访客（未登录亦可跑 testLoadSkillSmoke）。
 final class ChatSkillUITests: XCTestCase {
 
-    /// 生产 account 表 test@polang.net 的 token_plain（Android debug 同源；邮箱验证码
-    /// 流程无法全自动，登录态经 PoLangApp DEBUG 钩子 -serverAuthToken 注入）。
+    /// 生产 account 表 test@polang.net 的 token（邮箱验证码流程无法全自动，登录态经
+    /// PoLangApp DEBUG 钩子 -serverAuthToken 注入）。token 不入库：本地存 gitignored
+    /// 文件 iosApp/.test-account-token，CLI 经 TEST_RUNNER_ 前缀透传（xcodebuild 会把
+    /// TEST_RUNNER_ 前缀变量剥前缀传给 test runner）：
+    ///   TEST_RUNNER_POLANG_TEST_ACCOUNT_TOKEN=$(cat iosApp/.test-account-token) xcodebuild ... test
+    /// 缺失时登录态用例 XCTSkip（访客态冒烟不受影响）。
     private static let testAccountToken =
-        "pl-62d9665becc9708b4d1d5dfe1e19e74388082a9f9c03d4f6ccd600097a731d37"
+        ProcessInfo.processInfo.environment["POLANG_TEST_ACCOUNT_TOKEN"] ?? ""
 
     var app: XCUIApplication!
 
@@ -31,6 +35,10 @@ final class ChatSkillUITests: XCTestCase {
     /// 登录态技能冒烟（X-App-Token 鉴权路径）：-serverAuthToken 注入 test@polang.net
     /// 登录态后走同一链路——skill 同步带账号 token（server 0.9.44 前访客 401 的补充验证）。
     func testLoadSkillSmokeLoggedIn() throws {
+        try XCTSkipIf(
+            Self.testAccountToken.isEmpty,
+            "POLANG_TEST_ACCOUNT_TOKEN 未设置（见 testAccountToken 注释，token 不入库）"
+        )
         app.terminate()
         app.launchArguments = ["-serverAuthToken", Self.testAccountToken]
         app.launch()
