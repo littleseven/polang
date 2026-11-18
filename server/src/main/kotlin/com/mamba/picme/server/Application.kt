@@ -240,7 +240,7 @@ fun Application.module(config: AppConfig) {
         iosDownloadRoute(cosService)
         appLatestRoute(cosService)
         healthzRoute()
-        authRoute(emailService)
+        authRoute(emailService, config.playReviewEmail, config.playReviewCode)
 
         // Protected (auth interceptor above enforces token)
         recommendRoute(appJson)

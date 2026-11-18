@@ -175,3 +175,45 @@ git tag v1.0.37 && git push origin v1.0.37                # tag 触发 release.y
 - 商店文案与 ASO：`google-play-listing/README.md`（含迁移说明）、`google-play-listing/keyword-ledger.md`（关键词台账 SSOT）
 - 构建与签名：`scripts/build.sh` 头注释、`androidApp/build.gradle.kts` signing 段
 - 版本发布：`scripts/release-automation.sh` 头注释
+
+## 8. 审核登录凭证（App access，2026-11-18 起）
+
+**背景**：Play 管理中心要求「审核团队能登录并检查应用全部内容」。App 的登录是邮箱+验证码，
+审核员无法收信，必须提供免邮箱依赖的演示凭证——服务端为此提供固定码旁路
+（实现与开关口径见 `server/AGENTS.md` §4.1「Google Play 审核演示账号」）。
+
+**开启（生产，一次性）**：
+
+```bash
+# 1. 生成高熵固定码（verify 端点无限流，别用 6 位数字）
+openssl rand -base64 12
+
+# 2. VPS 上编辑 /etc/picme/server.env，追加两行后重启
+PLAY_REVIEW_EMAIL=play-review@polang.net
+PLAY_REVIEW_CODE=<上一步生成的串>
+sudo systemctl restart picme-api
+
+# 3. 自测（应返回 {"token":"pl-...", ...}）
+curl -X POST https://api.polang.net/auth/email/verify \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"play-review@polang.net","code":"<固定码>"}'
+```
+
+**Console 登记**：政策 → 应用内容 → 应用访问权限 → 选「应用的部分或全部功能受到访问限制」→
+添加访问说明（英文），内容模板：
+
+```
+Demo account (email + fixed verification code):
+  Email: play-review@polang.net
+  Code:  <固定码>
+
+Steps: open the app → Settings tab → "Account" → enter the email above →
+tap "Send code" (no email will actually arrive — this is expected) → enter the
+fixed code above → tap "Verify". You are now signed in with full functionality.
+
+Note: sign-in is OPTIONAL. All features (gallery, camera, AI chat) work without
+an account in guest mode; an account only raises the AI usage quota. Feel free
+to browse every screen without signing in.
+```
+
+**审核通过后清理**：清空两个 env 值并 `systemctl restart picme-api`，旁路即关（默认关）。

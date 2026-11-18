@@ -48,9 +48,20 @@ data class QuotaResponse(val email: String, val llmCallsUsed: Int, val llmCallsL
 
 fun Route.authRoute(
     emailService: EmailService,
+    playReviewEmail: String = "",
+    playReviewCode: String = "",
 ) {
+    // Play 审核演示账号旁路（默认关）：env 双非空启用。该邮箱不发真实验证码邮件，
+    // verify 用固定码直接放行换 token，供 Google 审核团队无邮箱依赖登录。
+    val reviewEnabled = playReviewEmail.isNotBlank() && playReviewCode.isNotBlank()
+    fun isReviewEmail(email: String) = reviewEnabled && email.trim().equals(playReviewEmail, ignoreCase = true)
+
     post("/auth/email/send") {
         val req = call.receive<EmailSendRequest>()
+        if (isReviewEmail(req.email)) {
+            call.respond(mapOf("sent" to true, "dev" to true))
+            return@post
+        }
         val code = AccountService.createVerification(req.email)
         val sent = emailService.sendVerificationCode(req.email, code, req.lang)
         if (sent) {
@@ -63,12 +74,20 @@ fun Route.authRoute(
 
     post("/auth/email/verify") {
         val req = call.receive<EmailVerifyRequest>()
-        val valid = AccountService.verifyCode(req.email, req.code)
+        val valid = if (isReviewEmail(req.email)) {
+            req.code.trim() == playReviewCode
+        } else {
+            AccountService.verifyCode(req.email, req.code)
+        }
         if (!valid) {
             call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_code"))
             return@post
         }
-        val account = AccountService.createOrRefresh(req.email, SettingsService.snapshot().freeLlmQuota)
+        // 审核邮箱归一到配置值开户，避免审核员大小写变体重复建号
+        val account = AccountService.createOrRefresh(
+            if (isReviewEmail(req.email)) playReviewEmail else req.email,
+            SettingsService.snapshot().freeLlmQuota,
+        )
         call.respond(
             TokenResponse(
                 token = account.token,

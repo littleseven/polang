@@ -50,6 +50,10 @@ data class AppConfig(
     // debug 包额度豁免总闸（默认关）：开时 X-App-Channel: debug 请求跳过三处额度扣减
     // （/v1/chat/completions 账号+访客、/agent 网关回合、/v1/browser/open 每日配额），用量照记
     val debugQuotaBypass: Boolean = false,
+    // Google Play 审核演示账号（默认关）：email/code 均非空才启用——该邮箱登录不触发真实发信，
+    // 固定码通过 /auth/email/verify 旁路直接换 token。code 须用高熵串（verify 端点无限流）。
+    val playReviewEmail: String = "",
+    val playReviewCode: String = "",
 ) {
     companion object {
         fun load(): AppConfig = AppConfig(
@@ -94,6 +98,8 @@ data class AppConfig(
             deepseekSearchApiKey = env("DEEPSEEK_SEARCH_API_KEY", ""),
             deepseekSearchBaseUrl = env("DEEPSEEK_SEARCH_BASE_URL", "https://api.deepseek.com"),
             debugQuotaBypass = parseEnvBool(System.getenv("DEBUG_QUOTA_BYPASS")),
+            playReviewEmail = env("PLAY_REVIEW_EMAIL", ""),
+            playReviewCode = env("PLAY_REVIEW_CODE", ""),
         )
 
         private fun env(key: String, default: String): String =

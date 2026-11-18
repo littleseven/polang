@@ -13,9 +13,9 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.50
+**版本**：0.9.52
 
-**最后更新**：2026-11-12
+**最后更新**：2026-11-18
 
 **状态**：生效中 / 已上线
 
@@ -182,8 +182,8 @@ server/
 | POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存；per-user 并发=1，占用回 409 `round_in_flight` 不耗配额） |
 | POST | `/agent/sessions/{id}/tool-results` | P1 | ✅ | X-App-Token | 端侧工具结果上行（409 tool_request_not_pending；ADR-018 工具桥） |
 | POST | `/agent/sessions/{id}/finish` | P1 | ✅ | X-App-Token | 关闭会话（终态） |
-| POST | `/auth/email/send` | P0 | ✅ | 无 | 发送验证码 |
-| POST | `/auth/email/verify` | P0 | ✅ | 无 | 校验码换 token |
+| POST | `/auth/email/send` | P0 | ✅ | 无 | 发送验证码（Play 审核邮箱命中 env 旁路时直接回 sent+dev 不发信） |
+| POST | `/auth/email/verify` | P0 | ✅ | 无 | 校验码换 token（Play 审核邮箱走 env 固定码旁路） |
 | GET | `/admin/**` | P1 | ✅ | ADMIN_TOKEN | 管理后台 SSR |
 | GET | `/admin/devices` | P1 | ✅ | ADMIN_TOKEN | 未注册设备列表（anonymous_device） |
 | GET | `/admin/devices/{id}/raw` | P1 | ✅ | ADMIN_TOKEN | 设备 id 复制（返回完整 device_id） |
@@ -255,6 +255,7 @@ App → 后续请求带 X-App-Token: <picme_at_*>
 - 额度默认值持久化于 `server_setting` 表（`free_llm_quota` / `guest_llm_quota`）；env 仅在首次启动播种，之后由 `/admin/settings` 管理，运行时经 `SettingsService` 内存快照下发（热路径零 DB 读）。单账号上限可在「用户详情」页单独覆盖（`account.llm_calls_limit`，0=禁用）
 - **debug 包额度豁免**（2026-10-21）：`DEBUG_QUOTA_BYPASS=true` + 请求头 `X-App-Channel: debug` 双满足时跳过三处额度扣减（`/v1/chat/completions` 账号+访客、`/agent/sessions/{id}/messages` 网关回合、`/v1/browser/open` 每日配额 peek/计费），用量照记 `llm_call_log`；Android debug 包由 `data/remote/AppChannel.kt` 自动带头（BuildConfig.DEBUG 派生，release 发 "release"），iOS 暂不上报。头可伪造——env（默认关）是总闸。全局拦截器打标 `DebugQuotaBypassKey`，路由经 `call.isDebugQuotaBypass()` 判定；豁免请求的错误回滚（revertQuota）同步跳过，保证 increment/revert 严格配对
 - **debug 包免登录（云端 Agent 调试页访客身份，2026-10-22）**：复用 DEBUG_QUOTA_BYPASS 双闸——env 开 + `X-App-Channel: debug` + `X-Device-Id` 三满足且无有效账号 token 时，全局拦截器合成稳定访客身份 sha256("debug-guest:"+deviceId)（64 hex，与真实账号 token_hash 同形可落 VARCHAR(64) 列）写入 `TokenHashKey` + `DeviceIdKey`，`/agent/**` 由此免注册可达（会话/并发闸/审计按设备维度收敛）；输入域隔离（真实 token 为 picme_at_*）保证零碰撞，绝不落 account 表。客户端侧 CloudAgentChatViewModel DEBUG 构建放宽 not_logged_in 闸（空 token 继续）+ CloudAgentClient 补发 X-Device-Id 头（deviceIdProvider 注入）。env 默认关 = 生产全封
+- **Google Play 审核演示账号（2026-11-18，固定码旁路）**：env `PLAY_REVIEW_EMAIL` + `PLAY_REVIEW_CODE` 双非空启用（默认关）——审核邮箱走 `/auth/email/send` 直接回 `sent+dev`（不创建 email_verification、不调 Resend），`/auth/email/verify` 对该邮箱比对固定码（邮箱匹配大小写不敏感）放行换 token，账号走正常 `createOrRefresh`（每次登录额度清零重置，审核重复登录无 quota 枯竭风险）。verify 端点无限流，code 必须高熵；审核结束清空两 env 即关。登记口径与 Console 操作手册见 `docs/05-DEVELOPMENT/GOOGLE_PLAY_RELEASE_AUTOMATION.md` §8
 - Token 持久化在 `account` 表，`token_hash` 字段 SHA-256 存储
 
 ### 4.2 管理后台认证
@@ -328,5 +329,5 @@ nginx picme 反代段落仓库 SSOT：`server/deploy/nginx/api.polang.net.conf`�
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-11-08
+> **最后更新**：2026-11-18
 > **状态**：生效中
