@@ -200,20 +200,19 @@ curl -X POST https://api.polang.net/auth/email/verify \
 ```
 
 **Console 登记**：政策 → 应用内容 → 应用访问权限 → 选「应用的部分或全部功能受到访问限制」→
-添加访问说明（英文），内容模板：
+添加访问说明（英文，≤500 字符），内容模板：
 
 ```
-Demo account (email + fixed verification code):
-  Email: play-review@polang.net
-  Code:  <固定码>
+Demo account (email + fixed code):
+Email: play-review@polang.net
+Code: <固定码>
 
-Steps: open the app → Settings tab → "Account" → enter the email above →
-tap "Send code" (no email will actually arrive — this is expected) → enter the
-fixed code above → tap "Verify". You are now signed in with full functionality.
+Steps: Settings tab → Account → enter the email → tap "Send code"
+(no email arrives — expected) → enter the code → "Verify".
+Full access after sign-in.
 
-Note: sign-in is OPTIONAL. All features (gallery, camera, AI chat) work without
-an account in guest mode; an account only raises the AI usage quota. Feel free
-to browse every screen without signing in.
+Sign-in is optional: all features (gallery, camera, AI chat) work in
+guest mode; an account only raises the AI quota.
 ```
 
 **审核通过后清理**：清空两个 env 值并 `systemctl restart picme-api`，旁路即关（默认关）。
