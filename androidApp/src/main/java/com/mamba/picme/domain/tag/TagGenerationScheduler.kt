@@ -840,7 +840,7 @@ class TagGenerationScheduler(
      */
     private suspend fun cleanupInvalidHasFace(dao: com.mamba.picme.data.local.MediaDao) {
         val allHasFaceIds = dao.getHasFaceIds()
-        val mediaWithEmbeddings = personDao.getAllEmbeddings().map { it.mediaId }.toSet()
+        val mediaWithEmbeddings = personDao.getAllEmbeddingMediaIds().toSet()
 
         var cleanedCount = 0
         allHasFaceIds.chunked(CLEANUP_BATCH_SIZE).forEach { batchIds ->

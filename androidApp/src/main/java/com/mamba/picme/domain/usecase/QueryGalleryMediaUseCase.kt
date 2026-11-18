@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
  * 只读相册结构化查询，供 JS `gallery.query` handler 使用。
  *
  * - 读-only：不写库、不触发扫描。
- * - 候选集策略（规避全量 MediaEntity 的 OOM 风险——searchByHasFace/getAllMediaNow 已 deprecated）：
+ * - 候选集策略（规避全量 MediaEntity 的 OOM 风险——searchByHasFace 已 deprecated、getAllMediaNow 已删除（OOM））：
  *   - 需字段过滤（label/ocr/location 任一非空）→ 用对应 searchBy* 作主维度（结果已缩小），
  *     再内存 AND 其余维度（applyFilter）。
  *   - 仅时间/hasFace/空过滤 → 走 id-only 查询（searchByTimeRange 取 id / getHasFaceIds / getAllMediaIds）。

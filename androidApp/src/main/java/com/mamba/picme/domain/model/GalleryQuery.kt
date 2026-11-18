@@ -40,7 +40,7 @@ data class GalleryQueryResult(
  * 在内存按 [filter] 过滤候选媒体（纯逻辑，多维 AND）。便于纯 JVM 单测，不触碰 Room/Android。
  *
  * 注：时间范围在 QueryGalleryMediaUseCase 已尽量由 DAO 预筛
- * （走 searchByTimeRange 分支）；此处仍兜底二次过滤——候选来自 searchByHasFace / getAllMediaNow
+ * （走 searchByTimeRange 分支）；此处仍兜底二次过滤——候选来自 searchByHasFace（已 deprecated）
  * 分支时需在此补齐时间条件。
  */
 fun List<MediaEntity>.applyFilter(filter: QueryFilter): List<MediaEntity> =

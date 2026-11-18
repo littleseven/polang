@@ -175,10 +175,20 @@ interface MediaDao {
 
     // ── 人脸聚类查询 ──────────────────────────────────────────
 
-    /** 获取所有媒体（非 Flow，用于后台） */
-    @Deprecated("大数据量时易造成 Java Heap OOM，请优先使用 getAllMediaIds() 或分页查询")
-    @Query("SELECT * FROM media_assets ORDER BY captureDate DESC")
-    suspend fun getAllMediaNow(): List<MediaEntity>
+    /**
+     * 全量媒体轻量投影（仅 id + uri）。
+     * 全量 diff / uri↔id 映射专用：8148 行级别 SELECT * 全列加载（labels/ocrText 等大字段）
+     * 曾在启动同步链路直接 OOM（256MB heap），全量读取一律走本投影或 [getMediaPaged]。
+     */
+    @Query("SELECT id, uri FROM media_assets")
+    suspend fun getAllMediaIdUris(): List<MediaIdUri>
+
+    /**
+     * 分页读取全量媒体（备份导出用）：分块过 CursorWindow，且调用方可逐块转换释放，
+     * 避免单查询全量驻留 Java Heap。
+     */
+    @Query("SELECT * FROM media_assets ORDER BY id LIMIT :limit OFFSET :offset")
+    suspend fun getMediaPaged(limit: Int, offset: Int): List<MediaEntity>
 
     /** 仅获取所有媒体 ID（内存友好） */
     @Query("SELECT id FROM media_assets ORDER BY captureDate DESC")
@@ -763,4 +773,10 @@ data class QualityScoreEntry(
     val uri: String,
     val blurScore: Float,
     val exposureScore: Float,
+)
+
+/** 全量媒体轻量投影（id + uri）：全量 diff / uri↔id 映射用，见 [MediaDao.getAllMediaIdUris]。 */
+data class MediaIdUri(
+    val id: Long,
+    val uri: String,
 )

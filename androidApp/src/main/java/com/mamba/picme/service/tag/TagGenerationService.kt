@@ -29,6 +29,7 @@ import com.mamba.picme.PoLangApplication
 import com.mamba.picme.domain.tag.scan.ScanSessionState
 import com.mamba.picme.domain.tag.scan.TagScanOrchestrator
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -275,7 +276,12 @@ class TagGenerationService : Service() {
     //  内部实现（完全对外隐藏）
     // ═══════════════════════════════════════════════════════════
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    // 兜底异常处理器：FGS 协程任何未捕获异常只记日志不杀进程
+    // （START_STICKY 服务进程崩溃会被系统拉起重放，未捕获异常 = 崩溃循环）
+    private val serviceExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        android.util.Log.e(TAG, "Uncaught exception in service scope", throwable)
+    }
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main + serviceExceptionHandler)
     private var progressJob: Job? = null
 
     /**
@@ -479,8 +485,13 @@ class TagGenerationService : Service() {
                         )
                         return@launch
                     }
-                    scheduler?.reembedFacesAndRecluster { processed, total ->
-                        android.util.Log.i(TAG, "reembed progress: $processed/$total")
+                    try {
+                        scheduler?.reembedFacesAndRecluster { processed, total ->
+                            android.util.Log.i(TAG, "reembed progress: $processed/$total")
+                        }
+                    } catch (e: Exception) {
+                        // 重提+重聚失败（如聚类 OOM 熔断）只记日志，不穿透 serviceScope 杀进程
+                        android.util.Log.e(TAG, "reembed failed: ${e.message}", e)
                     }
                     stopSelf() // 完成后释放 FGS
                 }
