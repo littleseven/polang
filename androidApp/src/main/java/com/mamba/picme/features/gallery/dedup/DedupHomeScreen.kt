@@ -88,6 +88,8 @@ fun DedupHomeRoute(
     onNavigateBack: () -> Unit,
     /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：MainActivity 导航 swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
+    /** 整理中心 hub「按月回顾」入口（P0-3：带月份起点进 swipe_review 按月建队）。 */
+    onOpenMonthReview: (Long) -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
     /** hub 引导态类目卡点击：切到合并页 SCAN tab（embedded 模式由 OrganizeHomeRoute 注入 tab 切换）。 */
@@ -194,11 +196,14 @@ fun DedupHomeRoute(
                     // 看板流仅 Config 态订阅：Scanning/Results/Cleaned 态不再挂着
                     // 全量 Room+MediaStore 合并聚合
                     val board by viewModel.organizeBoard.collectAsState()
+                    val swipeMonths by viewModel.swipeMonths.collectAsState()
                     DedupHubContent(
                         config = state.config,
                         policy = policy,
                         board = board,
+                        swipeMonths = swipeMonths,
                         onQuickTidy = onQuickTidy,
+                        onOpenMonthReview = onOpenMonthReview,
                         onOpenCategory = onOpenCategory,
                         onOpenScan = onOpenScan,
                         onStartScan = { config -> viewModel.startScan(config) },

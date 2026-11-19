@@ -15,6 +15,8 @@ import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.KeepPolicyEngine
 import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategorizer
+import com.mamba.picme.domain.swipe.SwipeMonth
+import com.mamba.picme.domain.swipe.SwipeMonths
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -98,6 +100,13 @@ class DedupViewModel(
             .distinctUntilChanged()
             .flowOn(ioDispatcher)
             .stateIn(scope, SharingStarted.WhileSubscribed(5000), OrganizeBoard(emptyList(), 0L, 0))
+
+    /** 按月回顾（F2+）可用月份列表（新→旧），与建队同口径（非视频）。 */
+    val swipeMonths: StateFlow<List<SwipeMonth>> = organizeRepository.observeItems()
+        .map { items -> SwipeMonths.availableMonths(items) }
+        .distinctUntilChanged()
+        .flowOn(ioDispatcher)
+        .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         // 整理中心 v2：后台分批补算模糊/曝光分（缺分即 LOW 覆盖，hub 引导态承接；补算回写经 Room Flow 自动刷新）

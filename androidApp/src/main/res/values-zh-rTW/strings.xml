@@ -500,6 +500,12 @@
     <string name="swipe_pending_commit">%1$d 張待移入回收站</string>
     <string name="swipe_retry">重試</string>
     <string name="swipe_discard">放棄</string>
+    <string name="swipe_month_entry">按月回顧</string>
+    <string name="swipe_month_pick_title">選擇月份</string>
+    <string name="swipe_month_title">%2$d年%1$s</string>
+    <plurals name="swipe_month_photos">
+        <item quantity="other">%d 張</item>
+    </plurals>
 
     <!-- Memories（F3 相册首页回忆 carousel） -->
     <string name="memory_title">回憶</string>

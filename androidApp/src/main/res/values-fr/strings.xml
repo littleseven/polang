@@ -504,6 +504,13 @@
     <string name="swipe_pending_commit">%1$d éléments en attente de mise à la corbeille</string>
     <string name="swipe_retry">Réessayer</string>
     <string name="swipe_discard">Abandonner</string>
+    <string name="swipe_month_entry">Revoir par mois</string>
+    <string name="swipe_month_pick_title">Choisir un mois</string>
+    <string name="swipe_month_title">%1$s %2$d</string>
+    <plurals name="swipe_month_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
 
     <!-- Memories（F3 相册首页回忆 carousel） -->
     <string name="memory_title">Souvenirs</string>

@@ -79,6 +79,8 @@ fun MainPagerHost(
     onRequestGalleryView: (GalleryViewRequest) -> Unit = {},
     /** 整理中心 hub「滑动整理」(Swipe to tidy)（F2 已点亮：swipe_review 路由）。 */
     onQuickTidy: () -> Unit = {},
+    /** 整理中心 hub「按月回顾」入口（P0-3：带月份起点进 swipe_review 按月建队）。 */
+    onOpenMonthReview: (Long) -> Unit = {},
     /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
     /** Memory 页大卡点击 → 回忆详情页（memory_detail/{memoryId} 路由）。 */
@@ -180,6 +182,7 @@ fun MainPagerHost(
                 onSelectTab = { tab -> organizeTab = tab },
                 onLeaveToGallery = { onSwitchPage(MAIN_PAGE_GALLERY) },
                 onQuickTidy = onQuickTidy,
+                onOpenMonthReview = onOpenMonthReview,
                 onOpenCategory = onOpenCategory,
                 onNavigateToTagViewer = onNavigateToTagViewer,
                 onRequestGalleryView = onRequestGalleryView,

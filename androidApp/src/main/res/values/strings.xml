@@ -517,6 +517,13 @@
     <string name="swipe_pending_commit">%1$d items pending trash</string>
     <string name="swipe_retry">Retry</string>
     <string name="swipe_discard">Discard</string>
+    <string name="swipe_month_entry">Review by month</string>
+    <string name="swipe_month_pick_title">Pick a month</string>
+    <string name="swipe_month_title">%1$s %2$d</string>
+    <plurals name="swipe_month_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
 
     <!-- Memories（F3 相册首页回忆 carousel） -->
     <string name="memory_title">Memories</string>

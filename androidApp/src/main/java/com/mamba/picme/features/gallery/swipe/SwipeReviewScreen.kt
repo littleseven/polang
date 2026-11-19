@@ -116,6 +116,7 @@ fun SwipeReviewScreen(
             topBar = {
                 SwipeTopBar(
                     state = uiState,
+                    monthStartMs = viewModel.monthStartMs,
                     canUndo = viewModel.canUndo,
                     onNavigateBack = onNavigateBack,
                     onUndo = { viewModel.undo() },
@@ -163,10 +164,11 @@ fun SwipeReviewScreen(
 
 // ---------- 顶栏 ----------
 
-/** 顶栏：返回 + 居中进度「N / M」+ 副行「X freed」+ 右 undo（尾条决策已提交回收站时禁用）。 */
+/** 顶栏：返回 + 居中进度「N / M」+ 副行「X freed」+ 右 undo（尾条决策已提交回收站时禁用）；按月回顾时非 Reviewing 态标题显示月份。 */
 @Composable
 private fun SwipeTopBar(
     state: SwipeUiState,
+    monthStartMs: Long?,
     canUndo: Boolean,
     onNavigateBack: () -> Unit,
     onUndo: () -> Unit,
@@ -191,7 +193,14 @@ private fun SwipeTopBar(
                     )
                 }
             } else {
-                Text(text = stringResource(R.string.swipe_title))
+                Text(
+                    text = if (monthStartMs != null) {
+                        val cal = java.util.Calendar.getInstance().apply { timeInMillis = monthStartMs }
+                        swipeMonthLabel(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1)
+                    } else {
+                        stringResource(R.string.swipe_title)
+                    }
+                )
             }
         },
         navigationIcon = { AppTopBarNavBack(onClick = onNavigateBack) },

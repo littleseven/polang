@@ -122,4 +122,16 @@ class SwipeQueueBuilderTest {
         assertEquals(listOf("blur", "portrait"), queue.map { candidate -> candidate.uri })
         assertEquals(SwipeReason.LOW_QUALITY_PORTRAIT, queue[1].reason)
     }
+
+    @Test
+    fun `captureRange filters photos outside the month`() {
+        val inMonth = item(uri = "in", captureDate = 1_000L)
+        val outMonth = item(uri = "out", captureDate = 10_000L)
+        val queue = SwipeQueueBuilder.build(
+            items = listOf(inMonth, outMonth),
+            now = 20_000L,
+            captureRange = 500L to 5_000L,
+        )
+        assertEquals(listOf("in"), queue.map { candidate -> candidate.uri })
+    }
 }

@@ -37,8 +37,10 @@ sealed class Screen(val route: String) {
         fun createRoute(category: String): String = "organize_category/$category"
     }
 
-    /** 手势快速整理（F2）：全屏滑动决策页（右滑保留 / 左滑跳过 / 上滑删除，点按=跳过） */
-    data object SwipeReview : Screen("swipe_review")
+    /** 手势快速整理（F2）：全屏滑动决策页；monthStart>0 为「按月回顾」建队月份起点（本地时区） */
+    data object SwipeReview : Screen("swipe_review?monthStart={monthStart}") {
+        fun createRoute(monthStart: Long = -1L): String = "swipe_review?monthStart=$monthStart"
+    }
 
     /** 回忆详情（F3）：封面大图 + 精选网格 + 分享；路由段为 Memory.id（Uri.encode，Navigation 自动解码一次） */
     data object MemoryDetail : Screen("memory_detail/{memoryId}") {

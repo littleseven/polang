@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,7 +31,9 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,8 +69,11 @@ import com.mamba.picme.domain.organize.CategoryBoard
 import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.SignalCoverage
+import com.mamba.picme.domain.swipe.SwipeMonth
+import com.mamba.picme.domain.swipe.SwipeMonths
 import com.mamba.picme.features.gallery.organize.organizeCategoryIcon
 import com.mamba.picme.features.gallery.organize.organizeCategoryLabelRes
+import com.mamba.picme.features.gallery.swipe.swipeMonthLabel
 
 /** 品牌渐变（青玉）：hub 大数字 / 主按钮同源（与 tagcontrol 设计稿同一口径）。 */
 private val orgBrandGradient: Brush
@@ -93,7 +99,9 @@ fun DedupHubContent(
     config: DedupScanConfig,
     policy: KeepPolicy,
     board: OrganizeBoard,
+    swipeMonths: List<SwipeMonth>,
     onQuickTidy: () -> Unit,
+    onOpenMonthReview: (Long) -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
     onOpenScan: () -> Unit,
     onStartScan: (DedupScanConfig) -> Unit,
@@ -134,6 +142,14 @@ fun DedupHubContent(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White
+            )
+        }
+
+        // 「按月回顾」入口（P0-3）：有可用月份才渲染；选中经 onOpenMonthReview 带月份进滑动整理
+        if (swipeMonths.isNotEmpty()) {
+            SwipeMonthReviewEntry(
+                swipeMonths = swipeMonths,
+                onOpenMonthReview = onOpenMonthReview,
             )
         }
 
@@ -183,6 +199,56 @@ fun DedupHubContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/** 「按月回顾」入口（P0-3）：OutlinedButton 唤起月份选择对话框，选中带月份起点进滑动整理。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeMonthReviewEntry(
+    swipeMonths: List<SwipeMonth>,
+    onOpenMonthReview: (Long) -> Unit,
+) {
+    var showMonthPicker by rememberSaveable { mutableStateOf(false) }
+    OutlinedButton(
+        onClick = { showMonthPicker = true },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Text(stringResource(R.string.swipe_month_entry))
+    }
+    if (showMonthPicker) {
+        AlertDialog(
+            onDismissRequest = { showMonthPicker = false },
+            title = { Text(stringResource(R.string.swipe_month_pick_title)) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    swipeMonths.forEach { month ->
+                        Text(
+                            text = swipeMonthLabel(month.year, month.month) +
+                                " · " + pluralStringResource(
+                                    R.plurals.swipe_month_photos, month.count, month.count
+                                ),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showMonthPicker = false
+                                    onOpenMonthReview(
+                                        SwipeMonths.startMsOf(month.year, month.month)
+                                    )
+                                }
+                                .padding(vertical = 12.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMonthPicker = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
         )
     }
 }

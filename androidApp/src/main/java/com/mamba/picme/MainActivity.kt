@@ -367,7 +367,13 @@ class MainActivity : ComponentActivity() {
                                     },
                                     // 整理中心 hub 出口：F2 Quick tidy → 手势整理页；类目卡 → F1 类目详情路由
                                     onQuickTidy = {
-                                        navController.navigate(Screen.SwipeReview.route) {
+                                        navController.navigate(Screen.SwipeReview.createRoute()) {
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    // hub「按月回顾」入口（P0-3）：带月份起点进滑动整理（按月建队）
+                                    onOpenMonthReview = { monthStart ->
+                                        navController.navigate(Screen.SwipeReview.createRoute(monthStart)) {
                                             launchSingleTop = true
                                         }
                                     },
@@ -489,9 +495,21 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
-                            composable(Screen.SwipeReview.route) {
+                            composable(
+                                route = Screen.SwipeReview.route,
+                                arguments = listOf(
+                                    navArgument("monthStart") {
+                                        type = NavType.LongType
+                                        defaultValue = -1L
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val monthStart = backStackEntry.arguments?.getLong("monthStart") ?: -1L
                                 val viewModel: SwipeReviewViewModel = viewModel(
-                                    factory = app.container.createSwipeReviewViewModelFactory()
+                                    factory = app.container.createSwipeReviewViewModelFactory(
+                                        // -1L 为唯一「无月份」哨兵（>0 判定会误杀东八区 1970-01 的负起点）
+                                        monthStartMs = monthStart.takeIf { ms -> ms != -1L }
+                                    )
                                 )
                                 SwipeReviewScreen(
                                     viewModel = viewModel,

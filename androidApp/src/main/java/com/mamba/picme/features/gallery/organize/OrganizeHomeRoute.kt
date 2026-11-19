@@ -65,6 +65,7 @@ fun OrganizeHomeRoute(
     /** Dedup 扫描态「后台运行」按钮离页回相册（根页无返回箭头，此回调仅服务该按钮语义） */
     onLeaveToGallery: () -> Unit,
     onQuickTidy: () -> Unit,
+    onOpenMonthReview: (Long) -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
     onNavigateToTagViewer: () -> Unit,
     /** 扫描 Tab v3 确定性相册视图出口（已打标/含人脸/最佳照片） */
@@ -101,6 +102,7 @@ fun OrganizeHomeRoute(
                         viewModel = dedupViewModel,
                         onNavigateBack = onLeaveToGallery,
                         onQuickTidy = onQuickTidy,
+                        onOpenMonthReview = onOpenMonthReview,
                         onOpenCategory = onOpenCategory,
                         // hub 引导态类目卡（NEEDS_SCAN）点击切到 SCAN tab
                         onOpenScan = { onSelectTab(OrganizeTab.SCAN) },

@@ -7,6 +7,7 @@ import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.swipe.SwipeCandidate
 import com.mamba.picme.domain.swipe.SwipeKeepHistory
 import com.mamba.picme.domain.swipe.SwipeKeepHistoryStore
+import com.mamba.picme.domain.swipe.SwipeMonths
 import com.mamba.picme.domain.swipe.SwipeQueueBuilder
 import com.mamba.picme.domain.trash.TrashBackend
 import com.mamba.picme.domain.trash.TrashGuidanceGate
@@ -81,9 +82,15 @@ class SwipeReviewViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     /** 时间源（测试注入 fake 时钟）。 */
     private val nowMs: () -> Long = { System.currentTimeMillis() },
+    /** 按月回顾建队月份起点（本地时区）；null = 全量建队。UI 顶栏读月份标签用。 */
+    val monthStartMs: Long? = null,
 ) : ViewModel() {
 
     private val scope: CoroutineScope = coroutineScope ?: viewModelScope
+
+    /** 按月回顾建队区间；null = 全量。 */
+    private val monthRange: Pair<Long, Long>? =
+        monthStartMs?.let { ms -> SwipeMonths.rangeContaining(ms) }
 
     val trashController = TrashSessionController(trashBackend, scope, ioDispatcher, trashGuidanceGate)
 
@@ -167,7 +174,11 @@ class SwipeReviewViewModel(
                     keepHistoryStore.save(keepEntries.toSet())
                 }
                 val suppressed = SwipeKeepHistory.activeUris(keepEntries)
-                SwipeQueueBuilder.build(organizeRepository.loadItems(), now = now)
+                SwipeQueueBuilder.build(
+                    organizeRepository.loadItems(),
+                    now = now,
+                    captureRange = monthRange,
+                )
                     .filterNot { candidate -> candidate.uri in suppressed }
             }
             _uiState.value = if (queue.isEmpty()) {

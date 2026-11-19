@@ -26,10 +26,19 @@ object SwipeQueueBuilder {
         Bucket(null, SwipeReason.RECENT), // 兜底桶：其余照片
     )
 
-    fun build(items: List<OrganizeItem>, now: Long = System.currentTimeMillis()): List<SwipeCandidate> {
+    fun build(
+        items: List<OrganizeItem>,
+        now: Long = System.currentTimeMillis(),
+        /** 按月回顾：仅建该月 [start, end) 拍摄的队列；null = 全量。 */
+        captureRange: Pair<Long, Long>? = null,
+    ): List<SwipeCandidate> {
         // 视频不做无效裁定（永不入队）；media_assets.uri 非唯一索引，重复行按 uri 去重
         // （只出一张卡，与类目详情页 VM 同防线；重复行保留最后一条快照）
-        val photos = items.filter { item -> !item.isVideo }
+        val photos = items.filter { item ->
+            !item.isVideo &&
+                (captureRange == null ||
+                    (item.captureDate >= captureRange.first && item.captureDate < captureRange.second))
+        }
         val photosByUri = photos.associateByTo(LinkedHashMap()) { item -> item.uri }
         val classifiedByUri = OrganizeCategorizer.classifyAll(photos, now)
             .associateByTo(LinkedHashMap()) { entry -> entry.item.uri }

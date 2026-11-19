@@ -266,6 +266,8 @@ class SwipeReviewViewModelFactory(
     private val keepHistoryStore: SwipeKeepHistoryStore,
     private val silentTrashEnabled: suspend () -> Boolean = { false },
     private val trashGuidanceGate: TrashGuidanceGate? = null,
+    /** 按月回顾建队月份起点（本地时区）；null = 全量建队。 */
+    private val monthStartMs: Long? = null,
 ) : ViewModelProvider.Factory {
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -276,6 +278,7 @@ class SwipeReviewViewModelFactory(
                 trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
                 keepHistoryStore = keepHistoryStore,
                 trashGuidanceGate = trashGuidanceGate,
+                monthStartMs = monthStartMs,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -421,8 +424,8 @@ interface AppContainer {
     /** 整理中心（F1）类目详情 ViewModel 工厂（按类目参数化） */
     fun createOrganizeCategoryViewModelFactory(category: OrganizeCategory): ViewModelProvider.Factory
 
-    /** 手势快速整理（F2）ViewModel 工厂（无参数：队列由 VM 自建） */
-    fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory
+    /** 手势快速整理（F2）ViewModel 工厂（monthStartMs > 0 = 按月回顾建队） */
+    fun createSwipeReviewViewModelFactory(monthStartMs: Long? = null): ViewModelProvider.Factory
 
     /** 回忆 carousel（F3）ViewModel 工厂（无参数：数据源与隐藏集由容器注入） */
     fun createMemoriesViewModelFactory(): ViewModelProvider.Factory
@@ -1140,13 +1143,14 @@ class AppContainerImpl(
         )
     }
 
-    override fun createSwipeReviewViewModelFactory(): ViewModelProvider.Factory {
+    override fun createSwipeReviewViewModelFactory(monthStartMs: Long?): ViewModelProvider.Factory {
         return SwipeReviewViewModelFactory(
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
             keepHistoryStore = DataStoreSwipeKeepHistoryStore(context),
             silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
             trashGuidanceGate = silentTrashGuidance,
+            monthStartMs = monthStartMs,
         )
     }
 
