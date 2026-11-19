@@ -1052,3 +1052,59 @@ browser_live:
     - "live 态覆写：shared BrowserLiveOverlay 经 XCFramework 直接可得；500ms 节流节拍对齐"
     - "全屏接管页：Muse 三态（observing 观看默认只读缩放 + 接管 CTA / in_control 坐标交互 + 输入行 + 交还/停止任务 / ended 水印 + 返回对话 CTA）+ 暂停停流不停会话——读本节 full_preview 契约，不读 Android 源码"
     - "落库恢复：iOS ChatHistoryStore 增 tool_browser type 解码（payload=BrowserLive JSON）"
+
+# ============================================================================
+# 19. 图片全屏预览浮层（ChatImagePreviewOverlay）— 2026-11-19 底栏三件套定稿
+#     （能力面对齐相册 MediaPager 分享/编辑/删除；组件已迁 components/ChatImagePreviewOverlay.kt）
+# ============================================================================
+# 承接链路（三条已收敛同一浮层）：聊天气泡图片点击 / OpenUI 卡 Image 点击
+# （OPEN_PHOTO action → OpenUiCardHost.onPhotoClick）/ HTML 沙箱卡 media:// 缩略图点击
+# （polang-media-view:// 导航拦截 → onOpenMedia）。iOS 只需实现一个预览浮层吃全链路。
+image_preview_overlay:
+  status: "Android 已落地（2026-11-19）；iOS 跟随 TODO 见 ios_todo"
+  container:
+    type: fullscreen_overlay
+    background: "black"                   # 纯黑底（不看主题）
+    dismiss: [tap_on_image, back_key, close_button]
+    pager: horizontal_swipe               # 多页集合横滑翻页（OpenUI PhotoGrid/HTML 卡多图/会话图片集）
+    zoom: "已暂停（翻页优先，2026-11-01 起移除缩放手势）"
+  top_bar:
+    close_button:
+      position: top_end
+      style: "40dp 圆形黑 50% 底 + 白 Close 图标（24dp）"
+      safe_area: status_bar_padding + 16dp
+    page_indicator:
+      position: "close 按钮左侧（end 72dp, top 22dp）"
+      style: "白字 labelLarge「n / total」，黑 40% 底圆角 10dp 胶囊"
+  bottom_bar:                              # 底栏三件套（视觉对齐相册 MediaPager bottom bar）
+    container: "通栏 Surface 黑 85% 底 + navigationBarsPadding，Row SpaceEvenly"
+    button_style: "裸 Column 直排（不套圆形 Surface 防切长文案）：icon 22dp 白 90% + label 10sp 白 70%，最小触控 48dp，contentDescription = label"
+    actions:
+      - share:
+          icon: send
+          label_key: send                  # 既有键，五语已同步
+          show_when: "当前页可解析为图库媒体（uri→MediaAsset 反查命中）"
+          behavior: "系统分享面板 ACTION_SEND（单张，FLAG_GRANT_READ_URI_PERMISSION）"
+      - edit:
+          icon: auto_fix_high
+          label_key: edit
+          show_when: always                # PhotoEditor 支持 content/file 两种 uri，AI 生成图也可继续编辑
+          behavior: "导航 photo_editor 路由（sourceUri=当前页 uri，autoOptimize=false）"
+      - delete:
+          icon: delete
+          label_key: delete
+          show_when: "当前页可解析为图库媒体"
+          behavior: "API 30+ 系统回收站（30 天可恢复，TrashSessionController，tag=preview_swipe_chat 分桶授权）；API<30 降级永久删除 + 系统授权框；成功后收缩预览页集合，删空自动关闭浮层"
+  save_button:                             # 保存到相册（仅 AI 生成/编辑结果图页，底栏上方居中）
+    show_when: "当前页 isEditableResult（AGENT IMAGE / EDIT_RESULT）"
+    style: "M3 Button 居中，底栏上方 12dp 间距"
+    states: "未保存 → chat_edit_save_to_gallery 可点；已保存 → chat_edit_saved_to_gallery 禁用"
+    failure_toast: chat_edit_save_expired_failed   # LRU 已回收
+  capability_resolution:                   # Agent First 显式动作面（纯函数 resolveChatPreviewActions，JVM 可测）
+    rule: "canShare/canDelete = uri→MediaAsset 反查命中；canEdit = 恒 true；showSave = isEditableResult"
+    unresolvable_page: "AI 生成缓存图（file 路径非图库媒体）→ 仅 编辑 + 保存位，无分享/删除"
+  ios_todo:
+    - "预览浮层：黑底 + 横滑翻页 + 顶栏 close/页码 + 底栏三件套（按钮样式按 bottom_bar.button_style）"
+    - "删除：iOS 走 Photos framework 删除授权（平台原生，登记 allowed_differences），成功后同样收缩集合删空关闭"
+    - "分享：UIActivityViewController（平台原生）；编辑：跳 iOS 编辑器路由"
+    - "uri→asset 反查：shared 侧图库索引（Android 经 Room getAllMedia 流），iOS 用同源数据"

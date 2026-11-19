@@ -38,9 +38,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.annotation.StringRes
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
@@ -54,7 +51,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,8 +66,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
@@ -218,7 +212,17 @@ import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
+import com.mamba.picme.features.chat.components.ChatImagePreviewOverlay
 import com.mamba.picme.features.gallery.MediaViewModel
+import com.mamba.picme.agent.core.model.context.MediaAsset
+import com.mamba.picme.features.gallery.components.TRASH_TAG_PREVIEW_CHAT
+import com.mamba.picme.features.gallery.components.TrashAuthEffects
+import com.mamba.picme.features.gallery.components.shareMediaAssets
+import com.mamba.picme.features.gallery.components.toMediaAsset
+import com.mamba.picme.domain.trash.PreviewTrashRouting
+import com.mamba.picme.domain.trash.TrashOutcome
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import com.mamba.picme.agent.core.platform.voice.AsrEngine
 import androidx.compose.runtime.mutableIntStateOf
 import com.mamba.picme.agent.core.platform.voice.SherpaOnnxAsrEngine
@@ -374,6 +378,16 @@ fun ChatScreen(
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
 
+    // 预览底栏（分享/删除）uri→MediaAsset 反查（同 MemoriesViewModel.assetsByUri 模式）：
+    // 图库流驱动——回收成功后 MediaViewModel 经 removeTrashedFromLocalCache + refresh
+    // 重发射，底栏动作面随流自动收缩
+    val previewAssetsByUri by remember {
+        (context.applicationContext as PoLangApplication).container.database.mediaDao()
+            .getAllMedia()
+            .map { entities -> entities.associate { entity -> entity.uri to entity.toMediaAsset() } }
+            .flowOn(Dispatchers.IO)
+    }.collectAsStateWithLifecycle(emptyMap())
+
     /**
      * Html 卡本地媒体缩略图点击 → 原生横滑预览（2026-11-15）：集合语义对齐
      * OpenUI PhotoGrid（onPhotoClick）——卡内全部 media 引用为翻页集，点击项为初始页。
@@ -514,6 +528,33 @@ fun ChatScreen(
                 }
             }
             viewModel.consumeDeleteAuthRequest()
+        }
+    }
+
+    // ── 预览页删除（回收站 30 天可恢复）：授权拉起 + Trashed outcome 后收缩预览页集合 ──
+    // 三宿主范式（Gallery/Chat/MemoryDetail）的 Chat 挂载点，tag 分桶防跨宿主重复拉起
+    TrashAuthEffects(controller = mediaViewModel.trashController, tag = TRASH_TAG_PREVIEW_CHAT)
+    LaunchedEffect(Unit) {
+        mediaViewModel.trashController.outcomes.collect { outcome ->
+            if (outcome is TrashOutcome.Trashed && outcome.tag == TRASH_TAG_PREVIEW_CHAT) {
+                val trashed = outcome.trashedUris.toSet()
+                imagePreview = imagePreview?.let { state ->
+                    val remaining = state.pages.filter { page -> page.rawUri !in trashed }
+                    // 删空自动收起（对齐 Gallery 删空口径）
+                    if (remaining.isEmpty()) null else state.copy(pages = remaining)
+                }
+            }
+        }
+    }
+
+    /** 预览删除入口：API 30+ 走回收站（Trashed outcome 到达后收缩）；API<30 降级永久删除，立即本地收缩。 */
+    fun trashPreviewAsset(asset: MediaAsset) {
+        val route = mediaViewModel.requestTrash(asset, TRASH_TAG_PREVIEW_CHAT)
+        if (route == PreviewTrashRouting.Route.LEGACY_DELETE) {
+            imagePreview = imagePreview?.let { state ->
+                val remaining = state.pages.filter { page -> page.rawUri != asset.uri }
+                if (remaining.isEmpty()) null else state.copy(pages = remaining)
+            }
         }
     }
 
@@ -1088,8 +1129,10 @@ fun ChatScreen(
 
             // 图片全屏预览（横滑翻页）——组合序在 HTML 卡全屏查看器之后（z 序置顶：
             // 查看器内 media:// 缩略图点击进原生预览时叠在查看器之上，dismiss 回查看器）
+            // 底栏三件套（分享/编辑/删除）能力面对齐相册 MediaPager（2026-11-19）
             ChatImagePreviewOverlay(
                 state = imagePreview,
+                assetsByUri = previewAssetsByUri,
                 onSave = { messageId, onDone ->
                     viewModel.saveEditResult(messageId) { ok ->
                         if (ok) {
@@ -1104,6 +1147,9 @@ fun ChatScreen(
                         onDone(ok)
                     }
                 },
+                onShare = { asset -> shareMediaAssets(context, listOf(asset)) },
+                onEdit = { page -> onNavigateToPhotoEditor(page.rawUri, false) },
+                onDelete = { asset -> trashPreviewAsset(asset) },
                 onPageChanged = { page ->
                     if (page.isEditableResult) viewModel.touchEditImage(page.rawUri)
                 },
@@ -3019,139 +3065,4 @@ private fun chartIsLandscape(svg: String?): Boolean {
     val w = Regex("""width="(\d+)"""").find(svg)?.groupValues?.get(1)?.toIntOrNull() ?: 0
     val h = Regex("""height="(\d+)"""").find(svg)?.groupValues?.get(1)?.toIntOrNull() ?: 0
     return w > 0 && h > 0 && w > h
-}
-
-/**
- * 图片全屏预览浮层：对编辑/优化结果额外提供「保存到相册」按钮。
- */
-@Composable
-@OptIn(ExperimentalFoundationApi::class)
-private fun ChatImagePreviewOverlay(
-    state: ChatImagePreviewState?,
-    onSave: (messageId: String, onDone: (Boolean) -> Unit) -> Unit,
-    onPageChanged: (ImagePreviewPage) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val context = LocalContext.current
-    val expiredToast = stringResource(R.string.chat_edit_save_expired_failed)
-    AnimatedVisibility(
-        visible = state != null,
-        enter = fadeIn(),
-        exit = fadeOut()
-    ) {
-        if (state == null) return@AnimatedVisibility
-        val pages = state.pages
-        val pagerState = rememberPagerState(
-            initialPage = state.initialIndex.coerceIn(0, pages.lastIndex.coerceAtLeast(0)),
-            pageCount = { pages.size }
-        )
-
-        // 切页时：若是编辑/生成图则续期（LRU 回收）
-        LaunchedEffect(pagerState.currentPage, pages.size) {
-            pages.getOrNull(pagerState.currentPage)?.let(onPageChanged)
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                // detectTapGestures 只消费单击（关闭），不消费拖动——
-                // HorizontalPager 的横滑手势不再被 Box 的 clickable 拦截
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { onDismiss() },
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxSize()
-            ) { pageIndex ->
-                val page = pages[pageIndex]
-                var scale by remember(page.messageId) { mutableStateOf(1f) }
-                var offset by remember(page.messageId) { mutableStateOf(Offset.Zero) }
-                AsyncImage(
-                    model = resolvePreviewUri(page.rawUri),
-                    contentDescription = stringResource(R.string.cd_image_preview),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                        // 2026-11-01 翻页修复根因：detectTransformGestures 会消费全部
-                        // 指针事件（含横滑起点），HorizontalPager 完全收不到手势。
-                        // 修法：scale==1 时不消费横滑（让 pager 翻页），
-                        // 仅 scale>1（已缩放）时消费 pan/zoom
-                        // 2026-11-01 翻页修复：移除 detectTransformGestures（消费全部
-                        // 指针事件导致 pager 无法翻页）。缩放功能暂停——翻页优先。
-                        // 后续如需缩放：双击放大 + 仅在 scale>1 时消费 pan（不消费横滑起点）
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offset.x
-                            translationY = offset.y
-                        },
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // 关闭按钮（右上）
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(16.dp)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Close,
-                    contentDescription = stringResource(R.string.close),
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // 页码指示器（关闭键左侧）
-            Text(
-                text = "${pagerState.currentPage + 1} / ${pages.size}",
-                color = Color.White,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(end = 72.dp, top = 22.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-
-            // 保存按钮（仅当前页为编辑/优化结果，底部居中）
-            val currentPage = pages.getOrNull(pagerState.currentPage)
-            if (currentPage?.isEditableResult == true) {
-                val isSaved = currentPage.isSaved
-                Button(
-                    onClick = {
-                        if (!isSaved) {
-                            onSave(currentPage.messageId) { ok ->
-                                if (!ok) Toast.makeText(context, expiredToast, Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    enabled = !isSaved,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(24.dp)
-                ) {
-                    Text(
-                        text = stringResource(
-                            if (isSaved) R.string.chat_edit_saved_to_gallery else R.string.chat_edit_save_to_gallery
-                        )
-                    )
-                }
-            }
-        }
-    }
 }
