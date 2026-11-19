@@ -198,7 +198,7 @@ hub:
             text_key: org_confidence_high                    # "N confident"
             font: labelSmall
             color: primary
-            note: "highCount = HIGH 非保护张数（含 DUPLICATES keeper 张数——与 highBytes 口径差见 §8）"
+            note: "highCount = HIGH 非保护张数（DUPLICATES 按精确组扣 1 张 keeper，与 highBytes 同口径）"
         - review_badge:
             show_when: "reviewCount > 0"
             dot: { size: 6, filled: false, border: { width: 1, color: primary } }  # ○ 空心描边圆点
@@ -462,8 +462,6 @@ known_residuals:                                 # 已登记的口径差/裁剪�
     desc: "iOS 本批（ios-follow-batch-20260915）DUPLICATES 类目裁剪（T8 dedup_hash 扫描器独立后续阶段）：hub 去重卡由 UI 层 override 为 NEEDS_SCAN 引导卡（OrganizeHubView.swift:178），不渲染 summary/Config 展开；T8 落地后删 override 恢复 board 原生渲染；dedup_never_scanned/org_undo 等键已预置 xcstrings"
   - id: ios_cleaned_undo_cut
     desc: "iOS 无 API 从「最近删除」程序化恢复——cleaned 屏 Undo 按钮与回收站预览卡整段裁剪不显示；swipe Done 态「整批恢复」同理裁剪。待用户裁决是否改「打开系统相册最近删除」引导"
-  - id: highCount_vs_highBytes
-    desc: "hub 徽标 highCount（建议删除张数）含 DUPLICATES keeper 张数，而 highBytes（可释放字节）与 Hero 已扣 keeper 字节——张数与字节存在 1 张/组的口径差，有意保留（徽标表达「建议集规模」，字节表达「真实可释放」）"
   - id: exact_group_divergence
     desc: "EXACT 成组条件分叉：hub/整理侧 = 纯 MD5（dedup_hash 缓存聚类）；去重结果页 = (sizeBytes, mime) 分桶内 MD5——理论上同字节异扩展名文件 hub 成组而去重页不成组，实践影响忽略"
   - id: spec_6_1_preselect_scan_item

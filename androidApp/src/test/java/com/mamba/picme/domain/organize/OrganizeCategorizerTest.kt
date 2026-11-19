@@ -133,7 +133,7 @@ class OrganizeCategorizerTest {
             now = now,
         )
         val card = cardOf(board, OrganizeCategory.DUPLICATES)
-        assertEquals(3, card.highCount)
+        assertEquals(2, card.highCount)
         assertEquals(3, card.totalCount)
         assertEquals(15_000_000L, card.totalBytes)
         assertEquals(10_000_000L, card.highBytes)
@@ -153,7 +153,10 @@ class OrganizeCategorizerTest {
             ),
             now = now,
         )
-        assertEquals(9_000_000L, cardOf(board, OrganizeCategory.DUPLICATES).highBytes)
+        val card = cardOf(board, OrganizeCategory.DUPLICATES)
+        assertEquals(9_000_000L, card.highBytes)
+        // 5 张 HIGH − 2 组各 1 张 keeper = 3
+        assertEquals(3, card.highCount)
     }
 
     @Test
@@ -200,7 +203,7 @@ class OrganizeCategorizerTest {
         )
         val card = cardOf(board, OrganizeCategory.DUPLICATES)
         assertEquals(3, card.totalCount)
-        assertEquals(2, card.highCount)
+        assertEquals(1, card.highCount)
         assertEquals(1, card.reviewCount)
         assertEquals(5_000_000L, card.highBytes)
     }

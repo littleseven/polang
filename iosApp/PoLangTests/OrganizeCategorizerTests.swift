@@ -117,7 +117,7 @@ final class OrganizeCategorizerTests: XCTestCase {
             now: now
         )
         let card = cardOf(board, .duplicates)
-        XCTAssertEqual(3, card.highCount)
+        XCTAssertEqual(2, card.highCount)
         XCTAssertEqual(3, card.totalCount)
         XCTAssertEqual(15_000_000, card.totalBytes)
         XCTAssertEqual(10_000_000, card.highBytes)
@@ -176,7 +176,7 @@ final class OrganizeCategorizerTests: XCTestCase {
         )
         let card = cardOf(board, .duplicates)
         XCTAssertEqual(3, card.totalCount)
-        XCTAssertEqual(2, card.highCount)
+        XCTAssertEqual(1, card.highCount)
         XCTAssertEqual(1, card.reviewCount)
         XCTAssertEqual(5_000_000, card.highBytes)
     }

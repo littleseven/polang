@@ -72,7 +72,7 @@ data class CategoryBoard(
     val category: OrganizeCategory,
     val totalCount: Int,
     val totalBytes: Long,
-    /** HIGH 置信且非 protected：建议删除数。 */
+    /** HIGH 置信且非 protected：建议删除数；DUPLICATES 按精确组扣 1 张 keeper，与 highBytes 同口径。 */
     val highCount: Int,
     /** 建议删除字节；DUPLICATES 额外按精确组扣 1 张 keeper（全员进建议集时保留一张不可删）。 */
     val highBytes: Long,

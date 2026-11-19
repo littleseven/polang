@@ -23,7 +23,7 @@ enum OrganizeCategorizer {
     }
 
     /// hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集；
-    /// DUPLICATES 按精确组扣 1 张 keeper，与去重结果页只计非 keeper 口径一致）。
+    /// DUPLICATES 计数与字节均按精确组扣 1 张 keeper，与去重结果页只计非 keeper 口径一致）。
     /// 六类目全量产卡（含零命中类目：计数/字节全零、coverage 正常计算），
     /// NEEDS_SCAN 引导卡与空卡是否渲染由 UI 层决定（spec P3/AC-R2-4：类目不再静默消失）。
     static func board(_ items: [OrganizeItem], now: Int64) -> OrganizeBoard {
@@ -34,16 +34,15 @@ enum OrganizeCategorizer {
                 let entries = entriesByCategory[category] ?? []
                 let high = entries.filter { $0.confidence == .high && !$0.isProtected }
                 let review = entries.filter { $0.confidence != .high && !$0.isProtected }
-                var highBytes = high.reduce(Int64(0)) { $0 + $1.item.sizeBytes }
-                if category == .duplicates {
-                    highBytes -= duplicatesKeeperBytes(high)
-                }
+                let keeperGroups = category == .duplicates ? duplicatesKeeperGroups(high) : []
                 return (index, CategoryBoard(
                     category: category,
                     totalCount: entries.count,
                     totalBytes: entries.reduce(Int64(0)) { $0 + $1.item.sizeBytes },
-                    highCount: high.count,
-                    highBytes: highBytes,
+                    // 与 highBytes 同口径：精确组每组扣 1 张 keeper（keeper 永不进建议删除集）
+                    highCount: high.count - keeperGroups.count,
+                    highBytes: high.reduce(Int64(0)) { $0 + $1.item.sizeBytes }
+                        - keeperGroups.reduce(Int64(0)) { $0 + ($1.map { $0.item.sizeBytes }.max() ?? 0) },
                     reviewCount: review.count,
                     protectedCount: entries.filter { $0.isProtected }.count,
                     // 按 uri 排序取前 4：rows 无序（rowid 序漂移），稳定序防预览缩略图闪换
@@ -67,20 +66,19 @@ enum OrganizeCategorizer {
         )
     }
 
-    /// DUPLICATES keeper 扣减：hub「可释放」按每精确组留 1 张计（与详情页预选/全选按组
-    /// 排除 1 张 keeper 同口径）。组内同 MD5 内容相同，扣组内最大 sizeBytes
-    /// （防 first 落到 0 字节异常行）。
+    /// DUPLICATES keeper 扣减：hub「建议删除张数/可释放字节」同源按每精确组留 1 张计
+    /// （计数扣组数，字节扣组内最大 sizeBytes——防 first 落到 0 字节异常行；
+    /// 与详情页预选/全选按组排除 1 张 keeper 同口径）。
     /// 守卫 `group.count == exactDupGroupSize`：组全员都在建议集才扣。生产管线中聚类输入
     /// 已按库内 uri 收敛，组必然全员在列，本守卫仅防御直调 board 传部分列表的异常输入
-    /// ——不扣时按全组字节计（高估方向，仅展示口径偏差，无安全风险）。
+    /// ——不扣时按全组计（高估方向，仅展示口径偏差，无安全风险）。
     /// 注：DUPLICATES 不经 ValueGuard（见 ValueGuard.guardedCategories），
     /// 精确组成员恒 HIGH 非 protected，「全员在列」即「组未被建议集拆散」。
-    private static func duplicatesKeeperBytes(_ high: [ClassifiedItem]) -> Int64 {
+    private static func duplicatesKeeperGroups(_ high: [ClassifiedItem]) -> [[ClassifiedItem]] {
         Dictionary(grouping: high, by: { $0.item.exactDupGroupKey })
             .filter { $0.key != nil }
             .values
             .filter { group in group.count == group.first?.item.exactDupGroupSize }
-            .reduce(Int64(0)) { $0 + ($1.map { $0.item.sizeBytes }.max() ?? 0) }
     }
 
     /// 类目信号覆盖度：全库任一媒体持有该类目关键信号 → READY，否则 NEEDS_SCAN

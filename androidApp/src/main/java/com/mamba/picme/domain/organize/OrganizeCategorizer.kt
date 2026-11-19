@@ -25,7 +25,7 @@ object OrganizeCategorizer {
 
     /**
      * hub 聚合：类目卡（按建议优先级 highBytes 降序）+ Hero 口径（HIGH 非 protected 去重并集；
-     * DUPLICATES 按精确组扣 1 张 keeper，与去重结果页只计非 keeper 口径一致）。
+     * DUPLICATES 计数/字节同口径按每精确组扣 1 张 keeper，与去重结果页只计非 keeper 口径一致）。
      * 六类目全量产卡（含零命中类目：计数/字节全零、coverage 正常计算），
      * NEEDS_SCAN 引导卡与空卡是否渲染由 UI 层决定（spec P3/AC-R2-4：类目不再静默消失）。
      */
@@ -41,18 +41,19 @@ object OrganizeCategorizer {
                 val review = entries.filter { entry ->
                     entry.confidence != OrganizeConfidence.HIGH && !entry.isProtected
                 }
-                val highBytes = high.sumOf { entry -> entry.item.sizeBytes } -
-                    if (category == OrganizeCategory.DUPLICATES) {
-                        duplicatesKeeperBytes(high)
-                    } else {
-                        0L
-                    }
+                val keeperGroups = if (category == OrganizeCategory.DUPLICATES) {
+                    duplicatesKeeperGroups(high)
+                } else {
+                    emptyList()
+                }
                 CategoryBoard(
                     category = category,
                     totalCount = entries.size,
                     totalBytes = entries.sumOf { entry -> entry.item.sizeBytes },
-                    highCount = high.size,
-                    highBytes = highBytes,
+                    // 与 highBytes 同口径：精确组每组扣 1 张 keeper（keeper 永不进建议删除集）
+                    highCount = high.size - keeperGroups.size,
+                    highBytes = high.sumOf { entry -> entry.item.sizeBytes } -
+                        keeperGroups.sumOf { group -> group.maxOf { entry -> entry.item.sizeBytes } },
                     reviewCount = review.size,
                     protectedCount = entries.count { entry -> entry.isProtected },
                     // 按 uri 排序取前 4：rows 无序（rowid 序漂移），稳定序防预览缩略图闪换
@@ -72,22 +73,21 @@ object OrganizeCategorizer {
     }
 
     /**
-     * DUPLICATES keeper 扣减：hub「可释放」按每精确组留 1 张计（与详情页预选/全选按组
-     * 排除 1 张 keeper 同口径）。组内同 MD5 内容相同，扣组内最大 sizeBytes
+     * DUPLICATES keeper 组识别：hub 计数/字节同口径按每精确组留 1 张（与详情页预选/全选按组
+     * 排除 1 张 keeper 同口径）。组内同 MD5 内容相同，字节扣组内最大 sizeBytes
      * （防 first 落到 0 字节异常行）。
      * 守卫 `group.size == exactDupGroupSize`：组全员都在建议集才扣。生产管线中聚类输入
      * 已按库内 uri 收敛（OrganizeRepositoryImpl.queryDuplicateInfo），组必然全员在列，
-     * 本守卫仅防御直调 [board] 传部分列表的异常输入——不扣时按全组字节计（高估方向，
+     * 本守卫仅防御直调 [board] 传部分列表的异常输入——不扣时按全组计（高估方向，
      * 仅展示口径偏差，无安全风险）。
      * 注：DUPLICATES 不经 ValueGuard（见 ValueGuard.GUARDED_CATEGORIES），
      * 精确组成员恒 HIGH 非 protected，「全员在列」即「组未被建议集拆散」。
      */
-    private fun duplicatesKeeperBytes(high: List<ClassifiedItem>): Long =
+    private fun duplicatesKeeperGroups(high: List<ClassifiedItem>): List<List<ClassifiedItem>> =
         high.groupBy { entry -> entry.item.exactDupGroupKey }
             .filterKeys { key -> key != null }
             .values
             .filter { group -> group.size == group.first().item.exactDupGroupSize }
-            .sumOf { group -> group.maxOf { entry -> entry.item.sizeBytes } }
 
     /**
      * 类目信号覆盖度：全库任一媒体持有该类目关键信号 → READY，否则 NEEDS_SCAN
