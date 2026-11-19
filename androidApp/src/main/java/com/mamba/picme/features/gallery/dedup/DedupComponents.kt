@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -44,6 +45,7 @@ import com.mamba.picme.domain.dedup.DedupContentType
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.KeepPolicy
+import com.mamba.picme.domain.dedup.KeepReason
 import com.mamba.picme.domain.dedup.VersionRole
 
 private val KeepGreen = Color(0xFF4CAF50)
@@ -239,10 +241,26 @@ fun DedupGroupCard(
             ) {
                 LevelBadge(level = group.level)
                 ContentTypeBadge(contentType = group.contentType)
+                if (!group.userOverride) {
+                    Text(
+                        text = stringResource(R.string.dedup_ai_pick_badge),
+                        modifier = Modifier
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                RoundedCornerShape(6.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 Text(
                     text = dedupGroupMetaText(group),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (group.userOverride) {
                     Text(
@@ -345,4 +363,14 @@ internal fun keepPolicyDescRes(policy: KeepPolicy): Int = when (policy) {
     KeepPolicy.ORIGINAL -> R.string.dedup_policy_original_desc
     KeepPolicy.EDITED -> R.string.dedup_policy_edited_desc
     KeepPolicy.LATEST -> R.string.dedup_policy_latest_desc
+}
+
+internal fun keepReasonLabelRes(reason: KeepReason): Int = when (reason) {
+    KeepReason.USER_CHOICE -> R.string.dedup_keep_reason_user
+    KeepReason.FACE_QUALITY -> R.string.dedup_keep_reason_face
+    KeepReason.AESTHETIC -> R.string.dedup_keep_reason_aesthetic
+    KeepReason.HIGHEST_RESOLUTION -> R.string.dedup_keep_reason_resolution
+    KeepReason.ORIGINAL -> R.string.dedup_keep_reason_original
+    KeepReason.EDITED -> R.string.dedup_keep_reason_edited
+    KeepReason.LATEST -> R.string.dedup_keep_reason_latest
 }

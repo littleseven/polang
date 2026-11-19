@@ -389,6 +389,14 @@
     <string name="dedup_role_edited">Modifiée</string>
     <string name="dedup_role_compressed">Compressée</string>
     <string name="dedup_manual_mark">Choix manuel</string>
+    <string name="dedup_ai_pick_badge">Choix de l\'IA</string>
+    <string name="dedup_keep_reason_user">Conservée selon votre choix</string>
+    <string name="dedup_keep_reason_face">Recommandée : meilleure qualité de visage</string>
+    <string name="dedup_keep_reason_aesthetic">Recommandée : meilleur score esthétique</string>
+    <string name="dedup_keep_reason_resolution">Recommandée : meilleure qualité (résolution maximale)</string>
+    <string name="dedup_keep_reason_original">Recommandée : copie originale</string>
+    <string name="dedup_keep_reason_edited">Recommandée : version modifiée</string>
+    <string name="dedup_keep_reason_latest">Recommandée : la plus récente</string>
     <string name="dedup_rule_hint_default">Par défaut selon « %1$s » · touchez un groupe pour modifier</string>
     <!-- 内容类型 badge（spec §10.4，GENERAL 不显示）与类型差异化 footer 策略文案 -->
     <string name="dedup_type_screenshot">Capture d\'écran</string>

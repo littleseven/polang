@@ -386,6 +386,14 @@
     <string name="dedup_role_edited">已編輯</string>
     <string name="dedup_role_compressed">已壓縮</string>
     <string name="dedup_manual_mark">已手動選擇</string>
+    <string name="dedup_ai_pick_badge">AI 推薦</string>
+    <string name="dedup_keep_reason_user">已按你的選擇保留</string>
+    <string name="dedup_keep_reason_face">推薦保留：人臉品質最佳</string>
+    <string name="dedup_keep_reason_aesthetic">推薦保留：美學評分最高</string>
+    <string name="dedup_keep_reason_resolution">推薦保留：畫質最佳（解析度最高）</string>
+    <string name="dedup_keep_reason_original">推薦保留：原始版本</string>
+    <string name="dedup_keep_reason_edited">推薦保留：編輯版本</string>
+    <string name="dedup_keep_reason_latest">推薦保留：最新一張</string>
     <string name="dedup_rule_hint_default">按「%1$s」預設勾選 · 點組可改選</string>
     <!-- 內容類型 badge（spec §10.4，GENERAL 不顯示）與類型差異化 footer 策略文案 -->
     <string name="dedup_type_screenshot">截圖</string>

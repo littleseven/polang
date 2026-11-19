@@ -402,6 +402,14 @@
     <string name="dedup_role_edited">Edited</string>
     <string name="dedup_role_compressed">Compressed</string>
     <string name="dedup_manual_mark">Manual pick</string>
+    <string name="dedup_ai_pick_badge">AI pick</string>
+    <string name="dedup_keep_reason_user">Kept by your choice</string>
+    <string name="dedup_keep_reason_face">Recommended: best face quality</string>
+    <string name="dedup_keep_reason_aesthetic">Recommended: highest aesthetic score</string>
+    <string name="dedup_keep_reason_resolution">Recommended: best quality (highest resolution)</string>
+    <string name="dedup_keep_reason_original">Recommended: original copy</string>
+    <string name="dedup_keep_reason_edited">Recommended: edited version</string>
+    <string name="dedup_keep_reason_latest">Recommended: most recent</string>
     <string name="dedup_rule_hint_default">Default by \"%1$s\" · tap group to change</string>
     <!-- 内容类型 badge（spec §10.4，GENERAL 不显示）与类型差异化 footer 策略文案 -->
     <string name="dedup_type_screenshot">Screenshot</string>

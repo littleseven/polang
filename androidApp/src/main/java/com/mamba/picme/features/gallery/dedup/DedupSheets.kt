@@ -48,6 +48,7 @@ import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupMember
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.VersionRole
+import com.mamba.picme.domain.dedup.keepReasonOf
 import java.text.DateFormat
 import java.util.Date
 
@@ -70,6 +71,7 @@ fun DedupGroupDetailPage(
     onOpenKeepRules: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val policy by viewModel.policy.collectAsState()
     val group = remember(uiState) { viewModel.getGroup(groupId) }
     val editable = uiState is DedupUiState.Results
 
@@ -92,6 +94,7 @@ fun DedupGroupDetailPage(
                 DedupGroupDetailContent(
                     group = group,
                     editable = editable,
+                    policy = policy,
                     // 改选保留项后直接收起详情页回结果列表（一次点选完成改选，
                     // 组卡片「已手动选择」即时反馈）；删除仍由详情 CTA / 底部批量 CTA 承担
                     onKeep = { uri ->
@@ -148,6 +151,7 @@ private fun DedupGroupDetailTopBar(
 private fun DedupGroupDetailContent(
     group: DedupGroup,
     editable: Boolean,
+    policy: KeepPolicy,
     onKeep: (String) -> Unit,
     onPreview: (Int) -> Unit,
     onConfirm: () -> Unit,
@@ -170,6 +174,17 @@ private fun DedupGroupDetailContent(
                 text = dedupGroupMetaText(group),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // 推荐理由行仅 Results 态渲染：Scanning 态建组固定按 BEST_QUALITY 排序，
+        // 用户 policy 为 LATEST/ORIGINAL 时理由会与实际 keep 矛盾
+        if (editable) {
+            Text(
+                text = stringResource(keepReasonLabelRes(keepReasonOf(group, policy))),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Medium
             )
         }
 

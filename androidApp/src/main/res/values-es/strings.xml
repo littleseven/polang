@@ -389,6 +389,14 @@
     <string name="dedup_role_edited">Editada</string>
     <string name="dedup_role_compressed">Comprimida</string>
     <string name="dedup_manual_mark">Elección manual</string>
+    <string name="dedup_ai_pick_badge">Selección de IA</string>
+    <string name="dedup_keep_reason_user">Conservada por tu elección</string>
+    <string name="dedup_keep_reason_face">Recomendada: mejor calidad facial</string>
+    <string name="dedup_keep_reason_aesthetic">Recomendada: mayor puntuación estética</string>
+    <string name="dedup_keep_reason_resolution">Recomendada: mejor calidad (mayor resolución)</string>
+    <string name="dedup_keep_reason_original">Recomendada: copia original</string>
+    <string name="dedup_keep_reason_edited">Recomendada: versión editada</string>
+    <string name="dedup_keep_reason_latest">Recomendada: la más reciente</string>
     <string name="dedup_rule_hint_default">Predeterminado por «%1$s» · toca un grupo para cambiar</string>
     <!-- 内容类型 badge（spec §10.4，GENERAL 不显示）与类型差异化 footer 策略文案 -->
     <string name="dedup_type_screenshot">Captura de pantalla</string>
