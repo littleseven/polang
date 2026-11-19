@@ -424,7 +424,7 @@ interface AppContainer {
     /** 整理中心（F1）类目详情 ViewModel 工厂（按类目参数化） */
     fun createOrganizeCategoryViewModelFactory(category: OrganizeCategory): ViewModelProvider.Factory
 
-    /** 手势快速整理（F2）ViewModel 工厂（monthStartMs > 0 = 按月回顾建队） */
+    /** 手势快速整理（F2）ViewModel 工厂（monthStartMs 非 null = 按月回顾建队；-1L 为路由「无月份」哨兵，负值月份起点合法——东八区 1970-01 起点为负） */
     fun createSwipeReviewViewModelFactory(monthStartMs: Long? = null): ViewModelProvider.Factory
 
     /** 回忆 carousel（F3）ViewModel 工厂（无参数：数据源与隐藏集由容器注入） */

@@ -596,6 +596,8 @@ private fun SwipeShareReportButton(state: SwipeUiState.Done) {
                     throw e
                 } catch (e: IOException) {
                     Log.w(TAG, "战报渲染失败，取消分享", e)
+                } catch (e: IllegalArgumentException) {
+                    Log.w(TAG, "战报分享 FileProvider 配置异常", e)
                 } finally {
                     sharing = false
                 }

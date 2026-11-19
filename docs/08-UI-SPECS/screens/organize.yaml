@@ -394,7 +394,7 @@ cleaned:
 # ============================================================================
 # 5. swipe_review 屏口径（手势快速整理 F2，SwipeReviewScreen）
 # ============================================================================
-# 路由：swipe_review（NavHost 二级页）；入口 = hub「滑动整理」(Swipe to tidy) 主按钮。
+# 路由：swipe_review?monthStart={monthStart}（NavHost 二级页，monthStart 默认 -1 = 全量建队；非 -1 含负值 = hub「按月回顾」建队月份起点）；入口 = hub「滑动整理」(Swipe to tidy) 主按钮 + 「按月回顾」入口（§2 month_review_entry）。
 # 本屏 UI 细节沿用现状（v1 已定稿），本节固化与类目体系的【口径契约】。
 swipe_review:
   queue_source: "SwipeQueueBuilder 消费与类目页同一管线产出（OrganizeCategorizer.classifyAll）——口径同源，同一张图两处判定一致（spec AC-R2-7）"
@@ -403,6 +403,7 @@ swipe_review:
     waste_buckets: "废片桶只收 HIGH/MEDIUM 且非 protected 项；LOW 弱信号与 protected 项落 RECENT 兜底（用户全手动决策）"
     non_waste_categories: "DUPLICATES/DOCUMENTS/LARGE_FILES 类目的照片也落 RECENT 兜底（F2 只收截图与低质两类废片）"
     dedup_by_uri: "重复 uri 只出一张卡（保留最后一条快照，与类目详情页同防线）"
+    month_filter: "monthStart≠-1 时仅建该月 [start, end) 拍摄的队列（captureRange，本地时区；SwipeMonths.rangeContaining）；-1 = 全量"
     sort_within_bucket: captureDate_desc
   bucket_order:                                  # 声明序即出队顺序
     buckets:
@@ -418,8 +419,8 @@ swipe_review:
     tap: skip
     threshold: "卡片宽 25%（SWIPE_THRESHOLD_FRACTION=0.25）超阈值飞出落决策，未超弹回；主位移轴定方向（水平主导判 KEEP/SKIP，垂直向上判 DELETE）"
     preload: 3                                   # 预加载后续 3 张
-  top_bar: "返回 + 居中进度「N / M」+ 副行 freed + 右 undo（尾条已提交时禁用）"
-  states: [loading, reviewing, empty, done]        # 2026-09-15 补 empty：建队为空（含 KEEP 抑制后）→ swipe_empty；Done = 统计卡（Kept/Deleted/Skipped + Space freed）+ 再来一轮；iOS「整批恢复」裁剪（无最近删除恢复 API，§8）
+  top_bar: "返回 + 居中进度「N / M」+ 副行 freed + 右 undo（尾条已提交时禁用）；按月回顾时非 Reviewing 态标题显示月份标签（swipe_month_title 模板 + 应用语言环境 DateFormatSymbols 月名）"
+  states: [loading, reviewing, empty, done]        # 2026-09-15 补 empty：建队为空（含 KEEP 抑制后）→ swipe_empty；Done = 统计卡（Kept/Deleted/Skipped + Space freed）+ 再来一轮 + 分享战报（deleted>0 才显示，CleanupReportCard 1080×1350 PNG 经 FileProvider 分享，见 §8 台账）；iOS「整批恢复」裁剪（无最近删除恢复 API，§8）
   keep_history: "KEEP 30 天抑制：decide(KEEP) 即时写 DataStore（swipe_keep_history stringSet，uri|epochMs 编码 + TTL 裁剪）；restart 建队过滤活跃条目；undo(KEEP) 只回滚本会话新增"
   trash_flow: "同 category_grid（TrashSessionController 回收站编排）；授权被拒批次回滚可重试，末张决策后显示「待提交 N 张 + 重试/放弃」出口面板；API<30 提交短路，未提交 DELETE 以 skipped 口径进 Done"
 
