@@ -99,6 +99,10 @@ interface MediaDao {
     @Query("SELECT * FROM media_assets WHERE uri = :uri LIMIT 1")
     suspend fun getMediaByUri(uri: String): MediaEntity?
 
+    /** 按 URI 集合响应式查找（聊天图片预览底栏按需反查，避免全表常驻 Java Heap） */
+    @Query("SELECT * FROM media_assets WHERE uri IN (:uris)")
+    fun observeByUris(uris: List<String>): Flow<List<MediaEntity>>
+
     /** 更新索引结果 */
     @Query(
         """

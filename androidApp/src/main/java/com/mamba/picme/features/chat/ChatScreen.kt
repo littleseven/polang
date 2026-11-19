@@ -221,6 +221,7 @@ import com.mamba.picme.features.gallery.components.shareMediaAssets
 import com.mamba.picme.features.gallery.components.toMediaAsset
 import com.mamba.picme.domain.trash.PreviewTrashRouting
 import com.mamba.picme.domain.trash.TrashOutcome
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import com.mamba.picme.agent.core.platform.voice.AsrEngine
@@ -378,14 +379,19 @@ fun ChatScreen(
     // 图片预览状态（横滑翻页集合）
     var imagePreview by remember { mutableStateOf<ChatImagePreviewState?>(null) }
 
-    // 预览底栏（分享/删除）uri→MediaAsset 反查（同 MemoriesViewModel.assetsByUri 模式）：
-    // 图库流驱动——回收成功后 MediaViewModel 经 removeTrashedFromLocalCache + refresh
-    // 重发射，底栏动作面随流自动收缩
-    val previewAssetsByUri by remember {
-        (context.applicationContext as PoLangApplication).container.database.mediaDao()
-            .getAllMedia()
-            .map { entities -> entities.associate { entity -> entity.uri to entity.toMediaAsset() } }
-            .flowOn(Dispatchers.IO)
+    // 预览底栏（分享/删除）uri→MediaAsset 反查：按需查询当前预览页 uri，不做全表常驻
+    // （全表 8k+ 行推高 Java Heap 基线，2026-11-20 聊天页 OOM 实证；DAO 层纪律即
+    // 「避免加载全表」）；回收成功后本地行移除、flow 重发射，底栏动作面随流自动收缩
+    val previewPageUris = imagePreview?.pages?.map { it.rawUri }?.distinct()
+    val previewAssetsByUri by remember(previewPageUris) {
+        val dao = (context.applicationContext as PoLangApplication).container.database.mediaDao()
+        if (previewPageUris.isNullOrEmpty()) {
+            flowOf(emptyMap())
+        } else {
+            dao.observeByUris(previewPageUris)
+                .map { entities -> entities.associate { entity -> entity.uri to entity.toMediaAsset() } }
+                .flowOn(Dispatchers.IO)
+        }
     }.collectAsStateWithLifecycle(emptyMap())
 
     /**

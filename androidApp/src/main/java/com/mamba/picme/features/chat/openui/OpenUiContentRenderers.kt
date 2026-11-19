@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -1572,11 +1573,18 @@ private fun OpenUiContentStatCell(value: String, label: String?, modifier: Modif
         // 2026-10-31 对帧校准（OpenUILayouts pattern-stats-report）：数字与标签 2dp 间隙
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        // autoSize 收缩防截断：StatRow 4 等分格内 "8,146" 级长数字在固定 32sp 下必省略号
+        // （2026-11-20 相册健康报告卡实测），下限取 SUBHEAD 15sp 附近的 14sp 保底可读
         Text(
             text = value,
             style = OpenUiCardTokens.displayStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = 14.sp,
+                maxFontSize = OpenUiCardTokens.displayStyle.fontSize,
+                stepSize = 2.sp,
+            ),
         )
         label?.let { text ->
             Text(
