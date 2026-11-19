@@ -499,6 +499,10 @@
     <string name="swipe_done_freed">Espace libéré cette manche : %1$s</string>
     <string name="swipe_done_more">Encore une manche</string>
     <string name="swipe_done_back">Retour à Organiser</string>
+    <string name="swipe_share_report">Partager le bilan</string>
+    <string name="report_title">Bilan de nettoyage</string>
+    <string name="report_freed_label">Espace libéré</string>
+    <string name="report_app_caption">Nettoyé avec PoLang · IA sur l\'appareil</string>
     <string name="swipe_empty">Rien à trier — bravo !</string>
     <string name="swipe_undo_cd">Annuler la dernière décision</string>
     <string name="swipe_pending_commit">%1$d éléments en attente de mise à la corbeille</string>

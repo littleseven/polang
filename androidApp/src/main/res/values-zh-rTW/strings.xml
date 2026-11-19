@@ -495,6 +495,10 @@
     <string name="swipe_done_freed">本輪釋放空間 %1$s</string>
     <string name="swipe_done_more">再來一輪</string>
     <string name="swipe_done_back">返回整理中心</string>
+    <string name="swipe_share_report">分享戰報</string>
+    <string name="report_title">清理戰報</string>
+    <string name="report_freed_label">釋放空間</string>
+    <string name="report_app_caption">PoLang · 端側 AI 清理</string>
     <string name="swipe_empty">沒有需要整理的內容——很棒！</string>
     <string name="swipe_undo_cd">復原上一個決定</string>
     <string name="swipe_pending_commit">%1$d 張待移入回收站</string>

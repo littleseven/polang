@@ -512,6 +512,10 @@
     <string name="swipe_done_freed">Space freed this round %1$s</string>
     <string name="swipe_done_more">One more round</string>
     <string name="swipe_done_back">Back to Organize</string>
+    <string name="swipe_share_report">Share report</string>
+    <string name="report_title">Cleanup Report</string>
+    <string name="report_freed_label">Space freed</string>
+    <string name="report_app_caption">Cleaned with PoLang · On-device AI</string>
     <string name="swipe_empty">Nothing to tidy — nice!</string>
     <string name="swipe_undo_cd">Undo last decision</string>
     <string name="swipe_pending_commit">%1$d items pending trash</string>

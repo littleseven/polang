@@ -499,6 +499,10 @@
     <string name="swipe_done_freed">Espacio liberado esta ronda: %1$s</string>
     <string name="swipe_done_more">Una ronda más</string>
     <string name="swipe_done_back">Volver a Organizar</string>
+    <string name="swipe_share_report">Compartir informe</string>
+    <string name="report_title">Informe de limpieza</string>
+    <string name="report_freed_label">Espacio liberado</string>
+    <string name="report_app_caption">Limpiado con PoLang · IA en el dispositivo</string>
     <string name="swipe_empty">Nada que ordenar — ¡genial!</string>
     <string name="swipe_undo_cd">Deshacer la última decisión</string>
     <string name="swipe_pending_commit">%1$d elementos pendientes de enviar a la papelera</string>

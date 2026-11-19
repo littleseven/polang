@@ -1,5 +1,6 @@
 package com.mamba.picme.features.gallery.swipe
 
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -47,8 +48,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,12 +83,17 @@ import com.mamba.picme.features.common.topbar.AppTopBarAction
 import com.mamba.picme.features.common.topbar.AppTopBarNavBack
 import com.mamba.picme.features.gallery.components.TrashAuthEffects
 import com.mamba.picme.features.gallery.dedup.formatBytes
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private const val TAG = "PoLang:SwipeReview"
 private const val IMAGE_LOAD_SIZE = 1080
 private const val PRELOAD_AHEAD = 3
 private const val SWIPE_THRESHOLD_FRACTION = 0.25f
@@ -536,6 +544,10 @@ private fun SwipeDoneContent(
         )
         Spacer(modifier = Modifier.height(24.dp))
         SwipeDoneStatsCard(state = state)
+        // 清理战报分享（P0-2 获客钩子）：有实际删除才有战报意义
+        if (state.deleted > 0) {
+            SwipeShareReportButton(state = state)
+        }
         Spacer(modifier = Modifier.weight(1f))
         SwipePrimaryButton(
             text = stringResource(R.string.swipe_done_more),
@@ -555,6 +567,47 @@ private fun SwipeDoneContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** 战报分享按钮（P0-2 获客钩子）：IO 线程渲染 PNG 后经 FileProvider 拉起系统分享面板。 */
+@Composable
+private fun SwipeShareReportButton(state: SwipeUiState.Done) {
+    val context = LocalContext.current
+    val shareScope = rememberCoroutineScope()
+    // in-flight 防抖：渲染中禁用，防双击并发写同一 PNG
+    var sharing by remember { mutableStateOf(false) }
+    TextButton(
+        onClick = {
+            sharing = true
+            shareScope.launch {
+                try {
+                    val file = withContext(Dispatchers.IO) {
+                        CleanupReportCard.render(
+                            context = context,
+                            kept = state.kept,
+                            deleted = state.deleted,
+                            skipped = state.skipped,
+                            freedBytes = state.freedBytes,
+                        )
+                    }
+                    CleanupReportCard.share(context, file)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: IOException) {
+                    Log.w(TAG, "战报渲染失败，取消分享", e)
+                } finally {
+                    sharing = false
+                }
+            }
+        },
+        enabled = !sharing,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = stringResource(R.string.swipe_share_report),
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 

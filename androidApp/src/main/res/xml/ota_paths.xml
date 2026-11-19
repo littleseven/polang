@@ -2,4 +2,5 @@
 <paths>
     <cache-path name="ota" path="ota/" />
     <external-files-path name="ota_external" path="Download/ota/" />
+    <cache-path name="share" path="share/" />
 </paths>
