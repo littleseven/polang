@@ -476,13 +476,27 @@ interface MediaDao {
     )
     fun observeOrganizeRows(): Flow<List<OrganizeRow>>
 
-    /** 元数据回填候选：relativePath 未回填的行 uri（Room v29 存量回填，Agent 清理 M1）。 */
-    @Query("SELECT uri FROM media_assets WHERE relativePath IS NULL LIMIT :limit")
+    /**
+     * 元数据回填候选：relativePath 未回填的 MediaStore 行 uri（Room v29 存量回填，
+     * Agent 清理 M1）。`uri LIKE 'content://media/%'` 与 MediaRepositoryImpl 的过期
+     * 清理同判法——编辑器/AI 缓存图等非 MediaStore 行永远拿不到 provider meta，
+     * 不排除会每启动重试一批注定失败的候选，≥500 行时饿死合法候选。
+     */
+    @Query(
+        "SELECT uri FROM media_assets WHERE relativePath IS NULL " +
+            "AND uri LIKE 'content://media/%' LIMIT :limit"
+    )
     suspend fun getMediaNeedingMetaBackfill(limit: Int): List<String>
 
-    /** 回写 MediaStore 元数据列（relativePath/sizeBytes，存量回填专用）。 */
+    /** 回写 MediaStore 元数据列（relativePath/sizeBytes；批量回写的逐行原语）。 */
     @Query("UPDATE media_assets SET relativePath = :path, sizeBytes = :size WHERE uri = :uri")
     suspend fun updateMediaMeta(uri: String, path: String?, size: Long)
+
+    /** 批量回写元数据列：单事务一次 invalidation，避免逐行 UPDATE 触发 observe 流逐行重发射（判法同 updateQualityScoresBatch）。 */
+    @Transaction
+    suspend fun updateMediaMetaBatch(entries: List<MediaMetaEntry>) {
+        entries.forEach { entry -> updateMediaMeta(entry.uri, entry.relativePath, entry.sizeBytes) }
+    }
 
     /** 回写模糊/曝光分（整理中心 v2 惰性补算产出）。 */
     @Query("UPDATE media_assets SET blurScore = :blur, exposureScore = :exposure WHERE uri = :uri")
@@ -788,6 +802,13 @@ data class QualityScoreEntry(
     val uri: String,
     val blurScore: Float,
     val exposureScore: Float,
+)
+
+/** 元数据批量回写条目（Room v29 存量回填，MediaMetadataBackfiller 每批攒齐后单事务写入）。 */
+data class MediaMetaEntry(
+    val uri: String,
+    val relativePath: String?,
+    val sizeBytes: Long,
 )
 
 /** 全量媒体轻量投影（id + uri）：全量 diff / uri↔id 映射用，见 [MediaDao.getAllMediaIdUris]。 */

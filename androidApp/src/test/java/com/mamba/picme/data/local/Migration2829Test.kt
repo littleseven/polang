@@ -3,6 +3,7 @@ package com.mamba.picme.data.local
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.data.model.MediaEntity
@@ -23,11 +24,11 @@ import org.robolectric.annotation.Config
  * MIGRATION_28_29 端到端测试（Agent 清理 M1：media_assets 加 relativePath/sizeBytes 列）。
  * 构造策略同 [Migration2728Test]（exportSchema=false 无 schema JSON）：
  * 1. Room 以 v29 现行 Entity 真建库并灌 media fixture；
- * 2. 裸 SQLite 降回 v28 形态：DROP 两列（SQLite ≥3.35，sdk 34+）、user_version=28、
- *    清 room_master 身份；
+ * 2. 裸 SQLite 降回 v28 形态：rename+copy 去两列（Robolectric SQLite < 3.35 无 DROP
+ *    COLUMN，见 [MediaAssetsPreV29Downgrader]）、user_version=28、清 room_master 身份；
  * 3. 重开挂 MIGRATION_28_29——onUpgrade 执行两条 ALTER，身份缺失触发全库 schema 校验
  *    （迁移 DDL 与 v29 Entity 逐字段比对，不一致直接抛 IllegalStateException）；
- * 4. 断言存量数据保留 + 回填 DAO（getMediaNeedingMetaBackfill/updateMediaMeta）往返。
+ * 4. 断言存量数据保留 + 回填 DAO（getMediaNeedingMetaBackfill/updateMediaMetaBatch）往返。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -72,7 +73,7 @@ class Migration2829Test {
         assertEquals(mediaId, queryLong(raw, "SELECT `id` FROM `media_assets` WHERE `uri` = 'content://media/1'"))
 
         assertEquals(listOf("content://media/1"), mediaDao.getMediaNeedingMetaBackfill(10))
-        mediaDao.updateMediaMeta("content://media/1", "DCIM/Camera/", 1024L)
+        mediaDao.updateMediaMetaBatch(listOf(MediaMetaEntry("content://media/1", "DCIM/Camera/", 1024L)))
         assertEquals(emptyList<String>(), mediaDao.getMediaNeedingMetaBackfill(10))
         val organizeRow = mediaDao.observeOrganizeRows().first().single()
         assertEquals("DCIM/Camera/", organizeRow.relativePath)
@@ -93,7 +94,7 @@ class Migration2829Test {
         }
     }
 
-    private fun queryLong(db: androidx.sqlite.db.SupportSQLiteDatabase, sql: String): Long {
+    private fun queryLong(db: SupportSQLiteDatabase, sql: String): Long {
         db.query(sql).use { cursor ->
             assertTrue(cursor.moveToFirst())
             return cursor.getLong(0)

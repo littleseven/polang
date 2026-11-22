@@ -7,21 +7,24 @@ import android.os.Build
 import android.provider.MediaStore
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.MediaDao
+import com.mamba.picme.data.local.MediaMetaEntry
 
 /**
  * media_assets.relativePath/sizeBytes 存量回填器（Room v29，Agent 清理 M1 数据基础）。
  *
  * 仿 [com.mamba.picme.data.indexing.geo.LocationIndexer]：三函数注入（候选查询 /
- * MediaStore meta 批查 / 回写）让核心循环 JVM 纯可测。语义不变式：
+ * MediaStore meta 批查 / 批量回写）让核心循环 JVM 纯可测。语义不变式：
  * 1. 只补 `relativePath IS NULL` 的行（新行由 MediaRepositoryImpl 同步插入直接带列）；
  * 2. provider 缺失（MediaStore 已删/不可见）的行本轮不写但计入 attempted——下一批
  *    不再重复处理，候选集永不清空也不会死循环；
- * 3. 返回实际补写行数。
+ * 3. 每批攒齐后经 [writer] 一次批量写（生产 = MediaDao 单事务合批，防 O(N) 独立事务
+ *    + Flow 失效风暴，判法同 updateQualityScoresBatch）；
+ * 4. 返回实际补写行数。
  */
 class MediaMetadataBackfiller(
     private val candidateUris: suspend (limit: Int) -> List<String>,
     private val metaProvider: suspend (uris: List<String>) -> Map<String, Pair<String?, Long>>,
-    private val writer: suspend (uri: String, meta: Pair<String?, Long>) -> Unit,
+    private val writer: suspend (batch: List<Pair<String, Pair<String?, Long>>>) -> Unit,
 ) {
 
     /** 批量回填直到候选耗尽（空批 / 全部已 attempted），返回累计补写行数。 */
@@ -34,10 +37,12 @@ class MediaMetadataBackfiller(
             if (fresh.isEmpty()) break
             fresh.forEach { uri -> attempted.add(uri) }
             val metaByUri = metaProvider(fresh)
-            for (uri in fresh) {
-                val meta = metaByUri[uri] ?: continue
-                writer(uri, meta)
-                written++
+            val writable = fresh.mapNotNull { uri ->
+                metaByUri[uri]?.let { meta -> uri to meta }
+            }
+            if (writable.isNotEmpty()) {
+                writer(writable)
+                written += writable.size
             }
         }
         return written
@@ -49,13 +54,17 @@ class MediaMetadataBackfiller(
         /** 单批候选上限（与 DEDUP_HASH_BATCH_SIZE / OrganizeRepositoryImpl 分批口径一致）。 */
         const val DEFAULT_BATCH_LIMIT = 500
 
-        /** 生产装配：Room 候选/回写 + MediaStore 逐 uri 单行直查（item 主键命中，等价批查）。 */
+        /** 生产装配：Room 候选/批量回写 + MediaStore 逐 uri 单行直查（item 主键命中，等价批查）。 */
         fun create(context: Context, mediaDao: MediaDao): MediaMetadataBackfiller {
             val appContext = context.applicationContext
             return MediaMetadataBackfiller(
                 candidateUris = { limit -> mediaDao.getMediaNeedingMetaBackfill(limit) },
                 metaProvider = { uris -> queryMediaStoreMeta(appContext.contentResolver, uris) },
-                writer = { uri, meta -> mediaDao.updateMediaMeta(uri, meta.first, meta.second) },
+                writer = { batch ->
+                    mediaDao.updateMediaMetaBatch(
+                        batch.map { (uri, meta) -> MediaMetaEntry(uri, meta.first, meta.second) }
+                    )
+                },
             )
         }
 

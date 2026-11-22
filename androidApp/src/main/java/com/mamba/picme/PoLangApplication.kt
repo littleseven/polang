@@ -101,6 +101,9 @@ class PoLangApplication : Application(), ImageLoaderFactory {
     companion object {
         private const val TAG = "Application"
 
+        /** media_assets 元数据存量回填（Agent 清理 M1）专用日志标签。 */
+        private const val BACKFILL_TAG = "PoLang:Backfill"
+
         /** 端侧 VLM 打标模型（configure 的 modelId 仅作 localModelService 默认模型）。 */
         private const val TAGGER_MODEL_ID = "qwen3_vl_2b"
 
@@ -310,16 +313,19 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         }
 
         // media_assets.relativePath/sizeBytes 存量回填（Room v29，Agent 清理 M1 数据基础）：
-        // 只补 null 行，MediaStore 已删的行不写不重试；增量幂等，首启跑完后后续启动 no-op。
+        // 只补 null 行且候选限定 content://media/ 行（编辑器/AI 缓存图永远拿不到
+        // MediaStore meta，不排除会每启动重试注定失败的候选、饿死合法候选）；
+        // MediaStore 已删的行不写不重试。例外：MediaStore 存在但 RELATIVE_PATH 为
+        // NULL 的行写回后仍是候选，下次启动重试一轮（批内 attempted 守卫防死循环）。
         applicationScope.launch(Dispatchers.IO) {
             try {
                 val mediaDao = AppDatabase.getDatabase(this@PoLangApplication).mediaDao()
                 val written = MediaMetadataBackfiller
                     .create(this@PoLangApplication, mediaDao)
                     .runUntilDone()
-                if (written > 0) Logger.i(TAG, "media metadata backfill done: $written rows")
+                if (written > 0) Logger.i(BACKFILL_TAG, "media metadata backfill done: $written rows")
             } catch (e: Exception) {
-                Logger.w(TAG, "media metadata backfill failed: ${e.message}")
+                Logger.w(BACKFILL_TAG, "media metadata backfill failed: ${e.message}")
             }
         }
 
