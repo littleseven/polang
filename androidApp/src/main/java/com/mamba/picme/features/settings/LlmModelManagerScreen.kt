@@ -88,6 +88,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -227,10 +228,11 @@ fun ModelCenterScreen(
 
     // 删除确认对话框
     if (modelToDelete != null) {
+        val zhDisplayDelete = LocalConfiguration.current.locales[0]?.language == "zh"
         AlertDialog(
             onDismissRequest = { modelToDelete = null },
             title = { Text(stringResource(R.string.delete_model_title)) },
-            text = { Text(stringResource(R.string.delete_model_confirm, modelToDelete?.name ?: "")) },
+            text = { Text(stringResource(R.string.delete_model_confirm, modelToDelete?.displayName(zhDisplayDelete) ?: "")) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -582,6 +584,8 @@ internal fun ModelCardWithBadge(
 
     val primaryTag = model.tags.firstOrNull() ?: "Chat"
     val tagColor = getTagColor(primaryTag)
+    // 模型名/描述来自 llm_models.json（中/英双字段），按 Compose 配置（跟随应用内语言）取展示口径
+    val zhDisplay = LocalConfiguration.current.locales[0]?.language == "zh"
 
     Card(
         modifier = Modifier
@@ -609,7 +613,7 @@ internal fun ModelCardWithBadge(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = model.name,
+                            text = model.displayName(zhDisplay),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -626,7 +630,7 @@ internal fun ModelCardWithBadge(
 
                     // 描述
                     Text(
-                        text = model.description,
+                        text = model.displayDescription(zhDisplay),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,

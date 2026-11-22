@@ -3,6 +3,8 @@
     "id": "sherpa-onnx-zipformer-zh-en",
     "name": "Sherpa-ONNX Zipformer 中英双语",
     "description": "ONNX 流式语音识别模型，支持中文+英文，ONNX Runtime 端侧实时推理",
+    "name_en": "Sherpa-ONNX Zipformer Bilingual",
+    "description_en": "ONNX streaming speech recognition model (Chinese + English), on-device real-time inference via ONNX Runtime",
     "type": "ASR",
     "size": 198270793,
     "sources": {
@@ -20,6 +22,8 @@
     "id": "sherpa-onnx-kws-zipformer-wenetspeech",
     "name": "Sherpa-ONNX KWS 唤醒词",
     "description": "轻量级关键词识别模型，~5MB，支持自定义唤醒词（always-on 超低功耗）",
+    "name_en": "Sherpa-ONNX KWS Wake Word",
+    "description_en": "Lightweight keyword spotting model (~5MB), custom wake words, always-on with ultra-low power",
     "type": "KWS",
     "size": 5055221,
     "sources": {
@@ -38,6 +42,8 @@
     "id": "qwen3_vl_2b",
     "name": "Qwen3-VL-2B-Instruct-MNN",
     "description": "阿里通义千问 Qwen3-VL-2B-Instruct 多模态版（MNN 4bit 量化），Vision-Language 能力更强，作为 Florence-2 的备选打标模型",
+    "name_en": "Qwen3-VL-2B-Instruct-MNN",
+    "description_en": "Alibaba Qwen3-VL-2B-Instruct multimodal model (MNN 4-bit), vision-language tagging and captioning",
     "type": "LLM",
     "size": 1475225454,
     "sources": {
@@ -59,6 +65,8 @@
     "id": "face-det-retina10g-mnn",
     "name": "RetinaFace Det10G",
     "description": "RetinaFace 人脸检测模型 (MNN 格式)，用于 ROI 区域检测，GPU 加速",
+    "name_en": "RetinaFace Det10G",
+    "description_en": "RetinaFace face detection model (MNN format) for ROI detection, GPU accelerated",
     "type": "FACE_DETECTION",
     "size": 16925304,
     "sources": {
@@ -73,6 +81,8 @@
     "id": "face-landmark-2d106-mnn",
     "name": "2D106 Landmark",
     "description": "2D106 人脸关键点模型 (MNN 格式)，用于 106 点面部关键点检测，GPU 加速",
+    "name_en": "2D106 Landmark",
+    "description_en": "2D106 facial landmark model (MNN format) for 106-point landmark detection, GPU accelerated",
     "type": "FACE_DETECTION",
     "size": 4975640,
     "sources": {
@@ -88,6 +98,8 @@
     "id": "face-det-retina500m-mnn",
     "name": "RetinaFace Det500M",
     "description": "RetinaFace-MobileNet0.25 人脸检测模型 (MNN 格式)，用于 ROI 区域检测，GPU 加速",
+    "name_en": "RetinaFace Det500M",
+    "description_en": "RetinaFace-MobileNet0.25 face detection model (MNN format) for ROI detection, GPU accelerated",
     "type": "FACE_DETECTION",
     "size": 1285612,
     "sources": {
@@ -103,6 +115,8 @@
     "id": "face-embedding-glint360k-r100-mnn",
     "name": "Glint360K R100 MNN",
     "description": "Glint360K 上训练的 ArcFace ResNet100 人脸特征提取模型 (MNN 格式)，512 维 embedding，~248MB",
+    "name_en": "Glint360K R100 MNN",
+    "description_en": "ArcFace ResNet100 face embedding model trained on Glint360K (MNN format), 512-dim embedding",
     "type": "FACE_EMBEDDING",
     "size": 260598260,
     "sources": {
@@ -117,6 +131,8 @@
     "id": "mobileclip-onnx",
     "name": "MobileCLIP-S2-ONNX-FP32",
     "description": "MobileCLIP-S2 多模态语义编码模型 (ONNX fp32 格式)，512维图像/文本embedding，用于语义搜索。fp16 在 ONNX Runtime Android CPU 上会出现 NaN/Inf，因此使用 fp32",
+    "name_en": "MobileCLIP-S2-ONNX-FP32",
+    "description_en": "MobileCLIP-S2 multimodal semantic encoder (ONNX fp32), 512-dim image/text embeddings for semantic search",
     "type": "VISION",
     "size": 399139066,
     "sources": {
@@ -133,6 +149,8 @@
     "id": "opus-mt-zh-en",
     "name": "OPUS-MT 中英翻译",
     "description": "Helsinki-NLP OPUS-MT 中文→英文翻译模型 (ONNX INT8 量化)，~233MB，用于语义搜索时中文查询翻译",
+    "name_en": "OPUS-MT Chinese-English",
+    "description_en": "Helsinki-NLP OPUS-MT Chinese-to-English translation model (ONNX INT8), ~233MB, translates Chinese search queries",
     "type": "TRANSLATION",
     "size": 244426169,
     "sources": {
@@ -153,6 +171,8 @@
     "id": "opus-mt-en-zh",
     "name": "OPUS-MT 英中翻译",
     "description": "Helsinki-NLP OPUS-MT 英文→中文翻译模型 (ONNX INT8 量化)，~443MB，用于英文打标 summary 汉化（labelsZh.summary）",
+    "name_en": "OPUS-MT English-Chinese",
+    "description_en": "Helsinki-NLP OPUS-MT English-to-Chinese translation model (ONNX INT8), ~443MB, localizes English tags and summaries",
     "type": "TRANSLATION",
     "size": 443347908,
     "sources": {
@@ -173,6 +193,8 @@
     "id": "florence2_base",
     "name": "Florence-2-Base 打标",
     "description": "Microsoft Florence-2-base (231M) 视觉语言模型，ONNX INT8 量化，专为结构化物体检测+图像描述设计，~266MB",
+    "name_en": "Florence-2-Base Tagging",
+    "description_en": "Microsoft Florence-2-base (231M) vision-language model, ONNX INT8, for structured object/scene tagging",
     "type": "VISION_LLM",
     "size": 278936295,
     "sources": {
@@ -199,6 +221,8 @@
     "id": "modnet-onnx",
     "name": "MODNet ONNX",
     "description": "MODNet 人像抠图 ONNX 模型，用于去背景/证件照，~26MB",
+    "name_en": "MODNet ONNX",
+    "description_en": "MODNet portrait matting ONNX model for background removal / ID photos, ~26MB",
     "type": "MATTING",
     "size": 25969398,
     "sources": {
@@ -213,6 +237,8 @@
     "id": "u2netp-onnx",
     "name": "U2NetP ONNX",
     "description": "U2NetP 轻量抠图 ONNX 模型，用于去背景/证件照，~4.6MB",
+    "name_en": "U2NetP ONNX",
+    "description_en": "U2NetP lightweight matting ONNX model for background removal / ID photos, ~4.6MB",
     "type": "MATTING",
     "size": 4574861,
     "sources": {
@@ -227,6 +253,8 @@
     "id": "mediapipe-face-landmarker",
     "name": "MediaPipe Face Landmarker",
     "description": "MediaPipe 人脸 468 点关键点检测模型，用于相册人脸标记预览",
+    "name_en": "MediaPipe Face Landmarker",
+    "description_en": "MediaPipe 468-point face landmark model for gallery face marker preview",
     "type": "FACE_LANDMARKER",
     "size": 3758596,
     "sources": {
@@ -241,6 +269,8 @@
     "id": "ediffiqa-face-quality-onnx",
     "name": "eDifFIQA 人脸画质",
     "description": "eDifFIQA 人脸图像质量评估 ONNX (~7MB)，为人脸聚类挑最佳封面（人脸清晰度/光照/正脸）",
+    "name_en": "eDifFIQA Face Quality",
+    "description_en": "eDifFIQA face image quality assessment ONNX (~7MB), picks the best cover for face clusters",
     "size": 7272678,
     "sources": {
       "ModelScope": "budaoshou/ediffiqa-face-quality-onnx"
@@ -254,6 +284,8 @@
     "id": "nima-aesthetic-onnx",
     "name": "NIMA 美学评分",
     "description": "NIMA MobileNet (idealo) 图像美学评分 ONNX (~12MB)，为人物聚类挑最佳封面（构图/美学）",
+    "name_en": "NIMA Aesthetics",
+    "description_en": "NIMA MobileNet (idealo) aesthetic scoring ONNX (~12MB), picks the best cover for people clusters",
     "size": 12867270,
     "sources": {
       "ModelScope": "budaoshou/nima-aesthetic-onnx"

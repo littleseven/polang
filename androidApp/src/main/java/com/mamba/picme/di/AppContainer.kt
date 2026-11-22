@@ -782,6 +782,19 @@ class AppContainerImpl(
                     .getOrDefault(AppLanguage.SYSTEM)
                 ModelConfig.isChineseLanguageContext(appLang)
             },
+            // 模型中心 Tab/模型名描述的展示语言：与 MainActivity.getLocaleFromLanguage 同口径
+            displayLocaleProvider = {
+                val appLang = runCatching { userPreferencesRepository.getAppLanguageBlocking() }
+                    .getOrDefault(AppLanguage.SYSTEM)
+                when (appLang) {
+                    AppLanguage.ENGLISH -> java.util.Locale.ENGLISH
+                    AppLanguage.CHINESE -> java.util.Locale.SIMPLIFIED_CHINESE
+                    AppLanguage.TRADITIONAL_CHINESE -> java.util.Locale.TRADITIONAL_CHINESE
+                    AppLanguage.SPANISH -> java.util.Locale("es")
+                    AppLanguage.FRENCH -> java.util.Locale.FRENCH
+                    AppLanguage.SYSTEM -> java.util.Locale.getDefault()
+                }
+            },
         ).also {
             LlmModelDownloadManager.telemetryReporter = telemetryReporter
         }

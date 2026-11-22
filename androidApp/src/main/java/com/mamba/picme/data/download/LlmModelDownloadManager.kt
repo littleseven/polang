@@ -45,6 +45,14 @@ class LlmModelDownloadManager(
      * 决定 en→zh 汉化模型是否进入语言条件化必备集合；默认 true（保守，与旧行为一致）。
      */
     private val needsChineseLabels: suspend () -> Boolean = { true },
+    /**
+     * 模型中心展示语言（应用内语言设置）Provider。
+     *
+     * applicationContext 的资源配置不跟随应用内语言（attachBaseContext 只作用于 Activity），
+     * Tab 标签与模型名/描述必须经此 Provider 拿到与 MainActivity 同口径的 Locale。
+     * 默认系统 Locale（保守，与旧行为一致）。
+     */
+    private val displayLocaleProvider: suspend () -> java.util.Locale = { java.util.Locale.getDefault() },
 ) {
 
     companion object {
@@ -233,25 +241,30 @@ class LlmModelDownloadManager(
      * 默认标签翻译（按 PoLang 服务功能划分的分类标签），随 UI 语言本地化。
      * 覆盖模型中心顶部 Tab 与模型卡片徽章的展示文案。
      */
-    private fun defaultTagTranslations(): TagTranslations = mapOf(
-        "must-have" to appContext.getString(R.string.model_tag_must_have),
-        "recommended" to appContext.getString(R.string.model_tag_recommended),
-        "chat" to appContext.getString(R.string.model_tag_voice),
-        "photo-tagging" to appContext.getString(R.string.model_tag_photo_tagging),
-        "beauty-camera" to appContext.getString(R.string.model_tag_beauty_camera),
-        // 保留底层技术标签的翻译，用于模型卡片徽章展示
-        "face" to appContext.getString(R.string.model_tag_face),
-        "Vision" to appContext.getString(R.string.model_tag_vision),
-        "Audio" to appContext.getString(R.string.model_tag_audio),
-        "ASR" to appContext.getString(R.string.model_tag_asr),
-        "KWS" to appContext.getString(R.string.model_tag_kws),
-        "TTS" to appContext.getString(R.string.model_tag_tts),
-        "detection" to appContext.getString(R.string.model_tag_face),
-        "landmark" to appContext.getString(R.string.model_tag_landmark),
-        "speech" to appContext.getString(R.string.model_tag_speech),
-        "wake-word" to appContext.getString(R.string.model_tag_kws),
-        "keyword" to appContext.getString(R.string.model_tag_keyword)
-    )
+    private fun defaultTagTranslations(locale: java.util.Locale): TagTranslations {
+        val localizedResources = android.content.res.Configuration(appContext.resources.configuration)
+            .apply { setLocale(locale) }
+            .let { appContext.createConfigurationContext(it).resources }
+        return mapOf(
+            "must-have" to localizedResources.getString(R.string.model_tag_must_have),
+            "recommended" to localizedResources.getString(R.string.model_tag_recommended),
+            "chat" to localizedResources.getString(R.string.model_tag_voice),
+            "photo-tagging" to localizedResources.getString(R.string.model_tag_photo_tagging),
+            "beauty-camera" to localizedResources.getString(R.string.model_tag_beauty_camera),
+            // 保留底层技术标签的翻译，用于模型卡片徽章展示
+            "face" to localizedResources.getString(R.string.model_tag_face),
+            "Vision" to localizedResources.getString(R.string.model_tag_vision),
+            "Audio" to localizedResources.getString(R.string.model_tag_audio),
+            "ASR" to localizedResources.getString(R.string.model_tag_asr),
+            "KWS" to localizedResources.getString(R.string.model_tag_kws),
+            "TTS" to localizedResources.getString(R.string.model_tag_tts),
+            "detection" to localizedResources.getString(R.string.model_tag_face),
+            "landmark" to localizedResources.getString(R.string.model_tag_landmark),
+            "speech" to localizedResources.getString(R.string.model_tag_speech),
+            "wake-word" to localizedResources.getString(R.string.model_tag_kws),
+            "keyword" to localizedResources.getString(R.string.model_tag_keyword)
+        )
+    }
 
     private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -337,7 +350,7 @@ class LlmModelDownloadManager(
      */
     suspend fun loadMarketData(): ModelMarketData = withContext(Dispatchers.IO) {
         val localModels = loadLocalModels()
-        return@withContext ModelMarketData(localModels, defaultTagTranslations(), requiredIds = effectiveRequiredIds())
+        return@withContext ModelMarketData(localModels, defaultTagTranslations(displayLocaleProvider()), requiredIds = effectiveRequiredIds())
     }
 
     /**
@@ -347,7 +360,7 @@ class LlmModelDownloadManager(
      */
     suspend fun refreshMarketData(): ModelMarketData = withContext(Dispatchers.IO) {
         val localModels = loadLocalModels()
-        ModelMarketData(localModels, defaultTagTranslations(), requiredIds = effectiveRequiredIds())
+        ModelMarketData(localModels, defaultTagTranslations(displayLocaleProvider()), requiredIds = effectiveRequiredIds())
     }
 
     /**
@@ -363,15 +376,15 @@ class LlmModelDownloadManager(
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     Logger.w(TAG, "Model market fetch failed: HTTP ${response.code}")
-                    return ModelMarketData(emptyList(), defaultTagTranslations())
+                    return ModelMarketData(emptyList(), defaultTagTranslations(java.util.Locale.getDefault()))
                 }
 
-                val body = response.body?.string() ?: return ModelMarketData(emptyList(), defaultTagTranslations())
+                val body = response.body?.string() ?: return ModelMarketData(emptyList(), defaultTagTranslations(java.util.Locale.getDefault()))
                 parseMarketJson(body)
             }
         } catch (e: Exception) {
             Logger.w(TAG, "Failed to fetch model market, fallback to local", e)
-            ModelMarketData(emptyList(), defaultTagTranslations())
+            ModelMarketData(emptyList(), defaultTagTranslations(java.util.Locale.getDefault()))
         }
     }
 
@@ -552,7 +565,9 @@ class LlmModelDownloadManager(
                     size = obj.getLong("size"),
                     sources = sources,
                     files = modelFiles,
-                    tags = modelTags
+                    tags = modelTags,
+                    nameEn = obj.optString("name_en").ifBlank { null },
+                    descriptionEn = obj.optString("description_en").ifBlank { null }
                 )
             }
         } catch (e: Exception) {
@@ -1641,8 +1656,19 @@ data class ModelConfig(
     val size: Long,
     val sources: Map<String, String>,
     val files: List<String>,
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    /** 英文展示名/描述（llm_models.json name_en/description_en）；缺失时展示回退中文字段 */
+    val nameEn: String? = null,
+    val descriptionEn: String? = null,
 ) {
+    /** 展示名：非中文 UI 优先英文；无英文字段时回退默认（中文） */
+    fun displayName(zhDisplay: Boolean): String =
+        if (zhDisplay || nameEn.isNullOrBlank()) name else nameEn
+
+    /** 展示描述：同 [displayName] 口径 */
+    fun displayDescription(zhDisplay: Boolean): String =
+        if (zhDisplay || descriptionEn.isNullOrBlank()) description else descriptionEn
+
     companion object {
         /**
          * 必须模型 ID 集合（Tier 1：相册扫描/创建 TAG 相关，最高优先）

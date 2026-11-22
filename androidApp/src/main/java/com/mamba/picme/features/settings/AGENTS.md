@@ -126,6 +126,7 @@
   - `opus-mt-zh-en`（中文查询翻译）/ `opus-mt-en-zh`（英文 summary 汉化）
   - **必备清单语言条件化（2026-11-22）**：`opus-mt-en-zh` 为中文条件必备（`ModelConfig.REQUIRED_MODEL_IDS_ZH`）——非中文用户（系统语言非中文 且 应用语言非中文，`ModelConfig.isChineseLanguageContext` 判定）的必备集合经 `ModelConfig.requiredModelIds(false)` 免除该模型（423MB），模型中心「必须」Tab 与徽标同步隐藏（落入「相册打标」分类）；切换到中文时 `SettingsViewModel.setAppLanguage` 触发补下（WiFi 静默 / 蜂窝弹相册必备模型提醒）
 - **推荐模型含语音**：`sherpa-onnx-zipformer-zh-en`（ASR）、`sherpa-onnx-kws-zipformer-wenetspeech`（KWS）均在 `RECOMMENDED_MODEL_IDS`，按需下载
+- **模型元数据 i18n（2026-11-22）**：模型名/描述在 `llm_models.json` 内以 `name`/`description`（中文）+ `name_en`/`description_en`（英文）双字段承载，`ModelConfig.displayName/displayDescription(zhDisplay)` 按 UI 语言选取、ES/FR 回退英文（模型元数据属数据非 UI 文案，不走五语资源）；Tab 分类标签走 `model_tag_*` 字符串资源（五语齐全），由 `LlmModelDownloadManager.defaultTagTranslations(locale)` 经 `displayLocaleProvider`（AppContainer 注入，与 MainActivity 语言映射同口径）+ `createConfigurationContext` 解析——applicationContext 不跟随应用内语言，不可直接 `appContext.getString`
 
 **语音开关组（设置 → 沙盒与权限 → 语音，2026-08-19 全面默认关闭）**
 - `voiceCommandMode`（默认 DISABLED）：门控 Chat 页与 Agent 共享面板输入框的语音按钮/语音输入态，≠ DISABLED 才显示
