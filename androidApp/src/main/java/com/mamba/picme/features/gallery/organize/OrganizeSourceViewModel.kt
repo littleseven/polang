@@ -74,8 +74,9 @@ sealed interface OrganizeSourceUiState {
  * 来源详情页 VM（按 App 浏览媒体 + 回收站删除）：按 `appSourceOf(relativePath) == source`
  * 过滤全库快照，选中集管理与 TrashSessionController 编排与类目详情页同模式。
  *
- * 保护裁定：CategoryArbiter 定类后走 ValueGuard（仅低质两类受保护；未入任何类目的
- * 媒体无保护信号）。未分类媒体仍入网格（来源页是浏览视角，非清理管线出口）。
+ * 保护裁定：CategoryArbiter 定类后走 ValueGuard（低质两类：老照片/稀缺人物/用户互动；
+ * 截图敏感档：screenshotImportanceOf 命中金融/医疗/政务 → SENSITIVE_SCREENSHOT；未入任何
+ * 类目的媒体无保护信号）。未分类媒体仍入网格（来源页是浏览视角，非清理管线出口）。
  */
 class OrganizeSourceViewModel(
     val source: AppSource,
