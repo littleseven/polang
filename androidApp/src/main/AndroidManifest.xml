@@ -90,6 +90,12 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".service.dedup.DedupScanService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!-- onTimeout 兜底:闹钟唤醒后重启扫描服务 -->
         <receiver
             android:name=".service.tag.TagScanRescheduleReceiver"

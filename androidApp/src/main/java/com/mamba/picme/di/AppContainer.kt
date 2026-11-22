@@ -75,7 +75,7 @@ import com.mamba.picme.data.telemetry.TelemetryReporter
 import com.mamba.picme.domain.backup.BackupTagDataUseCase
 import com.mamba.picme.domain.backup.RestoreTagDataUseCase
 import com.mamba.picme.domain.backup.TagDataBackupRepository
-import com.mamba.picme.domain.dedup.DedupScanController
+import com.mamba.picme.domain.dedup.DedupScanSession
 import com.mamba.picme.domain.dedup.DedupScanner
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.agent.capability.optimize.analyzer.HeuristicSceneAnalyzer
@@ -155,6 +155,7 @@ import com.mamba.picme.domain.tag.TagGenerationScheduler
 import com.mamba.picme.domain.tag.TagScanProgress
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
+import com.mamba.picme.service.dedup.ServiceBackedDedupScanSession
 import com.mamba.picme.service.tag.TagGenerationService
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -204,8 +205,7 @@ class MediaViewModelFactory(
 }
 
 class DedupViewModelFactory(
-    private val mediaSource: DedupMediaSource,
-    private val scanner: DedupScanController,
+    private val session: DedupScanSession,
     private val trashManager: DedupTrashManager,
     private val organizeRepository: OrganizeRepository,
     /** API < 30 无回收站授权接口，由调用方（MainActivity）注入旧删除流回调兜底。 */
@@ -216,8 +216,7 @@ class DedupViewModelFactory(
         if (modelClass.isAssignableFrom(DedupViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return DedupViewModel(
-                mediaSource = mediaSource,
-                scanner = scanner,
+                session = session,
                 trashManager = trashManager,
                 organizeRepository = organizeRepository,
                 legacyDeleter = legacyDeleter,
@@ -406,8 +405,10 @@ interface AppContainer {
 
     /** 去重 2.0：MD5/pHash 缓存 DAO（增量扫描） */
     val dedupHashDao: DedupHashDao
-    /** 去重 2.0：分层扫描器（暂停/恢复/取消控制） */
+    /** 去重 2.0：分层扫描器（暂停/恢复/取消控制；DedupScanService 会话消费） */
     val dedupScanner: DedupScanner
+    /** 去重 2.0：扫描输入取数源（DedupScanService 会话消费） */
+    val dedupMediaSource: DedupMediaSource
     /** 去重 2.0：回收站删除/恢复授权管理 */
     val dedupTrashManager: DedupTrashManager
     /** 「删除不再询问」删除现场一次性引导（全宿主共享单例，弹窗挂 MainActivity 根） */
@@ -1046,7 +1047,7 @@ class AppContainerImpl(
         )
     }
 
-    private val dedupMediaSource: DedupMediaSource by lazy {
+    override val dedupMediaSource: DedupMediaSource by lazy {
         MediaStoreDedupMediaSource(context, repository)
     }
 
@@ -1159,8 +1160,7 @@ class AppContainerImpl(
         legacyDeleter: ((List<String>) -> Unit)?
     ): ViewModelProvider.Factory {
         return DedupViewModelFactory(
-            mediaSource = dedupMediaSource,
-            scanner = dedupScanner,
+            session = ServiceBackedDedupScanSession(context),
             trashManager = dedupTrashManager,
             organizeRepository = organizeRepository,
             legacyDeleter = legacyDeleter,

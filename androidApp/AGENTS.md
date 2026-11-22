@@ -175,6 +175,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `core/designsystem/` | `Color`、`Theme`、`Typography`、`DesignTokens`、`AppShapes`、`Spacing`、`components/`（`AppSlider` 等） | Compose 设计系统 |
 | `core/image/` | `CoilConfig`、`GpuBeautyProcessor`、`ImageProcessor` | 图片加载与处理 |
 | `service/chat/` | `FloatingChatBubbleService` | 悬浮聊天气泡 |
+| `service/dedup/` | `DedupScanService`（dataSync FGS）+ `DedupScanSessionManager` + `ServiceBackedDedupScanSession` | 去重扫描会话服务化（agent-cleanup M1 2026-11-22）：FGS（通知 10044/渠道 `picme_dedup_scan` + PARTIAL_WAKE_LOCK）持执行核心 Manager（取数→`DedupScanner` 流式扫描→`DedupScanProgress` 映射，纯 Kotlin 可 JVM 单测）；VM 经 intent 控制面 `ServiceBackedDedupScanSession` 驱动并观察 companion `sessionProgress` 进程级单例；实现细节见 `features/gallery/AGENTS.md` §2.4 |
 | `service/accessibility/` | `PoLangAccessibilityService` | Agent 自动化辅助服务 |
 
 ---

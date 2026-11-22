@@ -8,8 +8,9 @@ import com.mamba.picme.domain.repository.OrganizeRepository
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.DedupScanConfig
-import com.mamba.picme.domain.dedup.DedupScanController
-import com.mamba.picme.domain.dedup.DedupScanEvent
+import com.mamba.picme.domain.dedup.DedupScanProgress
+import com.mamba.picme.domain.dedup.DedupScanSession
+import com.mamba.picme.domain.dedup.DedupScanState
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.KeepPolicyEngine
@@ -20,7 +21,6 @@ import com.mamba.picme.domain.swipe.SwipeMonths
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -75,8 +75,8 @@ data class PendingTrash(
 )
 
 class DedupViewModel(
-    private val mediaSource: DedupMediaSource,
-    private val scanner: DedupScanController,
+    /** 扫描会话（服务所有）：VM 只观察进度并转发控制命令，不再自驱扫描。 */
+    private val session: DedupScanSession,
     private val trashManager: DedupTrashManager,
     /** 整理中心 hub（Config 态）类目统计数据源。 */
     private val organizeRepository: OrganizeRepository,
@@ -142,6 +142,11 @@ class DedupViewModel(
                 }
             }.onFailure { error -> Logger.w(TAG, "backfill quality signals failed", error) }
         }
+
+        // 扫描会话观察：服务端会话进度驱动 uiState 迁移（Scanning/Results/Config）
+        scope.launch {
+            session.progress.collect { progress -> onSessionProgress(progress) }
+        }
     }
 
     /** VM 级保留策略（Config/Results 共用）：Config 规则行与规则弹层改它；进入 Results 时带入 state.policy。 */
@@ -162,63 +167,43 @@ class DedupViewModel(
         _partialTrashNotice.value = false
     }
 
-    private var scanJob: Job? = null
-
-    // ---------- 扫描生命周期 ----------
+    // ---------- 扫描生命周期（转发 + 观察，执行归服务会话） ----------
 
     fun startScan(config: DedupScanConfig) {
-        if (_uiState.value is DedupUiState.Scanning) return // 防重入
-        val phases = config.levels.sorted()
-        _uiState.value = DedupUiState.Scanning(
-            phase = phases.firstOrNull() ?: DedupLevel.EXACT,
-            phaseIndex = 1,
-            phaseCount = phases.size.coerceAtLeast(1),
-            scanned = 0,
-            total = 0,
-            paused = false,
-            foundGroups = emptyList(),
-        )
-        scanJob = scope.launch {
-            val items = mediaSource.photoScanItems()
-            scanner.scan(items, config)
-                .flowOn(ioDispatcher)
-                .collect { event -> onScanEvent(event) }
-        }
+        if (_uiState.value is DedupUiState.Scanning) return // 防重入；会话侧亦有活跃态守卫
+        session.startScan(config)
     }
 
     fun pauseScan() {
         if (_uiState.value !is DedupUiState.Scanning) return
-        scanner.pauseRequested = true
-        updateScanning { state -> state.copy(paused = true) }
+        session.pauseScan()
     }
 
     fun resumeScan() {
-        scanner.resume()
-        updateScanning { state -> state.copy(paused = false) }
+        session.resumeScan()
     }
 
     fun cancelScan() {
-        scanner.resume() // 防卡死：暂停态取消时扫描循环需退出 awaitIfPaused
-        scanJob?.cancel()
-        scanJob = null
-        _uiState.value = DedupUiState.Config()
+        if (_uiState.value !is DedupUiState.Scanning) return
+        session.cancelScan()
     }
 
-    private fun onScanEvent(event: DedupScanEvent) {
-        when (event) {
-            is DedupScanEvent.Progress -> updateScanning { state ->
-                state.copy(phase = event.phase, scanned = event.scanned, total = event.total)
-            }
-            is DedupScanEvent.GroupFound -> updateScanning { state ->
-                state.copy(foundGroups = listOf(event.group) + state.foundGroups) // 最新发现排前
-            }
-            is DedupScanEvent.PhaseChanged -> updateScanning { state ->
-                state.copy(phase = event.phase, phaseIndex = event.phaseIndex, phaseCount = event.phaseCount)
-            }
-            is DedupScanEvent.Done -> {
-                // 扫描器按 BEST_QUALITY 建组；Done 时按当前保留规则重算默认勾选
+    /** 会话进度 → uiState：活跃态映射 Scanning；COMPLETED 落 Results（沿用 Done 分支的排序/选 Tab 逻辑）；CANCELLED/null 退 Config。 */
+    private fun onSessionProgress(progress: DedupScanProgress?) {
+        when (progress?.state) {
+            DedupScanState.RUNNING, DedupScanState.PAUSED -> _uiState.value = DedupUiState.Scanning(
+                phase = progress.phase,
+                phaseIndex = progress.phaseIndex,
+                phaseCount = progress.phaseCount,
+                scanned = progress.scanned,
+                total = progress.total,
+                paused = progress.state == DedupScanState.PAUSED,
+                foundGroups = progress.foundGroups,
+            )
+            DedupScanState.COMPLETED -> {
+                // 扫描器按 BEST_QUALITY 建组；完成时按当前保留规则重算默认勾选
                 //（resortGroup 天然跳过 userOverride，扫描态不会产生 override）
-                val groups = event.groups.map { group -> resortGroup(group, _policy.value) }
+                val groups = progress.resultGroups.orEmpty().map { group -> resortGroup(group, _policy.value) }
                 val firstTab = DedupLevel.entries.firstOrNull { level ->
                     groups.any { group -> group.level == level }
                 } ?: DedupLevel.EXACT
@@ -228,12 +213,9 @@ class DedupViewModel(
                     policy = _policy.value,
                 )
             }
-            DedupScanEvent.Cancelled -> _uiState.value = DedupUiState.Config()
+            DedupScanState.CANCELLED, null ->
+                if (_uiState.value is DedupUiState.Scanning) _uiState.value = DedupUiState.Config()
         }
-    }
-
-    private inline fun updateScanning(transform: (DedupUiState.Scanning) -> DedupUiState.Scanning) {
-        (_uiState.value as? DedupUiState.Scanning)?.let { state -> _uiState.value = transform(state) }
     }
 
     // ---------- 结果操作 ----------
@@ -490,10 +472,7 @@ class DedupViewModel(
         if (_uiState.value is DedupUiState.Cleaned) _uiState.value = DedupUiState.Config()
     }
 
-    override fun onCleared() {
-        scanner.resume()
-        super.onCleared()
-    }
+    // 会话归服务所有：VM 销毁不触碰扫描生命周期（转后台/关页扫描继续，onDestroy 清 sessionProgress 兜底）
 
     private companion object {
         const val TAG = "Dedup"

@@ -379,6 +379,9 @@
     <string name="dedup_policy_latest">Keep latest</string>
     <string name="dedup_policy_latest_desc">Most recently saved first</string>
     <string name="dedup_start_scan">Start scan</string>
+    <string name="dedup_scan_channel_name">Photo cleanup scan</string>
+    <string name="dedup_scan_notification_title">Scanning for duplicates</string>
+    <string name="dedup_scan_notification_text">%1$d/%2$d scanned</string>
     <string name="dedup_scanning_title">Scanning</string>
     <string name="dedup_phase_format">Phase %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">Scanned %1$d / %2$d</string>

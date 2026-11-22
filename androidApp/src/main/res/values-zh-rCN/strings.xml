@@ -363,6 +363,9 @@
     <string name="dedup_policy_latest">保留最新</string>
     <string name="dedup_policy_latest_desc">最近保存的优先</string>
     <string name="dedup_start_scan">开始扫描</string>
+    <string name="dedup_scan_channel_name">相册整理扫描</string>
+    <string name="dedup_scan_notification_title">正在扫描重复照片</string>
+    <string name="dedup_scan_notification_text">已扫描 %1$d/%2$d</string>
     <string name="dedup_scanning_title">正在扫描</string>
     <string name="dedup_phase_format">阶段 %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">已扫描 %1$d / %2$d 张</string>

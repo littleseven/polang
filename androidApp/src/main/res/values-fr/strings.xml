@@ -366,6 +366,9 @@
     <string name="dedup_policy_latest">Conserver la plus récente</string>
     <string name="dedup_policy_latest_desc">L\'enregistrement le plus récent en priorité</string>
     <string name="dedup_start_scan">Lancer l\'analyse</string>
+    <string name="dedup_scan_channel_name">Analyse de nettoyage</string>
+    <string name="dedup_scan_notification_title">Recherche de doublons</string>
+    <string name="dedup_scan_notification_text">%1$d/%2$d analysés</string>
     <string name="dedup_scanning_title">Analyse en cours</string>
     <string name="dedup_phase_format">Phase %1$d/%2$d · %3$s</string>
     <string name="dedup_scan_progress">%1$d / %2$d analysées</string>

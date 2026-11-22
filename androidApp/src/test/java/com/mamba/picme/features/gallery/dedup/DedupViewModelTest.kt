@@ -8,9 +8,9 @@ import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.DedupMember
 import com.mamba.picme.domain.dedup.DedupScanConfig
-import com.mamba.picme.domain.dedup.DedupScanController
-import com.mamba.picme.domain.dedup.DedupScanEvent
-import com.mamba.picme.domain.dedup.DedupScanner
+import com.mamba.picme.domain.dedup.DedupScanProgress
+import com.mamba.picme.domain.dedup.DedupScanSession
+import com.mamba.picme.domain.dedup.DedupScanState
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.VersionRole
@@ -21,9 +21,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -75,33 +73,63 @@ class DedupViewModelTest {
         autoPreselected = autoPreselected,
     )
 
-    /** 假扫描器：按脚本流出事件，可选挂起（模拟扫描进行中）。 */
-    private class FakeScanner(
-        private val events: List<DedupScanEvent>,
-        private val hang: Boolean = false,
-    ) : DedupScanController {
-        override var pauseRequested: Boolean = false
+    /** 假扫描会话：MutableStateFlow 进度 + 调用计数（JVM 接缝，服务端会话替身）。 */
+    private class FakeSession : DedupScanSession {
+        override val progress = MutableStateFlow<DedupScanProgress?>(null)
+        var startCount: Int = 0
+            private set
+        var pauseCount: Int = 0
+            private set
         var resumeCount: Int = 0
+            private set
+        var cancelCount: Int = 0
             private set
         var lastConfig: DedupScanConfig? = null
             private set
 
-        override fun resume() {
-            pauseRequested = false
+        override fun startScan(config: DedupScanConfig) {
+            startCount++
+            lastConfig = config
+        }
+
+        override fun pauseScan() {
+            pauseCount++
+        }
+
+        override fun resumeScan() {
             resumeCount++
         }
 
-        override fun scan(
-            items: List<DedupScanner.ScanItem>,
-            config: DedupScanConfig,
-        ): Flow<DedupScanEvent> {
-            lastConfig = config
-            return flow {
-                for (event in events) emit(event)
-                if (hang) awaitCancellation()
-            }
+        override fun cancelScan() {
+            cancelCount++
         }
     }
+
+    private fun activeProgress(
+        state: DedupScanState,
+        foundGroups: List<DedupGroup> = emptyList(),
+        scanned: Int = 0,
+        total: Int = 0,
+    ) = DedupScanProgress(
+        state = state,
+        phase = DedupLevel.EXACT,
+        phaseIndex = 1,
+        phaseCount = 1,
+        scanned = scanned,
+        total = total,
+        foundGroups = foundGroups,
+    )
+
+    private fun completedProgress(resultGroups: List<DedupGroup>) = DedupScanProgress(
+        state = DedupScanState.COMPLETED,
+        phase = DedupLevel.EXACT,
+        phaseIndex = 1,
+        phaseCount = 1,
+        scanned = 0,
+        total = 0,
+        foundGroups = emptyList(),
+        resultGroups = resultGroups,
+    )
 
     private fun fakeTrashManager(supported: Boolean = true): DedupTrashManager = mockk {
         every { isSupported } returns supported
@@ -124,14 +152,13 @@ class DedupViewModelTest {
     }
 
     private fun viewModel(
-        scanner: DedupScanController,
+        session: DedupScanSession,
         trashManager: DedupTrashManager = fakeTrashManager(),
         organizeRepository: OrganizeRepository = fakeOrganizeRepository(),
         scope: CoroutineScope,
         ioDispatcher: CoroutineDispatcher,
     ) = DedupViewModel(
-        mediaSource = DedupMediaSource { emptyList() },
-        scanner = scanner,
+        session = session,
         trashManager = trashManager,
         organizeRepository = organizeRepository,
         coroutineScope = scope,
@@ -148,7 +175,7 @@ class DedupViewModelTest {
             )
         }
         viewModel(
-            FakeScanner(events = emptyList()),
+            FakeSession(),
             scope = backgroundScope,
             ioDispatcher = StandardTestDispatcher(testScheduler),
             organizeRepository = organizeRepository,
@@ -173,7 +200,7 @@ class DedupViewModelTest {
             )
         }
         viewModel(
-            FakeScanner(events = emptyList()),
+            FakeSession(),
             scope = backgroundScope,
             ioDispatcher = StandardTestDispatcher(testScheduler),
             organizeRepository = organizeRepository,
@@ -198,7 +225,7 @@ class DedupViewModelTest {
             )
         }
         viewModel(
-            FakeScanner(events = emptyList()),
+            FakeSession(),
             scope = backgroundScope,
             ioDispatcher = StandardTestDispatcher(testScheduler),
             organizeRepository = organizeRepository,
@@ -212,42 +239,55 @@ class DedupViewModelTest {
     }
 
     @Test
-    fun `GroupFound events appear in Scanning state progressively`() = runTest {
+    fun `session running progress drives Scanning state progressively`() = runTest {
         val g1 = group("g1", DedupLevel.EXACT, listOf(member("a"), member("b")))
         val g2 = group("g2", DedupLevel.EXACT, listOf(member("c"), member("d")))
-        val scanner = FakeScanner(
-            events = listOf(
-                DedupScanEvent.PhaseChanged(DedupLevel.EXACT, 1, 2),
-                DedupScanEvent.Progress(DedupLevel.EXACT, scanned = 10, total = 100),
-                DedupScanEvent.GroupFound(g1),
-                DedupScanEvent.GroupFound(g2),
-            ),
-            hang = true,
-        )
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = activeProgress(
+            DedupScanState.RUNNING,
+            foundGroups = listOf(g1),
+            scanned = 10,
+            total = 100,
+        ).copy(phaseIndex = 1, phaseCount = 2)
         settle()
 
-        val state = vm.uiState.value as DedupUiState.Scanning
+        var state = vm.uiState.value as DedupUiState.Scanning
         assertEquals(DedupLevel.EXACT, state.phase)
         assertEquals(1, state.phaseIndex)
         assertEquals(2, state.phaseCount)
         assertEquals(10, state.scanned)
         assertEquals(100, state.total)
-        // 最新发现排前
-        assertEquals(listOf(g2, g1), state.foundGroups)
+        assertEquals(listOf(g1), state.foundGroups)
         assertFalse(state.paused)
+
+        session.progress.value = activeProgress(
+            DedupScanState.RUNNING,
+            foundGroups = listOf(g2, g1),
+            scanned = 60,
+            total = 100,
+        ).copy(phase = DedupLevel.VISUAL, phaseIndex = 2, phaseCount = 2)
+        settle()
+
+        state = vm.uiState.value as DedupUiState.Scanning
+        assertEquals(DedupLevel.VISUAL, state.phase)
+        assertEquals(2, state.phaseIndex)
+        assertEquals(60, state.scanned)
+        // 最新发现排前（由会话产出，VM 整体消费）
+        assertEquals(listOf(g2, g1), state.foundGroups)
     }
 
     @Test
     fun `setKeep marks userOverride and changes deleteUris`() = runTest {
-        // a 文件更大：Done 按 BEST_QUALITY 重算后仍保留 a（排序恒等）
+        // a 文件更大：完成按 BEST_QUALITY 重算后仍保留 a（排序恒等）
         val g = group("g1", DedupLevel.EXACT, listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         val results = vm.uiState.value as DedupUiState.Results
         assertEquals("a", results.groups.single().keepUri)
@@ -272,10 +312,11 @@ class DedupViewModelTest {
             "g2", DedupLevel.VISUAL,
             listOf(member("c", modifiedAt = 300L), member("d", modifiedAt = 400L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g1, g2))))
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g1, g2))
         settle()
         vm.setKeep("g1", "b") // 用户手动保留 b
 
@@ -304,10 +345,11 @@ class DedupViewModelTest {
             "g2", DedupLevel.SCENE,
             listOf(member("c", captureDate = 3L), member("d", captureDate = 4L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(exact, scene))))
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(exact, scene))
         settle()
         vm.setKeep("g1", "a")
         vm.setKeep("g2", "d")
@@ -326,54 +368,65 @@ class DedupViewModelTest {
     }
 
     @Test
-    fun `pause sets paused true and resume clears it`() = runTest {
-        val scanner = FakeScanner(
-            events = listOf(DedupScanEvent.Progress(DedupLevel.EXACT, 5, 100)),
-            hang = true,
-        )
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+    fun `pause forwards to session and paused progress maps to paused Scanning`() = runTest {
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = activeProgress(DedupScanState.RUNNING, scanned = 5, total = 100)
         settle()
 
         vm.pauseScan()
+        assertEquals(1, session.pauseCount)
+        session.progress.value = activeProgress(DedupScanState.PAUSED, scanned = 5, total = 100)
+        settle()
         val paused = vm.uiState.value as DedupUiState.Scanning
         assertTrue(paused.paused)
-        assertTrue(scanner.pauseRequested)
 
         vm.resumeScan()
+        assertEquals(1, session.resumeCount)
+        session.progress.value = activeProgress(DedupScanState.RUNNING, scanned = 5, total = 100)
+        settle()
         val resumed = vm.uiState.value as DedupUiState.Scanning
         assertFalse(resumed.paused)
-        assertFalse(scanner.pauseRequested)
-        assertEquals(1, scanner.resumeCount)
     }
 
     @Test
-    fun `cancelScan returns to Config and releases scanner pause`() = runTest {
-        val scanner = FakeScanner(events = emptyList(), hang = true)
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+    fun `cancelScan forwards to session and cancelled progress returns to Config`() = runTest {
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = activeProgress(DedupScanState.RUNNING)
         settle()
         assertTrue(vm.uiState.value is DedupUiState.Scanning)
 
         vm.cancelScan()
-        settle()
+        assertEquals(1, session.cancelCount)
+        // 状态迁移等会话流回推（转发本身不改 uiState）
+        assertTrue(vm.uiState.value is DedupUiState.Scanning)
 
+        session.progress.value = activeProgress(DedupScanState.CANCELLED)
+        settle()
         assertTrue(vm.uiState.value is DedupUiState.Config)
-        assertEquals(1, scanner.resumeCount)
+
+        // 会话清空（IDLE）对非扫描态是 no-op
+        session.progress.value = null
+        settle()
+        assertTrue(vm.uiState.value is DedupUiState.Config)
     }
 
     @Test
     fun `deleteSelected on API30 path emits PendingTrash and refusal returns to Results with groups intact`() =
         runTest {
-            // a 文件更大：Done 按 BEST_QUALITY 重算后排序恒等，deleteUris 仍为 [b]
+            // a 文件更大：完成按 BEST_QUALITY 重算后排序恒等，deleteUris 仍为 [b]
             val g = group("g1", DedupLevel.EXACT, listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)))
-            val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+            val session = FakeSession()
             val trash = fakeTrashManager(supported = true)
-            val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+            val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
             vm.startScan(DedupScanConfig())
+            session.progress.value = completedProgress(listOf(g))
             settle()
 
             vm.deleteSelected()
@@ -393,13 +446,14 @@ class DedupViewModelTest {
 
     @Test
     fun `deleteSelected confirmed moves to Cleaned with reclaimed bytes`() = runTest {
-        // a 文件更大：Done 按 BEST_QUALITY 重算后仍保留 a，b 进回收站
+        // a 文件更大：完成按 BEST_QUALITY 重算后仍保留 a，b 进回收站
         val g = group("g1", DedupLevel.EXACT, listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         vm.deleteSelected()
         settle()
@@ -418,11 +472,12 @@ class DedupViewModelTest {
     @Test
     fun `deleteSelected with no deletable uris is a no-op`() = runTest {
         val g = group("g1", DedupLevel.EXACT, listOf(member("a")))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         vm.deleteSelected()
 
@@ -432,25 +487,28 @@ class DedupViewModelTest {
 
     @Test
     fun `startScan is not re-entrant while Scanning`() = runTest {
-        val scanner = FakeScanner(events = emptyList(), hang = true)
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig(visualThreshold = 5))
+        session.progress.value = activeProgress(DedupScanState.RUNNING)
         settle()
         vm.startScan(DedupScanConfig(visualThreshold = 9))
         settle()
 
-        // 第二次启动被忽略：scanner 只见过第一份配置
-        assertEquals(5, scanner.lastConfig?.visualThreshold)
+        // 第二次启动被忽略：会话只见第一份配置
+        assertEquals(1, session.startCount)
+        assertEquals(5, session.lastConfig?.visualThreshold)
     }
 
     @Test
     fun `setKeep during Scanning is ignored`() = runTest {
         val g = group("g1", DedupLevel.EXACT, listOf(member("a"), member("b")))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.GroupFound(g)), hang = true)
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = activeProgress(DedupScanState.RUNNING, foundGroups = listOf(g))
         settle()
         vm.setKeep("g1", "b")
 
@@ -462,18 +520,19 @@ class DedupViewModelTest {
 
     @Test
     fun `partial trash refusal keeps Results with groups intact and raises notice`() = runTest {
-        // a 文件更大：Done 按 BEST_QUALITY 重算后排序恒等
+        // a 文件更大：完成按 BEST_QUALITY 重算后排序恒等
         val g = group("g1", DedupLevel.EXACT, listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+        val session = FakeSession()
         val trash = mockk<DedupTrashManager> {
             every { isSupported } returns true
             every { buildTrashIntent(any()) } returns mockk<IntentSender>()
             // 部分拒绝：uri 仍存在
             every { queryExisting(any()) } answers { firstArg() }
         }
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         vm.deleteSelected()
         settle()
@@ -491,7 +550,7 @@ class DedupViewModelTest {
 
     @Test
     fun `batch delete excludes SCENE groups and deleteSelected only acts on current tab`() = runTest {
-        // 每组首张文件更大：Done 按 BEST_QUALITY 重算后排序恒等，deleteUris 为各组第二张
+        // 每组首张文件更大：完成按 BEST_QUALITY 重算后排序恒等，deleteUris 为各组第二张
         val exact = group(
             "g1", DedupLevel.EXACT,
             listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)),
@@ -504,11 +563,12 @@ class DedupViewModelTest {
             "g3", DedupLevel.SCENE,
             listOf(member("e", sizeBytes = 6_000L), member("f", sizeBytes = 5_000L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(exact, visual, scene))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(exact, visual, scene))
         settle()
         val state = vm.uiState.value as DedupUiState.Results
         val groups = state.groups
@@ -540,11 +600,12 @@ class DedupViewModelTest {
             "g2", DedupLevel.VISUAL,
             listOf(member("c", sizeBytes = 4_000L), member("d", sizeBytes = 3_000L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(exact, visual))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(exact, visual))
         settle()
         vm.selectTab(DedupLevel.VISUAL)
         vm.deleteSelected()
@@ -580,11 +641,12 @@ class DedupViewModelTest {
             "g2", DedupLevel.VISUAL,
             listOf(member("c", sizeBytes = 4_000L), member("d", sizeBytes = 3_000L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(exact, visual))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(exact, visual))
         settle()
         vm.deleteSelected()
         // buildTrashIntent 的 IPC 窗口内切 Tab：当前 Tab 选择集与发起时已不一致
@@ -611,11 +673,12 @@ class DedupViewModelTest {
                 member("d", sizeBytes = 1_200L),
             ),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(exact, visual))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(exact, visual))
         settle()
         // EXACT Tab 删除：b 入回收站
         vm.deleteSelected()
@@ -641,7 +704,7 @@ class DedupViewModelTest {
 
     @Test
     fun `deleteGroup confirmed removes the group and stays in Results`() = runTest {
-        // 每组首张文件更大：Done 按 BEST_QUALITY 重算后排序恒等，deleteUris 为各组第二张
+        // 每组首张文件更大：完成按 BEST_QUALITY 重算后排序恒等，deleteUris 为各组第二张
         val g1 = group(
             "g1", DedupLevel.EXACT,
             listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)),
@@ -650,11 +713,12 @@ class DedupViewModelTest {
             "g2", DedupLevel.EXACT,
             listOf(member("c", sizeBytes = 4_000L), member("d", sizeBytes = 3_000L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g1, g2))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g1, g2))
         settle()
 
         vm.deleteGroup("g1")
@@ -680,11 +744,12 @@ class DedupViewModelTest {
     @Test
     fun `deleteGroup refusal keeps Results with groups intact`() = runTest {
         val g = group("g1", DedupLevel.EXACT, listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         vm.deleteGroup("g1")
         settle()
@@ -706,11 +771,12 @@ class DedupViewModelTest {
             ),
             autoPreselected = false,
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(screenshotVisual))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(screenshotVisual))
         settle()
         vm.deleteGroup("g1")
         settle()
@@ -726,11 +792,12 @@ class DedupViewModelTest {
             "g1", DedupLevel.SCENE,
             listOf(member("e", sizeBytes = 6_000L), member("f", sizeBytes = 5_000L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(scene))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(scene))
         settle()
         vm.setKeep("g1", "e") // 详情页改选 = 逐组确认
         vm.deleteGroup("g1")
@@ -749,11 +816,12 @@ class DedupViewModelTest {
     @Test
     fun `deleteGroup abandons authorization when group selection changed during IPC window`() = runTest {
         val g = group("g1", DedupLevel.EXACT, listOf(member("a", sizeBytes = 3_000L), member("b", sizeBytes = 2_000L)))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         vm.deleteGroup("g1")
         // buildTrashIntent 的 IPC 窗口内改选保留项：该组选择集与发起时不一致
@@ -775,10 +843,11 @@ class DedupViewModelTest {
             "g2", DedupLevel.VISUAL,
             listOf(member("c", captureDate = 3L), member("d", captureDate = 4L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(exact, visual))))
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(exact, visual))
         settle()
         // 两组都手动改选过（BEST_QUALITY 默认 keep 为 captureDate 最新者 b/d）
         vm.setKeep("g1", "a")
@@ -805,7 +874,7 @@ class DedupViewModelTest {
     }
 
     @Test
-    fun `scan Done recomputes default keep by current policy`() = runTest {
+    fun `session completion recomputes default keep by current policy`() = runTest {
         // 扫描器按 BEST_QUALITY 建组（pixelArea 大者在前），Config 已选「保留最新」
         val g = group(
             "g1", DedupLevel.EXACT,
@@ -814,17 +883,18 @@ class DedupViewModelTest {
                 member("new-small", modifiedAt = 200L, pixelArea = 1_000),
             ),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.applyPolicy(KeepPolicy.LATEST) // Config 态改策略
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
 
         val state = vm.uiState.value as DedupUiState.Results
         assertEquals(KeepPolicy.LATEST, state.policy)
         val result = state.groups.single()
-        // Done 分支按当前 policy 重算：keepUri 为 modifiedAt 最新者
+        // 完成分支按当前 policy 重算：keepUri 为 modifiedAt 最新者
         assertEquals("new-small", result.keepUri)
         assertEquals(listOf("new-small", "old-big"), result.members.map { m -> m.uri })
     }
@@ -832,14 +902,15 @@ class DedupViewModelTest {
     @Test
     fun `buildTrashIntent failure keeps Results and emits no PendingTrash`() = runTest {
         val g = group("g1", DedupLevel.EXACT, listOf(member("a"), member("b")))
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(g))))
+        val session = FakeSession()
         val trash = mockk<DedupTrashManager> {
             every { isSupported } returns true
             every { buildTrashIntent(any()) } throws RuntimeException("ipc boom")
         }
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(g))
         settle()
         vm.deleteSelected()
         settle()
@@ -863,11 +934,12 @@ class DedupViewModelTest {
             "g2", DedupLevel.EXACT,
             listOf(member("a", sizeBytes = 5_000L), member("b", sizeBytes = 4_000L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(screenshotVisual, exact))))
+        val session = FakeSession()
         val trash = fakeTrashManager(supported = true)
-        val vm = viewModel(scanner, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val vm = viewModel(session, trash, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(screenshotVisual, exact))
         settle()
         var groups = (vm.uiState.value as DedupUiState.Results).groups
 
@@ -901,10 +973,11 @@ class DedupViewModelTest {
             "g2", DedupLevel.EXACT,
             listOf(member("a", captureDate = 3L), member("b", captureDate = 4L)),
         )
-        val scanner = FakeScanner(events = listOf(DedupScanEvent.Done(listOf(screenshotVisual, exact))))
-        val vm = viewModel(scanner, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
+        val session = FakeSession()
+        val vm = viewModel(session, scope = backgroundScope, ioDispatcher = StandardTestDispatcher(testScheduler))
 
         vm.startScan(DedupScanConfig())
+        session.progress.value = completedProgress(listOf(screenshotVisual, exact))
         settle()
         vm.setKeep("g1", "s2") // 用户在详情逐组确认过
         vm.smartSelectAll()
