@@ -698,6 +698,41 @@ VM 过滤正确性（多来源混杂 → 只出目标 source）、保护项不�
 
 ---
 
+## Task 7.6: 截图重要度分级（金融/医疗/政务保护 + 外卖/电商低价值，2026-11-22 用户追加）
+
+**背景**：用户裁定截图价值按内容来源分级——银行/医院截图不轻易删，外卖/淘宝截图价值低。机制（已勘察定稿）：截图文件名包名解析为主信号（MIUI `Screenshot_YYYY-..._<package>.jpg`，设备实测含 `-edit_` 变体与 `cn.futu.trader` 等金融 App），`ocrText` 关键词兜底（无包名文件名的截图）；VLM 内容理解留 M2+。`media_assets.fileName` 列已存在（无 Room 迁移），`OrganizeItem` 需加 `displayName` 字段穿透。
+
+**Files:**
+- New: `domain/organize/ScreenshotImportance.kt`（解析 + 分级纯函数）
+- Modify: `domain/organize/OrganizeModels.kt`（`OrganizeItem.displayName: String?`；`ProtectReason` 加 `SENSITIVE_SCREENSHOT`）
+- Modify: `domain/organize/ValueGuard.kt`（`SCREEN_CONTENT` 纳入保护类目）
+- Modify: `domain/organize/ConfidenceGrader.kt`（LOW_VALUE + 过期 → HIGH 预选）
+- Modify: `domain/organize/StorageStory.kt`（过期截图建议口径剔除保护档）
+- Modify: `data/repository/OrganizeRepositoryImpl.kt`（displayName 映射）+ 查询投影行（`SystemMediaRow`）
+- Modify: `OrganizeResources.kt`（新 ProtectReason 五语 label）+ `res/values*/strings.xml`
+- Modify: `docs/08-UI-SPECS/screens/organize.yaml`（分级语义契约）
+
+**Interfaces:**
+- Consumes: `OrganizeItem.displayName`/`ocrText`（既有数据源，仅穿透）；`AppSource.SCREENSHOTS` 判定（`appSourceOf`，避免对非截图误解析）。
+- Produces: `screenshotImportanceOf(item: OrganizeItem): ScreenshotImportance`（sealed：PROTECTED_FINANCE / PROTECTED_HEALTH / PROTECTED_GOV / LOW_VALUE / NEUTRAL，命中来源包名或关键词入 verdict）。
+
+**设计裁定（已定，勿推翻）：**
+1. 只对截图生效（`appSourceOf(relativePath) == SCREENSHOTS`），非截图恒 NEUTRAL。
+2. 信号优先级：文件名包名 > ocrText 关键词；两信号冲突时**保护档优先**（保守偏置，与 ValueGuard「宁可不预选不可误删」一致）。
+3. 包名前缀匹配（如 `com.icbc` 命中 `com.icbc.mobile`）；词表实现者拟定+测试钉死——金融（工行/建行/农行/中行/招行/交行/云闪付/支付宝/券商）/医疗健康（挂号/医院/微医/好大夫）/政务（12123/政务服务/个税）；低价值（美团/饿了么/淘宝/天猫/京东/拼多多/大众点评）。
+4. OCR 兜底关键词：保护档（银行/转账/汇款/挂号/病历/处方/医保/身份证/护照），低价值（外卖/满减/淘宝/拼多多）；冲突同样保护优先。
+5. 接线三处：ValueGuard（PROTECTED_* → `SENSITIVE_SCREENSHOT`，进保护区不预选）；ConfidenceGrader（LOW_VALUE + captureDate 超 1 年 → HIGH）；StorageStory（`staleScreenshotCount/Bytes` 剔除 PROTECTED_*，建议行只推可删的）。
+6. hub 建议行文案不变；详情页保护原因 label 走 OrganizeResources 五语。
+
+- [ ] **Step 1**: `ScreenshotImportance.kt` 纯函数 + 单测（包名命中/`-edit_` 变体/无包名 → OCR 兜底/非截图 NEUTRAL/冲突保护优先/前缀匹配/大小写）。
+- [ ] **Step 2**: `OrganizeItem.displayName` 穿透（SystemMediaRow 投影 + OrganizeRepositoryImpl 映射 + 既有测试夹具补字段）。
+- [ ] **Step 3**: ValueGuard / ConfidenceGrader / StorageStory 三处接线 + 各自单测（保护进区不预选；LOW_VALUE+过期 HIGH；NEUTRAL 不变；story 口径剔除）。
+- [ ] **Step 4**: ProtectReason 五语 label + organize.yaml 契约。
+- [ ] **Step 5**: `./gradlew :androidApp:testDebugUnitTest :androidApp:assembleDebug` 全绿。
+- [ ] **Step 6**: Commit `feat(organize): 截图重要度分级（金融/医疗/政务保护 + 外卖/电商低价值，包名+OCR 双信号）`
+
+---
+
 ## Task 8: 文档同步 + 全量验证
 
 **Files:**
