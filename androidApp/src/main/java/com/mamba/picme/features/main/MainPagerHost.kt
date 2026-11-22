@@ -83,6 +83,8 @@ fun MainPagerHost(
     onOpenMonthReview: (Long) -> Unit = {},
     /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
+    /** hub 存储叙事区「立即分析」手动入口（Agent 清理 M1，透传 OrganizeHomeRoute）。 */
+    onAnalyzeNow: () -> Unit = {},
     /** Memory 页大卡点击 → 回忆详情页（memory_detail/{memoryId} 路由）。 */
     onNavigateToMemoryDetail: (String) -> Unit = {},
     /** 整理+扫描合并页扫描 Tab 内「查看标签」出口（tag_viewer 路由）。 */
@@ -184,6 +186,7 @@ fun MainPagerHost(
                 onQuickTidy = onQuickTidy,
                 onOpenMonthReview = onOpenMonthReview,
                 onOpenCategory = onOpenCategory,
+                onAnalyzeNow = onAnalyzeNow,
                 onNavigateToTagViewer = onNavigateToTagViewer,
                 onRequestGalleryView = onRequestGalleryView,
                 onSwitchMainPage = onBarSwitchPage

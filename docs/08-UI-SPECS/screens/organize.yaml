@@ -113,6 +113,48 @@ hub:
       font: bodySmall
       color: onSurfaceVariant
 
+  # ---- 存储叙事区（Agent 清理 M1，2026-11-22）----
+  storage_story_section:
+    position: hero_card 与 quick_tidy_button 之间
+    show_when: "storageStory != null（stateIn 初值 null = 未加载，同 board_contract.not_loaded 守卫，不渲染整卡）"
+    data: StorageStory                  # domain/organize/StorageStory.of：与 hub 看板共享一次 board() 计算（DedupViewModel.organizeBoardStory 单流双视图，防双份聚类）
+    shape: { corner_radius: appShapes_lg }
+    background: surfaceContainer
+    padding: 16
+    row_spacing: 8
+    ledger_line:                        # 总账行：照片 · 视频 · 截图字节（视频只统计不出建议）
+      text_key: org_story_ledger        # "Photos X · Videos Y · Screenshots Z"，X/Y/Z = FormatBytes.format（core/common，非 dedup internal 副本）
+      font: bodyMedium
+    source_top3:                        # 来源账 Top3（sourceLedgers 已 bytes 降序，取前 3；OTHER 不展示）
+      show_when: "sourceLedgers（剔 OTHER）非空"
+      item: "org_source_<appsource 小写> + FormatBytes(bytes)"   # 10 来源名 key：camera/wechat/qq/whatsapp/telegram/instagram/messenger/download/screenshots/other
+      font: labelSmall
+      color: onSurfaceVariant
+      flow: { horizontal_spacing: 12, vertical_spacing: 4 }      # FlowRow 徽标粒度折行，单元 max_lines 1 + soft_wrap false
+    suggestion_stale_screenshots:       # 建议行 1（冗余确定性序更高）：过期截图，可点
+      show_when: "staleScreenshotCount > 0（≥365 天截图张数，仅照片不含录屏）"
+      text_key: org_story_stale_screenshots   # "N 张一年前截图 · X"
+      font: bodySmall
+      color: primary
+      chevron: { icon: keyboard_arrow_right, tint: primary }
+      action: open_category_detail(SCREEN_CONTENT)   # → §3 SCREEN_CONTENT 类目
+    suggestion_app_noise:               # 建议行 2：LOW_VALUE 档来源账，M1 纯展示不进详情（方案面属 M2）
+      show_when: "LOW_VALUE 档（WECHAT/QQ/WHATSAPP/TELEGRAM/INSTAGRAM/MESSENGER）来源 bytes 合计 > 0"
+      text_key: org_story_app_noise     # "聊天与社交 App 转存 · X"
+      font: bodySmall
+      color: onSurfaceVariant
+    freshness_line:                     # 新鲜度行 + 手动入口
+      last_analysis:
+        show_when: "preAnalysisRanAt > 0（0 = 从未分析，左侧留白仅按钮）"
+        text_key: org_story_last_analysis   # "上次分析：X"，X = DateUtils.getRelativeTimeSpanString 相对时间
+        font: bodySmall
+        color: onSurfaceVariant
+      analyze_now_button:
+        text_key: org_story_analyze_now # "立即分析"
+        style: text_button
+        disabled_when: "DedupScanService.sessionProgress?.state ∈ {RUNNING, PAUSED}（去重扫描活性）"
+        action: "MainActivity 注入 AppContainer.preAnalysisScheduler.runNowWithCompletion(TRIGGER_MANUAL)；执行与否仍由 PreAnalysisConditions 裁定（条件不满足静默跳过，详见 M1 遗留）"
+
   # ---- 主按钮 ----
   quick_tidy_button:
     text_key: org_quick_tidy           # "Swipe to tidy"（滑动整理）

@@ -16,6 +16,8 @@ import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.KeepPolicyEngine
 import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategorizer
+import com.mamba.picme.domain.organize.StorageStory
+import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.swipe.SwipeMonth
 import com.mamba.picme.domain.swipe.SwipeMonths
 import kotlinx.coroutines.CoroutineDispatcher
@@ -74,12 +76,20 @@ data class PendingTrash(
     val groupId: String? = null,
 )
 
+/** board() 单次计算的双产出：hub 看板与存储叙事共享同一次 O(n²) 聚类（Task 7 合并派生）。 */
+private data class OrganizeBoardWithStory(
+    val board: OrganizeBoard,
+    val story: StorageStory?,
+)
+
 class DedupViewModel(
     /** 扫描会话（服务所有）：VM 只观察进度并转发控制命令，不再自驱扫描。 */
     private val session: DedupScanSession,
     private val trashManager: DedupTrashManager,
     /** 整理中心 hub（Config 态）类目统计数据源。 */
     private val organizeRepository: OrganizeRepository,
+    /** 上次预分析落点（organizePreAnalysisRanAtMsFlow，hub 新鲜度行）。 */
+    private val settingsRepository: UserSettingsRepository,
     /** API < 30 无回收站授权接口，由 UI 层注入旧删除流回调兜底。 */
     private val legacyDeleter: ((List<String>) -> Unit)? = null,
     /** 测试注入作用域（避开 Dispatchers.Main）；生产为 null → viewModelScope。 */
@@ -92,14 +102,38 @@ class DedupViewModel(
     private val _uiState = MutableStateFlow<DedupUiState>(DedupUiState.Config())
     val uiState: StateFlow<DedupUiState> = _uiState.asStateFlow()
 
-    /** 整理中心 hub 看板（Config 态由 UI 订阅）：类目卡聚合 + Hero 口径，管线单一事实来源。 */
-    val organizeBoard: StateFlow<OrganizeBoard> =
+    /** board() 单次计算双流源（hub 看板 + 存储叙事共享一次 O(n²) 聚类，Task 7 合并派生）。 */
+    private val organizeBoardStory: StateFlow<OrganizeBoardWithStory> =
         organizeRepository.observeItems()
-            .map { items -> OrganizeCategorizer.board(items, now = System.currentTimeMillis()) }
+            .map { items ->
+                val board = OrganizeCategorizer.board(items, now = System.currentTimeMillis())
+                OrganizeBoardWithStory(
+                    board = board,
+                    story = StorageStory.of(items, board, now = System.currentTimeMillis()),
+                )
+            }
             // 媒体库任何写都会触发 observeItems 重算，相同结果不下发（防抖重组）
             .distinctUntilChanged()
             .flowOn(ioDispatcher)
-            .stateIn(scope, SharingStarted.WhileSubscribed(5000), OrganizeBoard(emptyList(), 0L, 0))
+            .stateIn(
+                scope,
+                SharingStarted.WhileSubscribed(5000),
+                OrganizeBoardWithStory(OrganizeBoard(emptyList(), 0L, 0), null),
+            )
+
+    /** 整理中心 hub 看板（Config 态由 UI 订阅）：类目卡聚合 + Hero 口径，管线单一事实来源。 */
+    val organizeBoard: StateFlow<OrganizeBoard> = organizeBoardStory
+        .map { pair -> pair.board }
+        .stateIn(scope, SharingStarted.WhileSubscribed(5000), OrganizeBoard(emptyList(), 0L, 0))
+
+    /** 存储空间叙事（Agent 清理 M1）：总账/来源账/过期截图/Agent 面可释放口径；null = 未加载（hub 不渲染叙事区）。 */
+    val storageStory: StateFlow<StorageStory?> = organizeBoardStory
+        .map { pair -> pair.story }
+        .stateIn(scope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** 上次后台预分析落点（0 = 从未），hub 新鲜度行数据源。 */
+    val preAnalysisRanAt: StateFlow<Long> = settingsRepository.organizePreAnalysisRanAtMsFlow
+        .stateIn(scope, SharingStarted.WhileSubscribed(5000), 0L)
 
     /** 按月回顾（F2+）可用月份列表（新→旧），与建队同口径（非视频）。 */
     val swipeMonths: StateFlow<List<SwipeMonth>> = organizeRepository.observeItems()

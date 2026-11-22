@@ -54,6 +54,7 @@ import com.mamba.picme.features.common.avatar.AvatarCaptureController
 import com.mamba.picme.features.common.avatar.AvatarCaptureOrigin
 import com.mamba.picme.features.common.avatar.AvatarCaptureTarget
 import com.mamba.picme.features.common.trash.SilentTrashGuidanceDialog
+import com.mamba.picme.service.organize.PreAnalysisScheduler
 import com.mamba.picme.features.chat.ChatViewModel
 import com.mamba.picme.features.chat.ChatTaskAnchor
 import com.mamba.picme.features.chat.taskcenter.TaskCenterScreen
@@ -383,6 +384,13 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             launchSingleTop = true
                                         }
+                                    },
+                                    // hub 存储叙事区「立即分析」（Agent 清理 M1）：调度器自身 scope 异步执行
+                                    onAnalyzeNow = {
+                                        app.container.preAnalysisScheduler.runNowWithCompletion(
+                                            PreAnalysisScheduler.TRIGGER_MANUAL,
+                                            onFinished = {},
+                                        )
                                     },
                                     onNavigateToMemoryDetail = { memoryId ->
                                         navController.navigate(Screen.MemoryDetail.createRoute(memoryId)) {

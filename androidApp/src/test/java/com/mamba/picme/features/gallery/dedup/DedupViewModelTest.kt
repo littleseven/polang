@@ -3,6 +3,7 @@ package com.mamba.picme.features.gallery.dedup
 import android.content.IntentSender
 import com.mamba.picme.domain.repository.BackfillBatchResult
 import com.mamba.picme.domain.repository.OrganizeRepository
+import com.mamba.picme.domain.repository.UserSettingsRepository
 import com.mamba.picme.domain.dedup.DedupContentType
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
@@ -14,6 +15,9 @@ import com.mamba.picme.domain.dedup.DedupScanState
 import com.mamba.picme.domain.dedup.DedupTrashManager
 import com.mamba.picme.domain.dedup.KeepPolicy
 import com.mamba.picme.domain.dedup.VersionRole
+import com.mamba.picme.domain.organize.AppSource
+import com.mamba.picme.domain.organize.OrganizeItem
+import com.mamba.picme.domain.organize.StorageStory
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -23,6 +27,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -151,16 +156,23 @@ class DedupViewModelTest {
         coEvery { backfillQualitySignals(any(), any()) } returns BackfillBatchResult(attempted = 0, written = 0)
     }
 
+    /** 预分析落点替身：hub 新鲜度行数据源，恒 0（从未分析）。 */
+    private fun fakeSettingsRepository(): UserSettingsRepository = mockk {
+        every { organizePreAnalysisRanAtMsFlow } returns flowOf(0L)
+    }
+
     private fun viewModel(
         session: DedupScanSession,
         trashManager: DedupTrashManager = fakeTrashManager(),
         organizeRepository: OrganizeRepository = fakeOrganizeRepository(),
+        settingsRepository: UserSettingsRepository = fakeSettingsRepository(),
         scope: CoroutineScope,
         ioDispatcher: CoroutineDispatcher,
     ) = DedupViewModel(
         session = session,
         trashManager = trashManager,
         organizeRepository = organizeRepository,
+        settingsRepository = settingsRepository,
         coroutineScope = scope,
         ioDispatcher = ioDispatcher,
     )
@@ -991,4 +1003,112 @@ class DedupViewModelTest {
         assertFalse(resorted.userOverride)
         assertEquals("b", resorted.keepUri)
     }
+
+    @Test
+    fun `storage story and board derive from one items emission`() = runTest {
+        val now = System.currentTimeMillis()
+        val staleScreenshot = item(
+            uri = "content://media/2",
+            isVideo = false,
+            captureDate = now - 400L * 24 * 3600 * 1000,
+            sizeBytes = 50L,
+            relativePath = "Pictures/Screenshots/old.png",
+        )
+        val items = listOf(
+            item(
+                uri = "content://media/1",
+                isVideo = false,
+                captureDate = now,
+                sizeBytes = 100L,
+                relativePath = "DCIM/Camera/a.jpg",
+            ),
+            staleScreenshot,
+            item(
+                uri = "content://media/3",
+                isVideo = true,
+                captureDate = now,
+                sizeBytes = 900L,
+                relativePath = "Movies/vid.mp4",
+            ),
+        )
+        val organizeRepository = mockk<OrganizeRepository> {
+            every { observeItems() } returns flowOf(items)
+            coEvery { backfillQualitySignals(any(), any()) } returns BackfillBatchResult(attempted = 0, written = 0)
+        }
+        val vm = viewModel(
+            session = FakeSession(),
+            organizeRepository = organizeRepository,
+            settingsRepository = mockk {
+                every { organizePreAnalysisRanAtMsFlow } returns flowOf(123L)
+            },
+            scope = backgroundScope,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+
+        var story: StorageStory? = null
+        var boardCategoryCount = -1
+        var ranAt = -1L
+        val jobs = listOf(
+            launch { vm.storageStory.collect { value -> story = value } },
+            launch { vm.organizeBoard.collect { value -> boardCategoryCount = value.categories.size } },
+            launch { vm.preAnalysisRanAt.collect { value -> ranAt = value } },
+        )
+        settle()
+        jobs.forEach { job -> job.cancel() }
+
+        val emitted = story!!
+        assertEquals(1050L, emitted.totalBytes)
+        assertEquals(150L, emitted.photoBytes)
+        assertEquals(900L, emitted.videoBytes)
+        assertEquals(50L, emitted.screenshotBytes)
+        assertEquals(1, emitted.staleScreenshotCount)
+        assertEquals(50L, emitted.staleScreenshotBytes)
+        assertTrue(emitted.sourceLedgers.any { ledger ->
+            ledger.source == AppSource.CAMERA && ledger.bytes == 100L
+        })
+        // board 恒 6 卡口径不变（合并派生不改变看板语义）
+        assertEquals(6, boardCategoryCount)
+        // 上次分析落点直通（DataStore 流 → hub 新鲜度行）
+        assertEquals(123L, ranAt)
+    }
+
+    @Test
+    fun `storage story stays null before first emission`() = runTest {
+        val vm = viewModel(
+            session = FakeSession(),
+            settingsRepository = mockk {
+                every { organizePreAnalysisRanAtMsFlow } returns flowOf(0L)
+            },
+            scope = backgroundScope,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val job = launch { vm.storageStory.collect { } }
+        settle()
+        // 空媒体库：items 空列表也是一次发射，story 非空但全零口径（0 张库的诚实叙事）
+        assertNotNull(vm.storageStory.value)
+        assertEquals(0L, vm.storageStory.value?.totalBytes)
+        assertEquals(0, vm.storageStory.value?.staleScreenshotCount)
+        assertEquals(0L, vm.preAnalysisRanAt.value)
+        job.cancel()
+    }
+
+    private fun item(
+        uri: String,
+        isVideo: Boolean,
+        captureDate: Long,
+        sizeBytes: Long,
+        relativePath: String?,
+    ) = OrganizeItem(
+        uri = uri,
+        isVideo = isVideo,
+        captureDate = captureDate,
+        sizeBytes = sizeBytes,
+        relativePath = relativePath,
+        ocrText = null,
+        pixelArea = null,
+        labels = null,
+        hasFace = false,
+        aestheticScore = null,
+        faceQualityScore = null,
+    )
 }

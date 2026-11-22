@@ -67,6 +67,8 @@ fun OrganizeHomeRoute(
     onQuickTidy: () -> Unit,
     onOpenMonthReview: (Long) -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
+    /** hub 存储叙事区「立即分析」手动入口（Agent 清理 M1，透传 DedupHomeRoute）。 */
+    onAnalyzeNow: () -> Unit = {},
     onNavigateToTagViewer: () -> Unit,
     /** 扫描 Tab v3 确定性相册视图出口（已打标/含人脸/最佳照片） */
     onRequestGalleryView: (GalleryViewRequest) -> Unit = {},
@@ -104,6 +106,7 @@ fun OrganizeHomeRoute(
                         onQuickTidy = onQuickTidy,
                         onOpenMonthReview = onOpenMonthReview,
                         onOpenCategory = onOpenCategory,
+                        onAnalyzeNow = onAnalyzeNow,
                         // hub 引导态类目卡（NEEDS_SCAN）点击切到 SCAN tab
                         onOpenScan = { onSelectTab(OrganizeTab.SCAN) },
                         embedded = true,

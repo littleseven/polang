@@ -494,6 +494,23 @@
     <string name="org_section_protected">Likely precious (%1$d)</string>
     <string name="org_protected_badge">Possibly precious photo</string>
 
+    <!-- Storage story（存储叙事区，Agent 清理 M1） -->
+    <string name="org_story_ledger">Photos %1$s · Videos %2$s · Screenshots %3$s</string>
+    <string name="org_story_stale_screenshots">%1$d screenshots over a year old · %2$s</string>
+    <string name="org_story_last_analysis">Last analysis: %1$s</string>
+    <string name="org_story_analyze_now">Analyze now</string>
+    <string name="org_story_app_noise">Chat &amp; social app saves · %1$s</string>
+    <string name="org_source_camera">Camera</string>
+    <string name="org_source_wechat">WeChat</string>
+    <string name="org_source_qq">QQ</string>
+    <string name="org_source_whatsapp">WhatsApp</string>
+    <string name="org_source_telegram">Telegram</string>
+    <string name="org_source_instagram">Instagram</string>
+    <string name="org_source_messenger">Messenger</string>
+    <string name="org_source_download">Downloads</string>
+    <string name="org_source_screenshots">Screenshots</string>
+    <string name="org_source_other">Other</string>
+
     <!-- Swipe review（F2 手势快速整理全屏页） -->
     <string name="swipe_title">Quick tidy</string>
     <string name="swipe_progress">%1$d / %2$d</string>

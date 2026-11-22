@@ -477,6 +477,23 @@
     <string name="org_section_protected">可能是珍貴照片（%1$d）</string>
     <string name="org_protected_badge">可能是珍貴照片</string>
 
+    <!-- Storage story（儲存敘事區，Agent 清理 M1） -->
+    <string name="org_story_ledger">照片 %1$s · 影片 %2$s · 截圖 %3$s</string>
+    <string name="org_story_stale_screenshots">%1$d 張一年前截圖 · %2$s</string>
+    <string name="org_story_last_analysis">上次分析：%1$s</string>
+    <string name="org_story_analyze_now">立即分析</string>
+    <string name="org_story_app_noise">聊天與社交 App 轉存 · %1$s</string>
+    <string name="org_source_camera">相機</string>
+    <string name="org_source_wechat">微信</string>
+    <string name="org_source_qq">QQ</string>
+    <string name="org_source_whatsapp">WhatsApp</string>
+    <string name="org_source_telegram">Telegram</string>
+    <string name="org_source_instagram">Instagram</string>
+    <string name="org_source_messenger">Messenger</string>
+    <string name="org_source_download">下載</string>
+    <string name="org_source_screenshots">截圖</string>
+    <string name="org_source_other">其他</string>
+
     <!-- Swipe review（F2 手勢快速整理全螢幕頁） -->
     <string name="swipe_title">快速整理</string>
     <string name="swipe_progress">%1$d / %2$d</string>

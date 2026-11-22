@@ -159,6 +159,7 @@ import com.mamba.picme.domain.tag.TagScanProgress
 import com.mamba.picme.domain.tag.scan.TagScanSessionProgress
 import com.mamba.picme.data.indexing.MediaChangeEvent
 import com.mamba.picme.service.dedup.ServiceBackedDedupScanSession
+import com.mamba.picme.service.organize.PreAnalysisScheduler
 import com.mamba.picme.service.tag.TagGenerationService
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -211,6 +212,7 @@ class DedupViewModelFactory(
     private val session: DedupScanSession,
     private val trashManager: DedupTrashManager,
     private val organizeRepository: OrganizeRepository,
+    private val settingsRepository: UserSettingsRepository,
     /** API < 30 无回收站授权接口，由调用方（MainActivity）注入旧删除流回调兜底。 */
     private val legacyDeleter: ((List<String>) -> Unit)?,
 ) : ViewModelProvider.Factory {
@@ -222,6 +224,7 @@ class DedupViewModelFactory(
                 session = session,
                 trashManager = trashManager,
                 organizeRepository = organizeRepository,
+                settingsRepository = settingsRepository,
                 legacyDeleter = legacyDeleter,
             ) as T
         }
@@ -419,6 +422,9 @@ interface AppContainer {
 
     /** 整理中心（F1）：Room + MediaStore 按 uri 合并的类目数据源 */
     val organizeRepository: OrganizeRepository
+
+    /** 后台预分析调度器（Agent 清理 M1）：hub「立即分析」手动入口接缝；与 Receiver/闲时闹钟链共享同实例。 */
+    val preAnalysisScheduler: PreAnalysisScheduler
 
     fun createMediaViewModelFactory(): ViewModelProvider.Factory
     fun createChatViewModelFactory(): ViewModelProvider.Factory
@@ -1083,6 +1089,21 @@ class AppContainerImpl(
         )
     }
 
+    /**
+     * 后台预分析调度器（Agent 清理 M1）：单实例语义——backfiller/scope 复用 PoLangApplication
+     * 处的既有 lazy（启动回填 × 预分析调度共享单例，Task 6 注释口径不变）；App 属性委托本
+     * getter，Receiver/闹钟/hub 手动入口三触发点同对象。
+     */
+    override val preAnalysisScheduler: PreAnalysisScheduler by lazy {
+        val app = context.applicationContext as com.mamba.picme.PoLangApplication
+        PreAnalysisScheduler(
+            context = context,
+            backfiller = app.mediaMetadataBackfiller,
+            settingsRepository = userPreferencesRepository,
+            scope = app.applicationScope,
+        )
+    }
+
     private val photoEditorViewModelFactory: ViewModelProvider.Factory by lazy {
         PhotoEditorViewModelFactory(
             appContext = context,
@@ -1186,6 +1207,7 @@ class AppContainerImpl(
             session = ServiceBackedDedupScanSession(context),
             trashManager = dedupTrashManager,
             organizeRepository = organizeRepository,
+            settingsRepository = userPreferencesRepository,
             legacyDeleter = legacyDeleter,
         )
     }

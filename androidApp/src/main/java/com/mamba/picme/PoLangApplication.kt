@@ -156,16 +156,11 @@ class PoLangApplication : Application(), ImageLoaderFactory {
 
     /**
      * 后台预分析调度器（Agent 清理 M1 Task 6）：充电/每日 03:00 闲时触发链；
-     * 手动入口接缝 = `preAnalysisScheduler.runNow(TRIGGER_MANUAL)`（hub「立即分析」，Task 7 接线）。
+     * 实例归 [container]（backfiller/scope 单源），本属性委托——Receiver/闹钟与
+     * hub「立即分析」手动入口（Task 7）三触发点共享同一调度器。
      */
-    val preAnalysisScheduler: PreAnalysisScheduler by lazy {
-        PreAnalysisScheduler(
-            context = this,
-            backfiller = mediaMetadataBackfiller,
-            settingsRepository = container.userPreferencesRepository,
-            scope = applicationScope,
-        )
-    }
+    val preAnalysisScheduler: PreAnalysisScheduler
+        get() = container.preAnalysisScheduler
 
     /** 单通道管理器：按 selectedRemoteChannel 激活飞书或 Telegram。 */
     val remoteChannelManager: RemoteChannelManager by lazy {

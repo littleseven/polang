@@ -481,6 +481,23 @@
     <string name="org_section_protected">Probablement précieuses (%1$d)</string>
     <string name="org_protected_badge">Photo probablement précieuse</string>
 
+    <!-- Storage story (section récit de stockage, Agent cleanup M1) -->
+    <string name="org_story_ledger">Photos %1$s · Vidéos %2$s · Captures %3$s</string>
+    <string name="org_story_stale_screenshots">%1$d captures de plus d\'un an · %2$s</string>
+    <string name="org_story_last_analysis">Dernière analyse : %1$s</string>
+    <string name="org_story_analyze_now">Analyser</string>
+    <string name="org_story_app_noise">Médias d\'apps de chat et réseaux · %1$s</string>
+    <string name="org_source_camera">Appareil photo</string>
+    <string name="org_source_wechat">WeChat</string>
+    <string name="org_source_qq">QQ</string>
+    <string name="org_source_whatsapp">WhatsApp</string>
+    <string name="org_source_telegram">Telegram</string>
+    <string name="org_source_instagram">Instagram</string>
+    <string name="org_source_messenger">Messenger</string>
+    <string name="org_source_download">Téléchargements</string>
+    <string name="org_source_screenshots">Captures</string>
+    <string name="org_source_other">Autres</string>
+
     <!-- Swipe review（F2 page de tri rapide par gestes） -->
     <string name="swipe_title">Tri rapide</string>
     <string name="swipe_progress">%1$d / %2$d</string>

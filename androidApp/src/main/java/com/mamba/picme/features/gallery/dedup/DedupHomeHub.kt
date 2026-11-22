@@ -1,5 +1,6 @@
 package com.mamba.picme.features.gallery.dedup
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,6 +36,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,20 +62,27 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.mamba.picme.R
+import com.mamba.picme.core.common.FormatBytes
 import com.mamba.picme.core.designsystem.AppShapes
 import com.mamba.picme.core.designsystem.ChatBubbleTokens
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.DedupScanConfig
+import com.mamba.picme.domain.dedup.DedupScanState
 import com.mamba.picme.domain.dedup.KeepPolicy
+import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.CategoryBoard
 import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.SignalCoverage
+import com.mamba.picme.domain.organize.SourceTier
+import com.mamba.picme.domain.organize.StorageStory
+import com.mamba.picme.domain.organize.defaultTier
 import com.mamba.picme.domain.swipe.SwipeMonth
 import com.mamba.picme.domain.swipe.SwipeMonths
 import com.mamba.picme.features.gallery.organize.organizeCategoryIcon
 import com.mamba.picme.features.gallery.organize.organizeCategoryLabelRes
 import com.mamba.picme.features.gallery.swipe.swipeMonthLabel
+import com.mamba.picme.service.dedup.DedupScanService
 
 /** 品牌渐变（青玉）：hub 大数字 / 主按钮同源（与 tagcontrol 设计稿同一口径）。 */
 private val orgBrandGradient: Brush
@@ -92,7 +101,8 @@ private val orgBrandGradient: Brush
  * 初值），此时 Hero 与类目卡不渲染，避免 0B 假数据。
  *
  * 布局结构自上而下：
- * Hero 卡 → 渐变主按钮 → Categories 分组标题 → 重复卡（可展开）→ 类目卡 → 隐私 caption。
+ * Hero 卡 → 存储叙事区（Agent 清理 M1，story 未加载不渲染）→ 渐变主按钮 → Categories 分组标题 →
+ * 重复卡（可展开）→ 类目卡 → 隐私 caption。
  */
 @Composable
 fun DedupHubContent(
@@ -100,12 +110,15 @@ fun DedupHubContent(
     policy: KeepPolicy,
     board: OrganizeBoard,
     swipeMonths: List<SwipeMonth>,
+    storageStory: StorageStory?,
+    preAnalysisRanAt: Long,
     onQuickTidy: () -> Unit,
     onOpenMonthReview: (Long) -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
     onOpenScan: () -> Unit,
     onStartScan: (DedupScanConfig) -> Unit,
     onOpenKeepRules: () -> Unit,
+    onAnalyzeNow: () -> Unit,
 ) {
     var dedupExpanded by rememberSaveable { mutableStateOf(false) }
     // 看板未加载（stateIn 初值空列表）：Hero 与类目卡不渲染，防 0B 假 Hero
@@ -125,6 +138,16 @@ fun DedupHubContent(
     ) {
         if (boardLoaded) {
             OrgHeroCard(board = board)
+        }
+
+        // 存储叙事区（Agent 清理 M1）：boardLoaded 同款守卫，null = stateIn 初值未加载不渲染
+        if (storageStory != null) {
+            StorageStorySection(
+                story = storageStory,
+                preAnalysisRanAt = preAnalysisRanAt,
+                onOpenCategory = onOpenCategory,
+                onAnalyzeNow = onAnalyzeNow,
+            )
         }
 
         // 「滑动整理」(Swipe to tidy) 渐变主按钮（F2 已点亮：onQuickTidy 经 MainPagerHost 接 swipe_review 路由）
@@ -303,6 +326,158 @@ private fun OrgHeroCard(board: OrganizeBoard) {
             }
         }
     }
+}
+
+/**
+ * 存储叙事区（Agent 清理 M1）：总账行（照片/视频/截图字节）→ 来源账 Top3（bytes 降序，
+ * OTHER 不展示）→ 建议行（过期截图可点进 SCREEN_CONTENT 类目；LOW_VALUE 档来源账
+ * M1 纯展示，不进详情——方案面属 M2）→ 新鲜度行（上次分析相对时间 + 「立即分析」
+ * 手动入口，去重扫描活性时禁用）。数据口径 = StorageStory（与 hub 看板共享一次 board() 计算）。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StorageStorySection(
+    story: StorageStory,
+    preAnalysisRanAt: Long,
+    onOpenCategory: (OrganizeCategory) -> Unit,
+    onAnalyzeNow: () -> Unit,
+) {
+    val sessionProgress by DedupScanService.sessionProgress.collectAsState()
+    val dedupScanActive = when (sessionProgress?.state) {
+        DedupScanState.RUNNING, DedupScanState.PAUSED -> true
+        else -> false
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = AppShapes.lg,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // 总账行：照片 · 视频 · 截图（视频只统计不出建议，口径见 StorageStory）
+            Text(
+                text = stringResource(
+                    R.string.org_story_ledger,
+                    FormatBytes.format(story.photoBytes),
+                    FormatBytes.format(story.videoBytes),
+                    FormatBytes.format(story.screenshotBytes),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            // 来源账 Top3：bytes 降序取前 3（sourceLedgers 已排序），OTHER 不展示
+            val topSources = story.sourceLedgers
+                .filter { ledger -> ledger.source != AppSource.OTHER }
+                .take(STORY_SOURCE_TOP_N)
+            if (topSources.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    topSources.forEach { ledger ->
+                        Text(
+                            text = stringResource(appSourceLabelRes(ledger.source)) + " " +
+                                FormatBytes.format(ledger.bytes),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+            }
+            // 建议行 1（冗余确定性序更高）：过期截图 → SCREEN_CONTENT 类目详情
+            if (story.staleScreenshotCount > 0) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenCategory(OrganizeCategory.SCREEN_CONTENT) },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.org_story_stale_screenshots,
+                            story.staleScreenshotCount,
+                            FormatBytes.format(story.staleScreenshotBytes),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            // 建议行 2：LOW_VALUE 档来源账（IM 六家转存合计），M1 纯展示不进详情
+            val lowValueBytes = story.sourceLedgers
+                .filter { ledger -> ledger.source.defaultTier == SourceTier.LOW_VALUE }
+                .sumOf { ledger -> ledger.bytes }
+            if (lowValueBytes > 0) {
+                Text(
+                    text = stringResource(
+                        R.string.org_story_app_noise,
+                        FormatBytes.format(lowValueBytes)
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 新鲜度行：上次分析相对时间（0 = 从未，只留右侧手动入口）+「立即分析」
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (preAnalysisRanAt > 0) {
+                    Text(
+                        text = stringResource(
+                            R.string.org_story_last_analysis,
+                            DateUtils.getRelativeTimeSpanString(preAnalysisRanAt).toString(),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                TextButton(
+                    onClick = onAnalyzeNow,
+                    enabled = !dedupScanActive
+                ) {
+                    Text(stringResource(R.string.org_story_analyze_now))
+                }
+            }
+        }
+    }
+}
+
+/** 来源账 Top3 展示条数（bytes 降序截断）。 */
+private const val STORY_SOURCE_TOP_N = 3
+
+/** 来源名五语映射（叙事区来源账徽标行；OTHER 无条目不进映射）。 */
+private fun appSourceLabelRes(source: AppSource): Int = when (source) {
+    AppSource.CAMERA -> R.string.org_source_camera
+    AppSource.WECHAT -> R.string.org_source_wechat
+    AppSource.QQ -> R.string.org_source_qq
+    AppSource.WHATSAPP -> R.string.org_source_whatsapp
+    AppSource.TELEGRAM -> R.string.org_source_telegram
+    AppSource.INSTAGRAM -> R.string.org_source_instagram
+    AppSource.MESSENGER -> R.string.org_source_messenger
+    AppSource.DOWNLOAD -> R.string.org_source_download
+    AppSource.SCREENSHOTS -> R.string.org_source_screenshots
+    AppSource.OTHER -> R.string.org_source_other
 }
 
 /**

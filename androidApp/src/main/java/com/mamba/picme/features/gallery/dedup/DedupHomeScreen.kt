@@ -94,6 +94,8 @@ fun DedupHomeRoute(
     onOpenCategory: (OrganizeCategory) -> Unit = {},
     /** hub 引导态类目卡点击：切到合并页 SCAN tab（embedded 模式由 OrganizeHomeRoute 注入 tab 切换）。 */
     onOpenScan: () -> Unit = {},
+    /** hub 存储叙事区「立即分析」手动入口（Agent 清理 M1：MainActivity 注入 preAnalysisScheduler.runNow）。 */
+    onAnalyzeNow: () -> Unit = {},
     /** 嵌入整理+扫描合并页（OrganizeHomeRoute）时为 true：顶栏不再内置状态栏避让（外层胶囊条统一避让）。 */
     embedded: Boolean = false,
 ) {
@@ -197,17 +199,22 @@ fun DedupHomeRoute(
                     // 全量 Room+MediaStore 合并聚合
                     val board by viewModel.organizeBoard.collectAsState()
                     val swipeMonths by viewModel.swipeMonths.collectAsState()
+                    val storageStory by viewModel.storageStory.collectAsState()
+                    val preAnalysisRanAt by viewModel.preAnalysisRanAt.collectAsState()
                     DedupHubContent(
                         config = state.config,
                         policy = policy,
                         board = board,
                         swipeMonths = swipeMonths,
+                        storageStory = storageStory,
+                        preAnalysisRanAt = preAnalysisRanAt,
                         onQuickTidy = onQuickTidy,
                         onOpenMonthReview = onOpenMonthReview,
                         onOpenCategory = onOpenCategory,
                         onOpenScan = onOpenScan,
                         onStartScan = { config -> viewModel.startScan(config) },
                         onOpenKeepRules = { showKeepRules = true },
+                        onAnalyzeNow = onAnalyzeNow,
                     )
                 }
                 is DedupUiState.Scanning -> DedupScanningContent(
