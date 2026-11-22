@@ -896,7 +896,7 @@ class AppContainerImpl(
                         "pause" -> dedupScanSession.pauseScan()
                         "resume" -> dedupScanSession.resumeScan()
                         "cancel" -> dedupScanSession.cancelScan()
-                        else -> Logger.w("AppContainer", "unknown dedup scan control action: $action")
+                        else -> Logger.w("PoLang:UserTask", "unknown dedup scan control action: $action")
                     }
                 },
                 scope = userTaskScope,

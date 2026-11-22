@@ -23,12 +23,12 @@ class TagScanTaskAdapterTest {
     private class FakeDao : UserTaskDao {
         val rows = MutableStateFlow<List<UserTaskEntity>>(emptyList())
         override suspend fun upsert(task: UserTaskEntity) {
-            rows.value = rows.value.filterNot { it.id == task.id } + task
+            rows.value = rows.value.filterNot { row -> row.id == task.id } + task
         }
         override fun observeAll(): Flow<List<UserTaskEntity>> = rows
-        override suspend fun getById(id: String): UserTaskEntity? = rows.value.firstOrNull { it.id == id }
+        override suspend fun getById(id: String): UserTaskEntity? = rows.value.firstOrNull { row -> row.id == id }
         override suspend fun activeIdsOfKind(kind: String): List<String> =
-            rows.value.filter { it.kind == kind && it.status in setOf("PENDING", "RUNNING", "PAUSED") }.map { it.id }
+            rows.value.filter { row -> row.kind == kind && row.status in setOf("PENDING", "RUNNING", "PAUSED") }.map { row -> row.id }
         override suspend fun trimHistory(keep: Int) = Unit
     }
 

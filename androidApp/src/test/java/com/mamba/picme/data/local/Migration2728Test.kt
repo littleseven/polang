@@ -3,6 +3,7 @@ package com.mamba.picme.data.local
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import com.mamba.picme.agent.core.model.context.MediaType
 import com.mamba.picme.data.local.entity.ChatImageCacheEntity
@@ -169,7 +170,7 @@ class Migration2728Test {
         }
     }
 
-    private fun queryLong(db: androidx.sqlite.db.SupportSQLiteDatabase, sql: String): Long {
+    private fun queryLong(db: SupportSQLiteDatabase, sql: String): Long {
         db.query(sql).use { cursor ->
             assertTrue(cursor.moveToFirst())
             return cursor.getLong(0)
