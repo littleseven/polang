@@ -480,6 +480,10 @@
     <string name="org_section_review">À vérifier (%1$d)</string>
     <string name="org_section_protected">Probablement précieuses (%1$d)</string>
     <string name="org_protected_badge">Photo probablement précieuse</string>
+    <string name="org_protect_old_photo">Ancienne photo</string>
+    <string name="org_protect_scarce_person">Personne rare</string>
+    <string name="org_protect_user_engaged">Vue ou mise en favori</string>
+    <string name="org_protect_sensitive_screenshot">Capture d\'écran sensible</string>
 
     <!-- Storage story (section récit de stockage, Agent cleanup M1) -->
     <string name="org_story_ledger">Photos %1$s · Vidéos %2$s · Captures %3$s</string>

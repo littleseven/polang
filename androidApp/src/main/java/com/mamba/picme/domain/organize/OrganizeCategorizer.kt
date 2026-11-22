@@ -18,7 +18,7 @@ object OrganizeCategorizer {
             ClassifiedItem(
                 item = item,
                 category = category,
-                confidence = ConfidenceGrader.grade(item, category),
+                confidence = ConfidenceGrader.grade(item, category, now),
                 protectReasons = verdict.reasons,
             )
         }

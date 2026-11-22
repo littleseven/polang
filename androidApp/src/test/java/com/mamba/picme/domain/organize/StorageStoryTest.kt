@@ -76,6 +76,30 @@ class StorageStoryTest {
     }
 
     @Test
+    fun `stale screenshots exclude protected importance tiers`() {
+        val old = NOW - 400L * 24 * 3600 * 1000
+        val items = listOf(
+            // 保护档（金融包名）：过期也不计入建议口径
+            item(
+                "fin-shot", size = 10, path = "Pictures/Screenshots", captureDate = old,
+                fileName = "Screenshot_x_cn.futu.trader.jpg",
+            ),
+            // 低价值（美团包名）：过期照常计入（建议删除候选）
+            item(
+                "low-shot", size = 10, path = "Pictures/Screenshots", captureDate = old,
+                fileName = "Screenshot_x_com.sankuai.meituan.jpg",
+            ),
+            // 无信号：照常计入
+            item("plain-shot", size = 10, path = "Pictures/Screenshots", captureDate = old),
+        )
+        val story = StorageStory.of(items, emptyBoard(), now = NOW)
+        assertEquals(2, story.staleScreenshotCount)
+        assertEquals(20L, story.staleScreenshotBytes)
+        // screenshotBytes 口径 = 全部截图（含保护档，总账展示不含保护剔除）
+        assertEquals(30L, story.screenshotBytes)
+    }
+
+    @Test
     fun `zero size and empty inputs do not crash`() {
         val story = StorageStory.of(listOf(item("x", size = 0, path = null)), emptyBoard(), NOW)
         assertEquals(0L, story.totalBytes)
@@ -92,6 +116,7 @@ class StorageStoryTest {
         size: Long,
         path: String?,
         captureDate: Long = NOW,
+        fileName: String? = null,
     ): OrganizeItem = OrganizeItem(
         uri = "content://media/external/$name",
         isVideo = isVideo,
@@ -104,6 +129,7 @@ class StorageStoryTest {
         hasFace = false,
         aestheticScore = null,
         faceQualityScore = null,
+        displayName = fileName,
     )
 
     private fun emptyBoard(): OrganizeBoard = OrganizeBoard(

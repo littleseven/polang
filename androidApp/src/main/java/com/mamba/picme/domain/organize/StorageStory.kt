@@ -15,7 +15,7 @@ data class StorageStory(
     val videoBytes: Long,
     /** 全部截图（含录屏）。 */
     val screenshotBytes: Long,
-    /** ≥ 365 天的截图张数（仅照片，录屏不算）。 */
+    /** ≥ 365 天的截图张数（仅照片，录屏不算；剔除重要度保护档——建议行只推可删的，Task 7.6）。 */
     val staleScreenshotCount: Int,
     val staleScreenshotBytes: Long,
     /** 来源账目，bytes 降序（不过滤 CAMERA——「相机占多少」也是叙事；未识别来源并卷 OTHER）。 */
@@ -31,7 +31,9 @@ data class StorageStory(
             val bySource = items.groupBy { item -> appSourceOf(item.relativePath) }
             val screenshots = bySource[AppSource.SCREENSHOTS].orEmpty()
             val staleScreenshots = screenshots.filter { item ->
-                !item.isVideo && item.captureDate > 0 && now - item.captureDate >= STALE_SCREENSHOT_AGE_MS
+                !item.isVideo && item.captureDate > 0 && now - item.captureDate >= STALE_SCREENSHOT_AGE_MS &&
+                    // 建议行只推可删的：重要度保护档（金融/医疗/政务）剔除（Task 7.6）
+                    !screenshotImportanceOf(item).isProtectedTier
             }
             val lowQualityBytes = board.categories
                 .filter { card ->

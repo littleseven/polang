@@ -45,13 +45,15 @@ data class OrganizeItem(
     val similarDupGroupSize: Int = 0,
     /** 精确组标识（组内共享 MD5，仅 exactDupGroupSize ≥ 2 时非空）；hub 聚合按组扣 keeper 用。 */
     val exactDupGroupKey: String? = null,
+    /** 文件名（Room `fileName` 列穿透）；截图重要度分级（screenshotImportanceOf）包名解析主信号。 */
+    val displayName: String? = null,
 )
 
 /** 置信度分级（详情页三段分组 + 预选口径）。 */
 enum class OrganizeConfidence { HIGH, MEDIUM, LOW }
 
 /** 价值保护原因（详情页角标文案键）。 */
-enum class ProtectReason { OLD_PHOTO, SCARCE_PERSON, USER_ENGAGED }
+enum class ProtectReason { OLD_PHOTO, SCARCE_PERSON, USER_ENGAGED, SENSITIVE_SCREENSHOT }
 
 /** 管线产出：单媒体裁定结果。 */
 data class ClassifiedItem(

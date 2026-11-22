@@ -4,17 +4,18 @@ package com.mamba.picme.domain.organize
  * 置信度分级（纯函数）：决定详情页三段分组与默认勾选口径。
  * HIGH = 强信号命中（默认勾选）；MEDIUM = 单信号接近阈值（仅列出）；
  * LOW = 弱信号（美学分等辅助信号单独命中）。
- * 前置：item 已经 CategoryArbiter 裁定入 [category]，本层只评估信号强度。
+ * 前置：item 已经 CategoryArbiter 裁定入 [category]，本层只评估信号强度；
+ * [now] 注入（截图档「过期」判定）保证测试确定性。
  */
 object ConfidenceGrader {
 
-    fun grade(item: OrganizeItem, category: OrganizeCategory): OrganizeConfidence =
+    fun grade(item: OrganizeItem, category: OrganizeCategory, now: Long): OrganizeConfidence =
         when (category) {
             OrganizeCategory.DUPLICATES ->
                 if (item.exactDupGroupSize >= 2) OrganizeConfidence.HIGH else OrganizeConfidence.MEDIUM
 
-            // 路径判定为确定性强信号
-            OrganizeCategory.SCREEN_CONTENT -> OrganizeConfidence.HIGH
+            // 路径判定为确定性强信号；重要度分级（Task 7.6）细分见 gradeScreenContent
+            OrganizeCategory.SCREEN_CONTENT -> gradeScreenContent(item, now)
 
             OrganizeCategory.DOCUMENTS -> gradeDocument(item)
 
@@ -35,6 +36,25 @@ object ConfidenceGrader {
                 } else {
                     OrganizeConfidence.MEDIUM
                 }
+        }
+
+    /**
+     * 截图重要度分级（Task 7.6）：NEUTRAL 无信号 → 恒 HIGH（路径判定确定性，既有行为）；
+     * LOW_VALUE → 过期（≥ [StorageStory.STALE_SCREENSHOT_AGE_MS]，与 hub 建议行同口径；
+     * captureDate = 0 未知保守不判过期）升 HIGH，否则 MEDIUM；保护档 → MEDIUM
+     * （不建议删除，保护区口径由 ValueGuard 承接）。
+     */
+    private fun gradeScreenContent(item: OrganizeItem, now: Long): OrganizeConfidence =
+        when (screenshotImportanceOf(item)) {
+            ScreenshotImportance.Neutral -> OrganizeConfidence.HIGH
+            is ScreenshotImportance.LowValue ->
+                if (item.captureDate > 0 && now - item.captureDate >= StorageStory.STALE_SCREENSHOT_AGE_MS) {
+                    OrganizeConfidence.HIGH
+                } else {
+                    OrganizeConfidence.MEDIUM
+                }
+            // 保护档三值（金融/医疗/政务）
+            else -> OrganizeConfidence.MEDIUM
         }
 
     /** OCR 强命中（≥2×密度阈值）HIGH；OCR 命中或仅标签命中 MEDIUM。 */

@@ -63,16 +63,26 @@ pipeline:
       signals: "视频 ≥ 100 MiB；或照片像素面积 ≥ 50MP 且大小 ≥ 20MB（两条件同时满足）"
       video_allowed: true
   confidence:                          # ConfidenceGrader：决定三段分组与预选
-    HIGH: "强信号命中 → 默认勾选（建议删除段）。各类目定义：DUPLICATES=精确组成员；SCREEN_CONTENT=恒 HIGH（路径判定为确定性信号）；DOCUMENTS=OCR 密度 ≥ 2×裁定阈值；LOW_QUALITY_PORTRAITS=faceQualityScore < 0.175（0.35×0.5 强命中系数）；LOW_QUALITY_PHOTOS=blurScore < 50.0（100×0.5）；LARGE_FILES=大小 ≥ 2×主阈值"
-    MEDIUM: "单信号命中接近阈值：DUPLICATES=仅相似组成员；DOCUMENTS=OCR 命中未达 2× 或仅 labels 命中；低质两类=边界命中；LARGE_FILES=达主阈值未达 2×"
+    HIGH: "强信号命中 → 默认勾选（建议删除段）。各类目定义：DUPLICATES=精确组成员；SCREEN_CONTENT=screenshot_importance 为 NEUTRAL，或 LOW_VALUE 且 captureDate ≥365 天前（Task 7.6；路径判定为确定性信号）；DOCUMENTS=OCR 密度 ≥ 2×裁定阈值；LOW_QUALITY_PORTRAITS=faceQualityScore < 0.175（0.35×0.5 强命中系数）；LOW_QUALITY_PHOTOS=blurScore < 50.0（100×0.5）；LARGE_FILES=大小 ≥ 2×主阈值"
+    MEDIUM: "单信号命中接近阈值：DUPLICATES=仅相似组成员；SCREEN_CONTENT=LOW_VALUE 未过期/未知时间戳、或重要度保护档（不建议删除，保护区口径由 ValueGuard 承接）；DOCUMENTS=OCR 命中未达 2× 或仅 labels 命中；低质两类=边界命中；LARGE_FILES=达主阈值未达 2×"
     LOW: "弱信号（防御性兜底：信号全 null 等异常输入落最低档；正常管线不可达，arbiter 不定类 NIMA-only 项——NIMA 未接入管线）"
-  value_guard:                         # 价值保护：仅 LOW_QUALITY_PHOTOS / LOW_QUALITY_PORTRAITS 生效
-    scope: [LOW_QUALITY_PHOTOS, LOW_QUALITY_PORTRAITS]
+  value_guard:                         # 价值保护：低质两类三规则 + SCREEN_CONTENT 敏感截图规则（Task 7.6）
     rules:
-      - { reason: OLD_PHOTO,     rule: "captureDate < now − 5 年（captureDate=0 未知时间戳恒判老照片，保守偏置有意为之）" }
-      - { reason: SCARCE_PERSON, rule: "所属人物聚类照片总数 ∈ 1..3（0=异常数据视为无信号；null=无人脸不参与）" }
-      - { reason: USER_ENGAGED,  rule: "isFavorite（MediaStore，API 29+）或 lastViewedAt ≠ null（查看器打开过）" }
+      - { reason: OLD_PHOTO,           scope: [LOW_QUALITY_PHOTOS, LOW_QUALITY_PORTRAITS], rule: "captureDate < now − 5 年（captureDate=0 未知时间戳恒判老照片，保守偏置有意为之）" }
+      - { reason: SCARCE_PERSON,       scope: [LOW_QUALITY_PHOTOS, LOW_QUALITY_PORTRAITS], rule: "所属人物聚类照片总数 ∈ 1..3（0=异常数据视为无信号；null=无人脸不参与）" }
+      - { reason: USER_ENGAGED,        scope: [LOW_QUALITY_PHOTOS, LOW_QUALITY_PORTRAITS], rule: "isFavorite（MediaStore，API 29+）或 lastViewedAt ≠ null（查看器打开过）" }
+      - { reason: SENSITIVE_SCREENSHOT, scope: [SCREEN_CONTENT], rule: "screenshot_importance 命中保护档（PROTECTED_FINANCE/HEALTH/GOV，文件名包名 + OCR 关键词双信号）；低质三规则不扩大到截图（保护规则整体演进属 M2）" }
     effect: "protected=true → 不默认勾选（含显式全选）、不计入 Hero、排详情页保护区、带盾牌角标；仍计入类目浏览总数"
+  screenshot_importance:               # Task 7.6 截图重要度分级（ScreenshotImportance.kt SSOT；词表校准只改那里）
+    scope: "appSourceOf(relativePath) == SCREENSHOTS，非截图恒 NEUTRAL"
+    signal_priority: "文件名尾段包名（MIUI Screenshot_..._<package>.jpg，含 -edit_ 编辑变体；前缀匹配 + 大小写不敏感）> ocrText 关键词兜底；两信号冲突保护档优先"
+    tiers:
+      PROTECTED_FINANCE: { packages: "com.icbc / com.chinamworld.main / com.android.bankabc / com.chinamworld.bocmbci / cmb.pb / com.cmbchina / com.bankcomm / com.unionpay / com.eg.android.alipaygphone / cn.futu.trader / com.hexin.plat.android", ocr_keywords: "银行 / 转账 / 汇款" }
+      PROTECTED_HEALTH:  { packages: "com.haodf.android", ocr_keywords: "挂号 / 病历 / 处方 / 医保" }
+      PROTECTED_GOV:     { packages: "com.tmri.app.main", ocr_keywords: "身份证 / 护照" }
+      LOW_VALUE:         { packages: "com.sankuai.meituan / me.ele.android.eleme / com.taobao.taobao / com.tmall.wireless / com.jingdong.app.mall / com.xunmeng.pinduoduo / com.dianping.v1", ocr_keywords: "外卖 / 满减 / 淘宝 / 拼多多" }
+      NEUTRAL: "无信号（包名与 OCR 均未命中）"
+    wiring: "ValueGuard → SENSITIVE_SCREENSHOT（保护区）；ConfidenceGrader → NEUTRAL 恒 HIGH、LOW_VALUE 且 ≥365 天 HIGH（captureDate=0 保守不判过期）、其余 MEDIUM；StorageStory staleScreenshot 口径剔除保护档"
   hero_formula: "Estimated reclaimable = 全类目 HIGH 且非 protected 项的并集字节（互斥裁定保证天然去重）；DUPLICATES 额外按精确组扣 1 张 keeper 字节（组全员进建议集才扣，扣组内最大 sizeBytes）——与去重结果页 reclaimBytes 口径一致"
   thresholds_ssot: OrganizeThresholds  # object，校准只改这里
 
@@ -147,7 +157,7 @@ hub:
       row_tap_action: open_source_detail(source)
       icon_map: "camera→photo_camera · IM 六家→forum · download→download · screenshots→screenshot_monitor · other→apps（OrganizeResources.appSourceIcon SSOT）"
     suggestion_stale_screenshots:       # 建议行 1（冗余确定性序更高）：过期截图，可点
-      show_when: "staleScreenshotCount > 0（≥365 天截图张数，仅照片不含录屏）"
+      show_when: "staleScreenshotCount > 0（≥365 天截图张数，仅照片不含录屏，剔除 screenshot_importance 保护档——只推可删的）"
       text_key: org_story_stale_screenshots   # "N 张一年前截图 · X"
       font: bodySmall
       color: primary
@@ -539,6 +549,8 @@ i18n_keys:
   # 注：org_hero_across 为 plurals 资源（one/other），其余为 string
   category_grid: [org_ai_preselect_on, org_ai_preselect_off, org_ai_preselected,
                   org_section_suggested, org_section_review, org_section_protected, org_protected_badge,
+                  org_protect_old_photo, org_protect_scarce_person, org_protect_user_engaged,
+                  org_protect_sensitive_screenshot,
                   org_move_to_trash, org_trash_note, org_empty_category, org_partial_trash, org_trash_unsupported]
   source_grid: [org_source_detail_title, org_section_all_media, org_section_protected,
                 org_sources_view_all, org_sources_collapse, org_sources_title,

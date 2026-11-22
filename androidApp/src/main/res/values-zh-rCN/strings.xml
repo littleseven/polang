@@ -476,6 +476,10 @@
     <string name="org_section_review">请确认（%1$d）</string>
     <string name="org_section_protected">可能是珍贵照片（%1$d）</string>
     <string name="org_protected_badge">可能是珍贵照片</string>
+    <string name="org_protect_old_photo">老照片</string>
+    <string name="org_protect_scarce_person">稀缺人物</string>
+    <string name="org_protect_user_engaged">查看或收藏过</string>
+    <string name="org_protect_sensitive_screenshot">敏感截图</string>
 
     <!-- Storage story（存储叙事区，Agent 清理 M1） -->
     <string name="org_story_ledger">照片 %1$s · 视频 %2$s · 截图 %3$s</string>

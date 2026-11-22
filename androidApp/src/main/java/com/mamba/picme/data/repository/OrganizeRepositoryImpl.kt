@@ -81,6 +81,7 @@ class OrganizeRepositoryImpl(
                 sizeBytes = row.sizeBytes ?: meta?.sizeBytes ?: 0L,
                 relativePath = row.relativePath ?: meta?.path,
                 ocrText = row.ocrText,
+                displayName = row.fileName,
                 pixelArea = pixelAreaByUri[row.uri] ?: meta?.pixelArea,
                 labels = row.labels,
                 hasFace = row.hasFace,

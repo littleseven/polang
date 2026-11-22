@@ -493,6 +493,10 @@
     <string name="org_section_review">Review (%1$d)</string>
     <string name="org_section_protected">Likely precious (%1$d)</string>
     <string name="org_protected_badge">Possibly precious photo</string>
+    <string name="org_protect_old_photo">Old photo</string>
+    <string name="org_protect_scarce_person">Rare person</string>
+    <string name="org_protect_user_engaged">Opened or favorited</string>
+    <string name="org_protect_sensitive_screenshot">Sensitive screenshot</string>
 
     <!-- Storage story（存储叙事区，Agent 清理 M1） -->
     <string name="org_story_ledger">Photos %1$s · Videos %2$s · Screenshots %3$s</string>

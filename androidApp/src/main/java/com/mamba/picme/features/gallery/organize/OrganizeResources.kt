@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.mamba.picme.R
 import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.OrganizeCategory
+import com.mamba.picme.domain.organize.ProtectReason
 
 /**
  * 整理中心 v2 类目 → 资源映射（hub 类目卡 + 详情页顶栏同源共享）。
@@ -69,4 +70,12 @@ fun appSourceIcon(source: AppSource): ImageVector = when (source) {
     AppSource.DOWNLOAD -> Icons.Rounded.Download
     AppSource.SCREENSHOTS -> Icons.Outlined.ScreenshotMonitor
     AppSource.OTHER -> Icons.Rounded.Apps
+}
+
+/** 保护原因 → 文案映射（详情页保护区 label；Task 7.6 五语同步）。 */
+fun protectReasonLabelRes(reason: ProtectReason): Int = when (reason) {
+    ProtectReason.OLD_PHOTO -> R.string.org_protect_old_photo
+    ProtectReason.SCARCE_PERSON -> R.string.org_protect_scarce_person
+    ProtectReason.USER_ENGAGED -> R.string.org_protect_user_engaged
+    ProtectReason.SENSITIVE_SCREENSHOT -> R.string.org_protect_sensitive_screenshot
 }

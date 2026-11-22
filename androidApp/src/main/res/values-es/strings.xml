@@ -480,6 +480,10 @@
     <string name="org_section_review">Revisar (%1$d)</string>
     <string name="org_section_protected">Posiblemente valiosas (%1$d)</string>
     <string name="org_protected_badge">Foto posiblemente valiosa</string>
+    <string name="org_protect_old_photo">Foto antigua</string>
+    <string name="org_protect_scarce_person">Persona poco frecuente</string>
+    <string name="org_protect_user_engaged">Vista o marcada como favorita</string>
+    <string name="org_protect_sensitive_screenshot">Captura de pantalla sensible</string>
 
     <!-- Storage story (sección de narrativa de almacenamiento, Agent cleanup M1) -->
     <string name="org_story_ledger">Fotos %1$s · Vídeos %2$s · Capturas %3$s</string>

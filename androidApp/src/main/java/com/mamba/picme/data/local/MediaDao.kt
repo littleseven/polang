@@ -470,7 +470,7 @@ interface MediaDao {
      * type 列存枚举名（Room 内建 enum 转换），投影按 String 读。
      */
     @Query(
-        "SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, " +
+        "SELECT uri, type, captureDate, fileName, ocrText, labels, hasFace, aestheticScore, " +
             "faceQualityScore, blurScore, exposureScore, lastViewedAt, faceId, " +
             "relativePath, sizeBytes FROM media_assets"
     )
@@ -778,6 +778,7 @@ data class OrganizeRow(
     val uri: String,
     val type: String,
     val captureDate: Long,
+    val fileName: String?,
     val ocrText: String?,
     val labels: String?,
     val hasFace: Boolean,
