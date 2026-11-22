@@ -47,8 +47,12 @@ class AppSourceTest {
     @Test
     fun `qq and messenger are low value sources`() {
         assertEquals(AppSource.QQ, appSourceOf("Pictures/QQ Images"))
+        // QQ 双关键词另一翼：scoped storage 形态
+        assertEquals(AppSource.QQ, appSourceOf("Android/media/com.tencent.mobileqq/MobileQQ/download"))
         assertEquals(SourceTier.LOW_VALUE, AppSource.QQ.defaultTier)
         assertEquals(AppSource.MESSENGER, appSourceOf("Android/media/com.facebook.orca"))
+        // MESSENGER 裸关键词（对称另一翼）
+        assertEquals(AppSource.MESSENGER, appSourceOf("Pictures/Messenger"))
         assertEquals(SourceTier.LOW_VALUE, AppSource.MESSENGER.defaultTier)
     }
 

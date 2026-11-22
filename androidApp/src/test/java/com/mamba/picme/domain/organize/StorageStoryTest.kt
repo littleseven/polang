@@ -31,14 +31,21 @@ class StorageStoryTest {
     @Test
     fun `stale screenshots count photos older than 365 days only`() {
         val old = NOW - 400L * 24 * 3600 * 1000
+        val exactlyOneYear = NOW - StorageStory.STALE_SCREENSHOT_AGE_MS
         val items = listOf(
             item("old-shot", isVideo = false, size = 10, path = "Pictures/Screenshots", captureDate = old),
             item("new-shot", isVideo = false, size = 10, path = "Pictures/Screenshots", captureDate = NOW),
             item("old-video", isVideo = true, size = 10, path = "Pictures/Screenshots", captureDate = old),
+            // 恰 365 天：`>=` 含端，计入 stale
+            item("edge-shot", isVideo = false, size = 10, path = "Pictures/Screenshots", captureDate = exactlyOneYear),
+            // captureDate=0（未知时间）：不被当作 1970 年老图计入 stale
+            item("unknown-date-shot", isVideo = false, size = 10, path = "Pictures/Screenshots", captureDate = 0),
         )
         val story = StorageStory.of(items, emptyBoard(), now = NOW)
-        assertEquals(1, story.staleScreenshotCount)
-        assertEquals(10L, story.staleScreenshotBytes)
+        assertEquals(2, story.staleScreenshotCount)
+        assertEquals(20L, story.staleScreenshotBytes)
+        // screenshotBytes 口径 = 全部截图（含录屏），与 stale「仅照片」分野
+        assertEquals(50L, story.screenshotBytes)
     }
 
     @Test
@@ -53,6 +60,19 @@ class StorageStoryTest {
             heroReviewCount = 0,
         )
         assertEquals(500L, StorageStory.of(emptyList(), board, NOW).reclaimBytes)
+    }
+
+    @Test
+    fun `reclaim is clamped to zero when low quality bytes exceed hero`() {
+        val board = OrganizeBoard(
+            categories = listOf(
+                card(OrganizeCategory.LOW_QUALITY_PHOTOS, highBytes = 300),
+                card(OrganizeCategory.LOW_QUALITY_PORTRAITS, highBytes = 200),
+            ),
+            heroReclaimBytes = 100L,
+            heroReviewCount = 0,
+        )
+        assertEquals(0L, StorageStory.of(emptyList(), board, NOW).reclaimBytes)
     }
 
     @Test

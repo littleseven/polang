@@ -1,5 +1,7 @@
 package com.mamba.picme.domain.organize
 
+import java.util.Locale
+
 /**
  * 媒体来源 App（Agent 清理 M1）：按存储路径关键词判定产图 App，
  * 供存储空间叙事 / 清理预分析按来源聚合。Task 3（StorageStory）消费 `appSourceOf` 与 [defaultTier]。
@@ -46,7 +48,7 @@ val AppSource.defaultTier: SourceTier
  */
 fun appSourceOf(relativePath: String?): AppSource {
     if (relativePath == null) return AppSource.OTHER
-    val path = relativePath.uppercase()
+    val path = relativePath.uppercase(Locale.ROOT)
     return when {
         "SCREENSHOTS" in path || "截屏" in path -> AppSource.SCREENSHOTS
         "DCIM" in path -> AppSource.CAMERA

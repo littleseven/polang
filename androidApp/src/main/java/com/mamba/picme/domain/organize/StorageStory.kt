@@ -28,7 +28,8 @@ data class StorageStory(
         const val STALE_SCREENSHOT_AGE_MS: Long = 365L * 24 * 3600 * 1000
 
         fun of(items: List<OrganizeItem>, board: OrganizeBoard, now: Long): StorageStory {
-            val screenshots = items.filter { item -> appSourceOf(item.relativePath) == AppSource.SCREENSHOTS }
+            val bySource = items.groupBy { item -> appSourceOf(item.relativePath) }
+            val screenshots = bySource[AppSource.SCREENSHOTS].orEmpty()
             val staleScreenshots = screenshots.filter { item ->
                 !item.isVideo && item.captureDate > 0 && now - item.captureDate >= STALE_SCREENSHOT_AGE_MS
             }
@@ -45,15 +46,13 @@ data class StorageStory(
                 screenshotBytes = screenshots.sumOf { item -> item.sizeBytes },
                 staleScreenshotCount = staleScreenshots.size,
                 staleScreenshotBytes = staleScreenshots.sumOf { item -> item.sizeBytes },
-                sourceLedgers = items
-                    .groupBy { item -> appSourceOf(item.relativePath) }
-                    .map { (source, group) ->
-                        SourceLedger(
-                            source = source,
-                            count = group.size,
-                            bytes = group.sumOf { item -> item.sizeBytes },
-                        )
-                    }
+                sourceLedgers = bySource.map { (source, group) ->
+                    SourceLedger(
+                        source = source,
+                        count = group.size,
+                        bytes = group.sumOf { item -> item.sizeBytes },
+                    )
+                }
                     .sortedByDescending { ledger -> ledger.bytes },
                 reclaimBytes = (board.heroReclaimBytes - lowQualityBytes).coerceAtLeast(0L),
             )
