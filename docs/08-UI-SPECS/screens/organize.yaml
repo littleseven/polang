@@ -180,7 +180,7 @@ hub:
         text_key: org_story_analyze_now # "立即分析"
         style: text_button
         disabled_when: "DedupScanService.sessionProgress?.state ∈ {RUNNING, PAUSED}（去重扫描活性）"
-        action: "MainActivity 注入 AppContainer.preAnalysisScheduler.runNowWithCompletion(TRIGGER_MANUAL)；manual 豁免充电/亮屏守卫（Task 7 评审 R-1），仅 TAG 扫描活跃时静默跳过（I/O 互斥）；去重会话活跃时只补元数据不重触发"
+        action: "MainActivity 注入 AppContainer.preAnalysisScheduler.runNowAsync(TRIGGER_MANUAL)；manual 豁免充电/亮屏守卫（Task 7 评审 R-1），仅 TAG 扫描活跃时静默跳过（I/O 互斥）；去重会话活跃时只补元数据不重触发"
 
   # ---- 主按钮 ----
   quick_tidy_button:
@@ -424,7 +424,7 @@ category_grid:
 # 入口：hub 存储叙事区来源账 Top3 chip / 来源列表行（§2 source_top3 / source_list_expanded）
 source_grid:
   data_scope: "appSourceOf(relativePath) == source 的全库快照（OrganizeRepository.loadItems 一次性），按 uri 去重；未入任何类目的媒体也在列——浏览视角非清理管线出口"
-  value_guard: "CategoryArbiter 定类后走 ValueGuard（仅低质两类受保护，未分类媒体无保护信号）——红线不因浏览视角放松：命中保护项排保护区不可选"
+  value_guard: "CategoryArbiter 定类后走 ValueGuard（低质两类 + 截图敏感档 SENSITIVE_SCREENSHOT：screenshotImportanceOf 命中金融/医疗/政务；未分类媒体无保护信号）——红线不因浏览视角放松：命中保护项排保护区不可选"
   states: [loading, ready_grid, empty, cleaned]   # 与 category_grid 同构；empty 复用 org_empty_category
   top_bar:
     type: top_app_bar
