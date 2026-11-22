@@ -35,6 +35,7 @@ import com.mamba.picme.data.remote.picme.WebSearchClient
 import com.mamba.picme.data.repository.MediaMetadataBackfiller
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
+import com.mamba.picme.service.organize.PreAnalysisScheduler
 import com.mamba.picme.domain.memory.MemoryContextProviderImpl
 import com.mamba.picme.agent.core.remote.config.LatestLlmWireTap
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
@@ -144,6 +145,27 @@ class PoLangApplication : Application(), ImageLoaderFactory {
     val feishuChannelHandler: FeishuChannelHandler by lazy { FeishuChannelHandler(applicationScope) }
 
     val telegramChannelHandler: TelegramChannelHandler by lazy { TelegramChannelHandler(applicationScope) }
+
+    /**
+     * media_assets 元数据存量回填器（Agent 清理 M1）：启动回填与后台预分析调度
+     * （Task 6）共享单例；runUntilDone 伴生 Mutex 串行两触发点防重复取数。
+     */
+    val mediaMetadataBackfiller: MediaMetadataBackfiller by lazy {
+        MediaMetadataBackfiller.create(this, container.database.mediaDao())
+    }
+
+    /**
+     * 后台预分析调度器（Agent 清理 M1 Task 6）：充电/每日 03:00 闲时触发链；
+     * 手动入口接缝 = `preAnalysisScheduler.runNow(TRIGGER_MANUAL)`（hub「立即分析」，Task 7 接线）。
+     */
+    val preAnalysisScheduler: PreAnalysisScheduler by lazy {
+        PreAnalysisScheduler(
+            context = this,
+            backfiller = mediaMetadataBackfiller,
+            settingsRepository = container.userPreferencesRepository,
+            scope = applicationScope,
+        )
+    }
 
     /** 单通道管理器：按 selectedRemoteChannel 激活飞书或 Telegram。 */
     val remoteChannelManager: RemoteChannelManager by lazy {
@@ -319,15 +341,16 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         // NULL 的行写回后仍是候选，下次启动重试一轮（批内 attempted 守卫防死循环）。
         applicationScope.launch(Dispatchers.IO) {
             try {
-                val mediaDao = AppDatabase.getDatabase(this@PoLangApplication).mediaDao()
-                val written = MediaMetadataBackfiller
-                    .create(this@PoLangApplication, mediaDao)
-                    .runUntilDone()
+                val written = mediaMetadataBackfiller.runUntilDone()
                 if (written > 0) Logger.i(BACKFILL_TAG, "media metadata backfill done: $written rows")
             } catch (e: Exception) {
                 Logger.w(BACKFILL_TAG, "media metadata backfill failed: ${e.message}")
             }
         }
+
+        // 后台预分析调度（Agent 清理 M1 Task 6）：每日 03:00 闲时闹钟启动即重排；
+        // 插电/闹钟 fire 经 PreAnalysisReceiver 入 runNow（条件守卫 + 链条执行 + ranAt 记录）。
+        preAnalysisScheduler.scheduleDailyAlarm()
 
         // 预配置 AgentOrchestrator 默认远程推理配置
         // gatewayToken 异步从 DataStore 加载（syncRemoteModelConfigToOrchestrator）

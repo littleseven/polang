@@ -8,6 +8,8 @@ import android.provider.MediaStore
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.local.MediaDao
 import com.mamba.picme.data.local.MediaMetaEntry
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * media_assets.relativePath/sizeBytes 存量回填器（Room v29，Agent 清理 M1 数据基础）。
@@ -27,8 +29,12 @@ class MediaMetadataBackfiller(
     private val writer: suspend (batch: List<Pair<String, Pair<String?, Long>>>) -> Unit,
 ) {
 
-    /** 批量回填直到候选耗尽（空批 / 全部已 attempted），返回累计补写行数。 */
-    suspend fun runUntilDone(batchLimit: Int = DEFAULT_BATCH_LIMIT): Int {
+    /**
+     * 批量回填直到候选耗尽（空批 / 全部已 attempted），返回累计补写行数。
+     * 伴生 [RUN_MUTEX] 串行化并发调用（启动回填 × 后台预分析调度两触发点）：
+     * 候选查询无行锁，并发跑会重复取同一批行、重复查 MediaStore（写入幂等但纯浪费）。
+     */
+    suspend fun runUntilDone(batchLimit: Int = DEFAULT_BATCH_LIMIT): Int = RUN_MUTEX.withLock {
         var written = 0
         val attempted = HashSet<String>()
         while (true) {
@@ -45,11 +51,14 @@ class MediaMetadataBackfiller(
                 written += writable.size
             }
         }
-        return written
+        written
     }
 
     companion object {
         private const val TAG = "PoLang:MediaMeta"
+
+        /** 串行化并发 runUntilDone（进程级单例：类无状态，锁收口在伴生对象）。 */
+        private val RUN_MUTEX = Mutex()
 
         /** 单批候选上限（与 DEDUP_HASH_BATCH_SIZE / OrganizeRepositoryImpl 分批口径一致）。 */
         const val DEFAULT_BATCH_LIMIT = 500

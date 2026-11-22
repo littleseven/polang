@@ -66,6 +66,7 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         val ADAPTIVE_FACE_DETECTION_INTERVAL = booleanPreferencesKey("adaptive_face_detection_interval")
         val FACE_DETECT_INTERVAL_PROFILE = stringPreferencesKey("face_detect_interval_profile")
         val GL_ENGINE_RECOVERY_AVAILABLE_AT_MS = longPreferencesKey("gl_engine_recovery_available_at_ms")
+        val ORGANIZE_PRE_ANALYSIS_RAN_AT_MS = longPreferencesKey("organize_pre_analysis_ran_at_ms")
         val DEBUG_SHADER_MODE = intPreferencesKey("debug_shader_mode")
 
         // 阶段独立配置（ROI / Landmark）
@@ -320,6 +321,24 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     override suspend fun clearGlEngineRecoveryCooldown() {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.GL_ENGINE_RECOVERY_AVAILABLE_AT_MS] = 0L
+        }
+    }
+
+    override val organizePreAnalysisRanAtMsFlow: Flow<Long> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.ORGANIZE_PRE_ANALYSIS_RAN_AT_MS] ?: 0L
+        }
+
+    override suspend fun updateOrganizePreAnalysisRanAt(nowMs: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.ORGANIZE_PRE_ANALYSIS_RAN_AT_MS] = nowMs
         }
     }
 

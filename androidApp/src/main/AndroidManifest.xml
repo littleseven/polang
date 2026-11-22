@@ -101,6 +101,17 @@
             android:name=".service.tag.TagScanRescheduleReceiver"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- 后台预分析(Agent 清理 M1):插电 + 每日 03:00 闲时闹钟共用入口 -->
+        <receiver
+            android:name=".service.organize.PreAnalysisReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="com.mamba.picme.organize.PRE_ANALYSIS_ALARM" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

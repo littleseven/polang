@@ -227,6 +227,11 @@ interface UserSettingsRepository {
     /** 自增并返回自增后的累计值。 */
     suspend fun incrementGuestChatMessageCount(): Int
     suspend fun resetGuestChatMessageCount()
+
+    // ── 整理后台预分析（Agent 清理 M1） ─────────────────────
+    /** 上次后台预分析（元数据回填 + 去重扫描触发）执行时刻 epoch ms；0 = 从未执行。 */
+    val organizePreAnalysisRanAtMsFlow: Flow<Long>
+    suspend fun updateOrganizePreAnalysisRanAt(nowMs: Long)
 }
 
 
