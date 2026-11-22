@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.Card
@@ -53,6 +54,7 @@ fun UserTaskCard(
             UserTaskKind.TAG_SCAN -> R.string.user_task_title_tag_scan
             // 不会走到：下载必有 displayName（modelId）；兜底语义独立成串，不复用扫描标题
             UserTaskKind.MODEL_DOWNLOAD -> R.string.user_task_title_model_download
+            UserTaskKind.DEDUP_SCAN -> R.string.user_task_title_dedup_scan
         }
     )
     val cardCd = stringResource(R.string.cd_user_task_card, title)
@@ -174,6 +176,8 @@ private fun TaskProgressSection(task: UserTask) {
 private fun kindIcon(kind: UserTaskKind): ImageVector = when (kind) {
     UserTaskKind.TAG_SCAN -> Icons.Rounded.Sync
     UserTaskKind.MODEL_DOWNLOAD -> Icons.Rounded.Download
+    // 与底栏整理项同源图标（MainFloatingBottomBar），整理域视觉锚点一致
+    UserTaskKind.DEDUP_SCAN -> Icons.Rounded.CleaningServices
 }
 
 /** ETA 人类可读格式化（纯 JVM 逻辑不涉 i18n：单位符 h/m 各语通用）。 */

@@ -21,7 +21,7 @@ data class UserTask(
     val updatedAt: Long,
 )
 
-enum class UserTaskKind { TAG_SCAN, MODEL_DOWNLOAD }
+enum class UserTaskKind { TAG_SCAN, MODEL_DOWNLOAD, DEDUP_SCAN }
 enum class UserTaskStatus { PENDING, RUNNING, PAUSED, COMPLETED, FAILED, CANCELLED }
 enum class UserTaskAction { PAUSE, RESUME, CANCEL, RETRY }
 enum class UserTaskErrorCode {
@@ -30,7 +30,7 @@ enum class UserTaskErrorCode {
     /** 模型已下架或下载源不可用 */
     MODEL_UNAVAILABLE,
 }
-enum class UserTaskDestination { TAG_SCAN_CONTROL, MODEL_CENTER }
+enum class UserTaskDestination { TAG_SCAN_CONTROL, MODEL_CENTER, ORGANIZE_HUB }
 
 /** 高频进度快照（仅内存，不落库——spec §5 混合注册表）。 */
 data class TaskProgressSnapshot(

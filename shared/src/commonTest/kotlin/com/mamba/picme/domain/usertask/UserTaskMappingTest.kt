@@ -27,5 +27,6 @@ class UserTaskMappingTest {
         assertFalse(UserTaskMapping.isActive(UserTaskStatus.CANCELLED))
         assertEquals(UserTaskDestination.TAG_SCAN_CONTROL, UserTaskMapping.destinationFor(UserTaskKind.TAG_SCAN))
         assertEquals(UserTaskDestination.MODEL_CENTER, UserTaskMapping.destinationFor(UserTaskKind.MODEL_DOWNLOAD))
+        assertEquals(UserTaskDestination.ORGANIZE_HUB, UserTaskMapping.destinationFor(UserTaskKind.DEDUP_SCAN))
     }
 }

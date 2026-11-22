@@ -870,6 +870,10 @@ class MainActivity : ComponentActivity() {
                                                 Screen.ModelCenter.createRoute(""),
                                                 navOptions { launchSingleTop = true }
                                             )
+                                            UserTaskDestination.ORGANIZE_HUB -> {
+                                                organizeTabRequest = OrganizeTab.ORGANIZE
+                                                switchMainPage(MAIN_PAGE_DEDUP)
+                                            }
                                         }
                                     }
                                 )

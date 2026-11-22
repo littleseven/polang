@@ -21,5 +21,6 @@ object UserTaskMapping {
     fun destinationFor(kind: UserTaskKind): UserTaskDestination = when (kind) {
         UserTaskKind.TAG_SCAN -> UserTaskDestination.TAG_SCAN_CONTROL
         UserTaskKind.MODEL_DOWNLOAD -> UserTaskDestination.MODEL_CENTER
+        UserTaskKind.DEDUP_SCAN -> UserTaskDestination.ORGANIZE_HUB
     }
 }

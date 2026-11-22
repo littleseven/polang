@@ -1820,6 +1820,7 @@
     <string name="task_center_empty_user_tasks">暂无后台任务</string>
     <string name="user_task_title_tag_scan">相册标签扫描</string>
     <string name="user_task_title_model_download">模型下载</string>
+    <string name="user_task_title_dedup_scan">重复照片扫描</string>
     <string name="cd_user_task_card">%1$s任务卡</string>
     <string name="user_task_status_pending">等待中</string>
     <string name="user_task_status_running">进行中</string>

@@ -1,6 +1,7 @@
 package com.mamba.picme.domain.usertask
 
 import com.mamba.picme.data.download.DownloadStatus
+import com.mamba.picme.domain.dedup.DedupScanState
 import com.mamba.picme.domain.tag.scan.ScanSessionState
 
 /**
@@ -28,4 +29,13 @@ fun UserTaskMapping.fromDownloadStatus(status: DownloadStatus): UserTaskStatus =
     DownloadStatus.COMPLETED -> UserTaskStatus.COMPLETED
     DownloadStatus.FAILED -> UserTaskStatus.FAILED
     DownloadStatus.CANCELLED -> UserTaskStatus.CANCELLED
+}
+
+/** 去重扫描会话 4 态 → 协议 6 态（无中间过渡态，一一对应）；null = 无会话（返回 null 不发射）。 */
+fun UserTaskMapping.fromDedupScanState(state: DedupScanState?): UserTaskStatus? = when (state) {
+    DedupScanState.RUNNING -> UserTaskStatus.RUNNING
+    DedupScanState.PAUSED -> UserTaskStatus.PAUSED
+    DedupScanState.COMPLETED -> UserTaskStatus.COMPLETED
+    DedupScanState.CANCELLED -> UserTaskStatus.CANCELLED
+    null -> null
 }

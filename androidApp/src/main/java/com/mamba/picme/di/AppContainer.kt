@@ -75,6 +75,7 @@ import com.mamba.picme.data.telemetry.TelemetryReporter
 import com.mamba.picme.domain.backup.BackupTagDataUseCase
 import com.mamba.picme.domain.backup.RestoreTagDataUseCase
 import com.mamba.picme.domain.backup.TagDataBackupRepository
+import com.mamba.picme.domain.dedup.DedupScanConfig
 import com.mamba.picme.domain.dedup.DedupScanSession
 import com.mamba.picme.domain.dedup.DedupScanner
 import com.mamba.picme.domain.dedup.DedupTrashManager
@@ -140,6 +141,8 @@ import com.mamba.picme.domain.trash.DedupTrashBackend
 import com.mamba.picme.domain.trash.TrashBackend
 import com.mamba.picme.domain.trash.TrashGuidanceGate
 import com.mamba.picme.features.common.trash.SilentTrashGuidanceController
+import com.mamba.picme.domain.usertask.DedupScanControl
+import com.mamba.picme.domain.usertask.DedupScanTaskAdapter
 import com.mamba.picme.domain.usertask.ModelDownloadControl
 import com.mamba.picme.domain.usertask.ModelDownloadTaskAdapter
 import com.mamba.picme.domain.usertask.TagScanControl
@@ -869,6 +872,26 @@ class AppContainerImpl(
                     }.onFailure { err ->
                         Logger.w("AppContainer", "displayNameOf failed for $modelId", err)
                     }.getOrNull()
+                },
+                scope = userTaskScope,
+            )
+        )
+        // 去重扫描任务卡（agent-cleanup M1）：控制面复用 DedupViewModel 同款
+        // ServiceBackedDedupScanSession intent 通道——start 走 startForegroundService、
+        // pause/resume/cancel 走 startService+runCatching 防崩（Task 4 先例）；
+        // 任务卡 RETRY 以默认 DedupScanConfig 重启扫描（用户上次自定义档位不持久化，无法复原）
+        val dedupScanSession = ServiceBackedDedupScanSession(context)
+        userTaskRegistry.registerAdapter(
+            DedupScanTaskAdapter(
+                registry = userTaskRegistry,
+                control = DedupScanControl { action ->
+                    when (action) {
+                        "start" -> dedupScanSession.startScan(DedupScanConfig())
+                        "pause" -> dedupScanSession.pauseScan()
+                        "resume" -> dedupScanSession.resumeScan()
+                        "cancel" -> dedupScanSession.cancelScan()
+                        else -> Logger.w("AppContainer", "unknown dedup scan control action: $action")
+                    }
                 },
                 scope = userTaskScope,
             )
