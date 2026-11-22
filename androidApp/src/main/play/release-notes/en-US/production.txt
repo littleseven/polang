@@ -1,4 +1,2 @@
-- Photo cards and grids now fill in progressively as each image loads — no more blank placeholders
-- Chart cards render with built-in themes; HTML cards show live thumbnails and open the native viewer
-- Chat search replies now include tappable photos; tag scanning is more reliable with visible progress
+- Fixed crashes on startup and media scanning — large libraries load reliably now
 - Stability and performance improvements
