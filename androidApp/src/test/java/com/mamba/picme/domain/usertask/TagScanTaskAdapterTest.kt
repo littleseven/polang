@@ -116,10 +116,10 @@ class TagScanTaskAdapterTest {
     }
 
     @Test
-    fun `首帧 null 且注册表残留活动态行时置 FAILED 对账可重试`() = runTest {
+    fun `null 帧且注册表残留活动态行时置 FAILED 对账可重试`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
         registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
-        adapter.sync(null, isFirstEmission = true)
+        adapter.sync(null)
         val task = registry.tasks.value.single()
         // FAILED 而非 CANCELLED：actionsFor(FAILED)=RETRY，「已中断——点重试重新开始」文案有按钮可点
         assertEquals(UserTaskStatus.FAILED, task.status)
@@ -129,13 +129,24 @@ class TagScanTaskAdapterTest {
     }
 
     @Test
-    fun `非首帧 null 不动状态仅清快照`() = runTest {
+    fun `运行中 null 帧（会话失败清流）同样对账置 FAILED 不残留 RUNNING 行`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
-        registry.upsertStatus("tagscan:main", UserTaskKind.TAG_SCAN, null, UserTaskStatus.RUNNING)
-        registry.updateProgress("tagscan:main", TaskProgressSnapshot(0.5f, "10/20", 3000L))
+        adapter.sync(progress(ScanSessionState.RUNNING, processed = 10, total = 20))
         adapter.sync(null)
         val task = registry.tasks.value.single()
-        assertEquals(UserTaskStatus.RUNNING, task.status)
+        assertEquals(UserTaskStatus.FAILED, task.status)
+        assertEquals(UserTaskErrorCode.PROCESS_TERMINATED, task.errorCode)
+        assertNull(task.progress)
+    }
+
+    @Test
+    fun `null 帧且行已终态时无操作仅清快照`() = runTest {
+        val (registry, adapter, _) = fixture(testScheduler)
+        adapter.sync(progress(ScanSessionState.COMPLETED, processed = 20, total = 20))
+        adapter.sync(null)
+        val task = registry.tasks.value.single()
+        // 终态帧先于死亡 null 到达：COMPLETED 行不被 null 帧翻写
+        assertEquals(UserTaskStatus.COMPLETED, task.status)
         assertNull(task.errorCode)
         assertNull(task.progress)
     }
@@ -155,7 +166,7 @@ class TagScanTaskAdapterTest {
     @Test
     fun `null 进度且注册表无行时不产生任务`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
-        adapter.sync(null, isFirstEmission = true)
+        adapter.sync(null)
         assertTrue(registry.tasks.value.isEmpty())
     }
 

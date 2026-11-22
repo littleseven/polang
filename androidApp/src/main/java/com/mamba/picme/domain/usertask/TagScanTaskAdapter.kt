@@ -35,26 +35,22 @@ class TagScanTaskAdapter(
     /** 非幂等：重复调用会起双订阅；当前唯一调用方 UserTaskRegistry.registerAdapter 保证单次。 */
     override fun start() {
         scope.launch {
-            var isFirstEmission = true
             progressFlow.collect { progress ->
-                sync(progress, isFirstEmission)
-                isFirstEmission = false
+                sync(progress)
             }
         }
     }
 
     @VisibleForTesting
-    internal suspend fun sync(
-        progress: TagScanSessionProgress?,
-        isFirstEmission: Boolean = false,
-    ) {
+    internal suspend fun sync(progress: TagScanSessionProgress?) {
         val status = progress?.let { value -> UserTaskMapping.fromTagScanState(value.state) }
         if (status == null) {
-            // 进程被杀对账仅限「start() 后首帧为 null」（进程重启后 Service 静态流必为 null 初值）：
-            // 注册表残留活动态行 = 进程死于扫描中 → 置 FAILED(PROCESS_TERMINATED)——
+            // null 帧对账（任意帧，不限首帧）：null = 会话已不存在——进程重启后静态流必为 null 初值，
+            // 服务侧失败/自灭清流也会发出。注册表残留活动态行 = 会话死于半途而行未收口 →
+            // 置 FAILED(PROCESS_TERMINATED)；终态帧必先于死亡 null 到达，isActive 守卫天然放过终态行——
             // actionsFor(FAILED)=RETRY 使「已中断——点重试重新开始」文案有按钮可点（CANCELLED 动作集为空）。
-            // 运行中出现的 IDLE 对象（orchestrator resume 竞态窗口会发）或后续 null 只清快照、不动状态。
-            if (progress == null && isFirstEmission) {
+            // 运行中出现的 IDLE 对象（orchestrator resume 竞态窗口会发）只清快照、不动状态。
+            if (progress == null) {
                 val current = registry.currentStatus(TASK_ID)
                 if (current != null && UserTaskMapping.isActive(current)) {
                     registry.upsertStatus(

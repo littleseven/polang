@@ -125,10 +125,10 @@ class DedupScanTaskAdapterTest {
     }
 
     @Test
-    fun `首帧 null 且注册表残留活动态行时置 FAILED 对账可重试`() = runTest {
+    fun `null 帧且注册表残留活动态行时置 FAILED 对账可重试`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
         registry.upsertStatus("dedupscan:main", UserTaskKind.DEDUP_SCAN, null, UserTaskStatus.RUNNING)
-        adapter.sync(null, isFirstEmission = true)
+        adapter.sync(null)
         val task = registry.tasks.value.single()
         // FAILED 而非 CANCELLED：actionsFor(FAILED)=RETRY，「已中断——点重试重新开始」文案有按钮可点
         assertEquals(UserTaskStatus.FAILED, task.status)
@@ -138,9 +138,34 @@ class DedupScanTaskAdapterTest {
     }
 
     @Test
+    fun `运行中 null 帧（会话失败 stop-on-null）同样对账置 FAILED 不残留 RUNNING 行`() = runTest {
+        val (registry, adapter, _, flow) = fixture(testScheduler)
+        flow.value = progress(DedupScanState.RUNNING, scanned = 10, total = 20)
+        adapter.start()
+        // Manager 失败路径：不发终态帧直接清流（stop-on-null）
+        flow.value = null
+        val task = registry.tasks.value.single()
+        assertEquals(UserTaskStatus.FAILED, task.status)
+        assertEquals(UserTaskErrorCode.PROCESS_TERMINATED, task.errorCode)
+        assertNull(task.progress)
+    }
+
+    @Test
+    fun `null 帧且行已终态时无操作仅清快照`() = runTest {
+        val (registry, adapter, _) = fixture(testScheduler)
+        adapter.sync(progress(DedupScanState.CANCELLED, scanned = 8, total = 20))
+        adapter.sync(null)
+        val task = registry.tasks.value.single()
+        // 终态帧先于死亡 null 到达：CANCELLED 行不被 null 帧翻写，入历史
+        assertEquals(UserTaskStatus.CANCELLED, task.status)
+        assertNull(task.errorCode)
+        assertNull(task.progress)
+    }
+
+    @Test
     fun `null 进度且注册表无行时不产生任务`() = runTest {
         val (registry, adapter, _) = fixture(testScheduler)
-        adapter.sync(null, isFirstEmission = true)
+        adapter.sync(null)
         assertTrue(registry.tasks.value.isEmpty())
     }
 
