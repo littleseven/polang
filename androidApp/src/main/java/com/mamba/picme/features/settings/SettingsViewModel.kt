@@ -804,17 +804,6 @@ class SettingsViewModel(
     }
 
     /**
-     * 获取所有模型分类标签（用于 TabRow）
-     * 返回 Map<分类标签, 中文翻译>
-     */
-    fun getModelTypeLabels(): Map<ModelCategory, String> {
-        val translations = _tagTranslations.value
-        return _categories.value.associateWith { category ->
-            translations[category.tag] ?: category.tag
-        }
-    }
-
-    /**
      * 刷新模型列表（强制从网络获取）
      */
     fun refreshModels() {

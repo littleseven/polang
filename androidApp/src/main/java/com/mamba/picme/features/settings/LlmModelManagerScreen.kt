@@ -142,10 +142,15 @@ fun ModelCenterScreen(
     onNavigateBack: () -> Unit
 ) {
     val groupedModels by viewModel.groupedModels.collectAsState()
-    val modelTypeLabels = viewModel.getModelTypeLabels()
     val downloadStates by viewModel.downloadStates.collectAsState()
     val downloadedModels by viewModel.downloadedModels.collectAsState()
     val tagTranslations by viewModel.tagTranslations.collectAsState()
+    val modelCategories by viewModel.categories.collectAsState()
+    // Tab 标签必须从 StateFlow 派生：getModelTypeLabels() 直读 .value 不触发重组，
+    // 语言热切换后 tagTranslations 已更新但 Tab 标签会停在旧语言
+    val modelTypeLabels = modelCategories.associateWith { category ->
+        tagTranslations[category.tag] ?: category.tag
+    }
     val autoDownloadRecommended by viewModel.autoDownloadRecommendedOnWifi.collectAsState()
     val requiredModelIds by viewModel.requiredModelIdsFlow.collectAsState()
     var modelToDelete by remember { mutableStateOf<ModelConfig?>(null) }
@@ -160,6 +165,13 @@ fun ModelCenterScreen(
         pageCount = { categories.size }
     )
     val chipScrollState = rememberScrollState()
+
+    // 语言切换后 Tab 标签/必备分组随 locale 重载（activity 配置变更不重建 Activity 级 ViewModel，
+    // 分组与 tagTranslations 为 VM 内缓存，需主动刷新；模型名/描述走 displayName 渲染期自取，不受影响）
+    val currentLocales = LocalConfiguration.current.locales
+    LaunchedEffect(currentLocales) {
+        viewModel.refreshModels()
+    }
 
     // 横滑切页 → 同步当前分类 + 把选中 Chip 滚进可视区
     LaunchedEffect(pagerState) {
