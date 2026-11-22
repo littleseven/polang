@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.navOptions
 import com.mamba.picme.agent.core.runtime.state.SceneManager
+import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.chat.ChatScreen
 import com.mamba.picme.features.chat.ChatTaskAnchor
@@ -83,6 +84,8 @@ fun MainPagerHost(
     onOpenMonthReview: (Long) -> Unit = {},
     /** 整理中心 hub 类目卡点击（organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
+    /** 整理中心 hub 来源账行点击（Agent 清理 M1 Task 7.5：organize_source/{source} 路由）。 */
+    onOpenSource: (AppSource) -> Unit = {},
     /** hub 存储叙事区「立即分析」手动入口（Agent 清理 M1，透传 OrganizeHomeRoute）。 */
     onAnalyzeNow: () -> Unit = {},
     /** Memory 页大卡点击 → 回忆详情页（memory_detail/{memoryId} 路由）。 */
@@ -186,6 +189,7 @@ fun MainPagerHost(
                 onQuickTidy = onQuickTidy,
                 onOpenMonthReview = onOpenMonthReview,
                 onOpenCategory = onOpenCategory,
+                onOpenSource = onOpenSource,
                 onAnalyzeNow = onAnalyzeNow,
                 onNavigateToTagViewer = onNavigateToTagViewer,
                 onRequestGalleryView = onRequestGalleryView,

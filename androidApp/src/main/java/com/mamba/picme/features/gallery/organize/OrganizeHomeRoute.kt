@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mamba.picme.R
+import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.features.gallery.GalleryViewFilter
 import com.mamba.picme.features.gallery.GalleryViewRequest
@@ -67,6 +68,8 @@ fun OrganizeHomeRoute(
     onQuickTidy: () -> Unit,
     onOpenMonthReview: (Long) -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
+    /** hub 来源账行点击（Agent 清理 M1 Task 7.5，透传 DedupHomeRoute → organize_source 路由）。 */
+    onOpenSource: (AppSource) -> Unit = {},
     /** hub 存储叙事区「立即分析」手动入口（Agent 清理 M1，透传 DedupHomeRoute）。 */
     onAnalyzeNow: () -> Unit = {},
     onNavigateToTagViewer: () -> Unit,
@@ -106,6 +109,7 @@ fun OrganizeHomeRoute(
                         onQuickTidy = onQuickTidy,
                         onOpenMonthReview = onOpenMonthReview,
                         onOpenCategory = onOpenCategory,
+                        onOpenSource = onOpenSource,
                         onAnalyzeNow = onAnalyzeNow,
                         // hub 引导态类目卡（NEEDS_SCAN）点击切到 SCAN tab
                         onOpenScan = { onSelectTab(OrganizeTab.SCAN) },

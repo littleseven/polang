@@ -76,11 +76,13 @@ import com.mamba.picme.R
 import com.mamba.picme.domain.dedup.DedupGroup
 import com.mamba.picme.domain.dedup.DedupLevel
 import com.mamba.picme.domain.dedup.VersionRole
+import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.OrganizeCategory
 
 private val KeepGreen = Color(0xFF4CAF50)
 
 /** 去重 2.0 主页：单路由内 Config → Scanning → Results → Cleaned 四态切换；组详情与保留规则为内部弹层。 */
+@Suppress("LongParameterList") // hub 出口回调集（Task 7.5 加 onOpenSource），聚合收口代价高于参数拆包
 @Composable
 fun DedupHomeRoute(
     viewModel: DedupViewModel,
@@ -92,6 +94,8 @@ fun DedupHomeRoute(
     onOpenMonthReview: (Long) -> Unit = {},
     /** 整理中心 hub 类目卡点击（Task 5 已点亮：MainActivity 导航 organize_category/{category} 路由）。 */
     onOpenCategory: (OrganizeCategory) -> Unit = {},
+    /** hub 来源账行点击（Task 7.5：MainActivity 导航 organize_source/{source} 路由）。 */
+    onOpenSource: (AppSource) -> Unit = {},
     /** hub 引导态类目卡点击：切到合并页 SCAN tab（embedded 模式由 OrganizeHomeRoute 注入 tab 切换）。 */
     onOpenScan: () -> Unit = {},
     /** hub 存储叙事区「立即分析」手动入口（Agent 清理 M1：MainActivity 注入 preAnalysisScheduler.runNow）。 */
@@ -211,6 +215,7 @@ fun DedupHomeRoute(
                         onQuickTidy = onQuickTidy,
                         onOpenMonthReview = onOpenMonthReview,
                         onOpenCategory = onOpenCategory,
+                        onOpenSource = onOpenSource,
                         onOpenScan = onOpenScan,
                         onStartScan = { config -> viewModel.startScan(config) },
                         onOpenKeepRules = { showKeepRules = true },

@@ -497,6 +497,11 @@
     <string name="org_source_download">Téléchargements</string>
     <string name="org_source_screenshots">Captures</string>
     <string name="org_source_other">Autres</string>
+    <string name="org_sources_view_all">Tout voir</string>
+    <string name="org_sources_collapse">Réduire</string>
+    <string name="org_sources_title">Sources</string>
+    <string name="org_source_detail_title">Médias de %1$s</string>
+    <string name="org_section_all_media">Tous les médias (%1$d)</string>
 
     <!-- Swipe review（F2 page de tri rapide par gestes） -->
     <string name="swipe_title">Tri rapide</string>

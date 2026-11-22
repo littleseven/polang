@@ -131,6 +131,7 @@ import com.mamba.picme.features.gallery.dedup.DedupMediaSource
 import com.mamba.picme.features.gallery.dedup.DedupViewModel
 import com.mamba.picme.features.gallery.dedup.MediaStoreDedupMediaSource
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.organize.OrganizeSourceViewModel
 import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.swipe.SwipeReviewViewModel
 import com.mamba.picme.data.preferences.DataStoreMemoryHiddenStore
@@ -152,6 +153,7 @@ import com.mamba.picme.domain.usertask.UserTaskKind
 import com.mamba.picme.domain.usertask.UserTaskRegistry
 import com.mamba.picme.domain.usertask.UserTaskStatus
 import androidx.lifecycle.ViewModel
+import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.tag.FaceClusterEngine
 import com.mamba.picme.domain.tag.TagGenerationScheduler
@@ -259,6 +261,29 @@ class OrganizeCategoryViewModelFactory(
             @Suppress("UNCHECKED_CAST")
             return OrganizeCategoryViewModel(
                 category = category,
+                organizeRepository = organizeRepository,
+                trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
+                trashGuidanceGate = trashGuidanceGate,
+            ) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
+/** 来源详情页 VM 工厂（Agent 清理 M1 Task 7.5）：同 F1 类目工厂，仅过滤维度换为 AppSource。 */
+class OrganizeSourceViewModelFactory(
+    private val source: AppSource,
+    private val organizeRepository: OrganizeRepository,
+    private val trashManager: DedupTrashManager,
+    private val silentTrashEnabled: suspend () -> Boolean = { false },
+    private val trashGuidanceGate: TrashGuidanceGate? = null,
+) : ViewModelProvider.Factory {
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(OrganizeSourceViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return OrganizeSourceViewModel(
+                source = source,
                 organizeRepository = organizeRepository,
                 trashBackend = DedupTrashBackend(trashManager, silentTrashEnabled),
                 trashGuidanceGate = trashGuidanceGate,
@@ -439,6 +464,9 @@ interface AppContainer {
 
     /** 整理中心（F1）类目详情 ViewModel 工厂（按类目参数化） */
     fun createOrganizeCategoryViewModelFactory(category: OrganizeCategory): ViewModelProvider.Factory
+
+    /** 来源详情页 ViewModel 工厂（Agent 清理 M1 Task 7.5：按 AppSource 参数化） */
+    fun createOrganizeSourceViewModelFactory(source: AppSource): ViewModelProvider.Factory
 
     /** 手势快速整理（F2）ViewModel 工厂（monthStartMs 非 null = 按月回顾建队；-1L 为路由「无月份」哨兵，负值月份起点合法——东八区 1970-01 起点为负） */
     fun createSwipeReviewViewModelFactory(monthStartMs: Long? = null): ViewModelProvider.Factory
@@ -1221,6 +1249,16 @@ class AppContainerImpl(
     ): ViewModelProvider.Factory {
         return OrganizeCategoryViewModelFactory(
             category = category,
+            organizeRepository = organizeRepository,
+            trashManager = dedupTrashManager,
+            silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },
+            trashGuidanceGate = silentTrashGuidance,
+        )
+    }
+
+    override fun createOrganizeSourceViewModelFactory(source: AppSource): ViewModelProvider.Factory {
+        return OrganizeSourceViewModelFactory(
+            source = source,
             organizeRepository = organizeRepository,
             trashManager = dedupTrashManager,
             silentTrashEnabled = { userPreferencesRepository.mediaManageSilentTrashFlow.first() },

@@ -37,6 +37,11 @@ sealed class Screen(val route: String) {
         fun createRoute(category: String): String = "organize_category/$category"
     }
 
+    /** 来源详情页（Agent 清理 M1 Task 7.5）：按 AppSource 过滤的媒体网格 + 回收站删除；路由段为 domain AppSource 枚举名 */
+    data object OrganizeSource : Screen("organize_source/{source}") {
+        fun createRoute(source: String): String = "organize_source/$source"
+    }
+
     /** 手势快速整理（F2）：全屏滑动决策页；monthStart≠-1 为「按月回顾」建队月份起点（本地时区，负值合法——东八区 1970-01 起点为负），-1 = 全量 */
     data object SwipeReview : Screen("swipe_review?monthStart={monthStart}") {
         fun createRoute(monthStart: Long = -1L): String = "swipe_review?monthStart=$monthStart"

@@ -48,6 +48,7 @@ import com.mamba.picme.core.designsystem.PoLangTheme
 import com.mamba.picme.data.preferences.UserPreferencesRepository
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.ThemeMode
+import com.mamba.picme.domain.organize.AppSource
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.usertask.UserTaskDestination
 import com.mamba.picme.features.common.avatar.AvatarCaptureController
@@ -71,6 +72,8 @@ import com.mamba.picme.features.idphoto.IDPhotoViewModel
 import com.mamba.picme.features.gallery.GalleryViewRequest
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryScreen
 import com.mamba.picme.features.gallery.organize.OrganizeCategoryViewModel
+import com.mamba.picme.features.gallery.organize.OrganizeSourceScreen
+import com.mamba.picme.features.gallery.organize.OrganizeSourceViewModel
 import com.mamba.picme.features.gallery.organize.OrganizeTab
 import com.mamba.picme.features.gallery.memories.MemoriesViewModel
 import com.mamba.picme.features.gallery.memories.MemoryDetailScreen
@@ -385,6 +388,14 @@ class MainActivity : ComponentActivity() {
                                             launchSingleTop = true
                                         }
                                     },
+                                    // hub 来源账行（Agent 清理 M1 Task 7.5）：来源详情页路由
+                                    onOpenSource = { source ->
+                                        navController.navigate(
+                                            Screen.OrganizeSource.createRoute(source.name)
+                                        ) {
+                                            launchSingleTop = true
+                                        }
+                                    },
                                     // hub 存储叙事区「立即分析」（Agent 清理 M1）：调度器自身 scope 异步执行
                                     onAnalyzeNow = {
                                         app.container.preAnalysisScheduler.runNowAsync(
@@ -497,6 +508,27 @@ class MainActivity : ComponentActivity() {
                                         factory = app.container.createOrganizeCategoryViewModelFactory(category)
                                     )
                                     OrganizeCategoryScreen(
+                                        viewModel = viewModel,
+                                        onNavigateBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+                            composable(
+                                route = Screen.OrganizeSource.route,
+                                arguments = listOf(
+                                    navArgument("source") { type = NavType.StringType }
+                                )
+                            ) { backStackEntry ->
+                                val sourceName = backStackEntry.arguments?.getString("source").orEmpty()
+                                val source = runCatching { AppSource.valueOf(sourceName) }.getOrNull()
+                                if (source == null) {
+                                    // 非法来源参数（旧版本路由/手写 deep link）：直接弹栈不崩溃
+                                    LaunchedEffect(Unit) { navController.popBackStack() }
+                                } else {
+                                    val viewModel: OrganizeSourceViewModel = viewModel(
+                                        factory = app.container.createOrganizeSourceViewModelFactory(source)
+                                    )
+                                    OrganizeSourceScreen(
                                         viewModel = viewModel,
                                         onNavigateBack = { navController.popBackStack() }
                                     )

@@ -2,12 +2,12 @@
 # 整理中心完整产品规格书（Organize Screen Spec，类目体系 v2）
 # ============================================================================
 # 基准端：Android DedupHomeHub.kt / OrganizeCategoryScreen.kt /
-#        OrganizeCategoryViewModel.kt / OrganizeHomeRoute.kt /
-#        SwipeReviewScreen.kt / domain/organize/* / domain/swipe/SwipeQueueBuilder.kt
+#        OrganizeCategoryViewModel.kt / OrganizeSourceScreen.kt / OrganizeSourceViewModel.kt /
+#        OrganizeHomeRoute.kt / SwipeReviewScreen.kt / domain/organize/* / domain/swipe/SwipeQueueBuilder.kt
 # 用途：iOS 实现的唯一输入，不读 Android 源码（[PARITY] 红线）
 # 值引用：颜色引用 Material colorScheme 语义色 / design-tokens.json token 名
 # 版本：v2（2026-09-07 落地固化）；设计 spec 已随交付清理（git 历史可查）
-# 覆盖四屏：hub（§2）/ category_grid（§3）/ cleaned（§4）/ swipe_review 口径（§5）
+# 覆盖五屏：hub（§2）/ category_grid（§3）/ source_grid（§3b）/ cleaned（§4）/ swipe_review 口径（§5）
 
 # ============================================================================
 # 0. 页面定位与入口
@@ -129,8 +129,23 @@ hub:
       show_when: "sourceLedgers（剔 OTHER）非空"
       item: "org_source_<appsource 小写> + FormatBytes(bytes)"   # 10 来源名 key：camera/wechat/qq/whatsapp/telegram/instagram/messenger/download/screenshots/other
       font: labelSmall
-      color: onSurfaceVariant
+      color: primary                    # Task 7.5 起可点导航（与建议行同 affordance 色）
       flow: { horizontal_spacing: 12, vertical_spacing: 4 }      # FlowRow 徽标粒度折行，单元 max_lines 1 + soft_wrap false
+      tap_action: open_source_detail(source)   # → §3b 来源详情页（每 chip 独立点击区，clip 8dp 圆角 + 4/2dp 内 padding）
+    source_list_expanded:               # 来源列表（Task 7.5：hub 内展开形态，非独立页——复杂度裁定）
+      toggle_entries:                   # 两个入口共用同一展开态（rememberSaveable）
+        - view_all_button:              # 命名来源（剔 OTHER）种类 > 3 时渲染
+            text_key: "org_sources_view_all ↔ org_sources_collapse（展开态）"
+            font: labelSmall
+            color: primary
+        - app_noise_row: suggestion_app_noise 行整行点击切换展开
+      header:
+        text_key: org_sources_title     # "Sources"
+        font: titleSmall
+        color: onSurfaceVariant
+      rows: "全部非零来源完整行（含 OTHER）：appSourceIcon 18dp + org_source_* 名称（bodyMedium weight 1）+ org_cat_meta(count, bytes) + chevron；行高 padding 8v/4h，clip 8dp"
+      row_tap_action: open_source_detail(source)
+      icon_map: "camera→photo_camera · IM 六家→forum · download→download · screenshots→screenshot_monitor · other→apps（OrganizeResources.appSourceIcon SSOT）"
     suggestion_stale_screenshots:       # 建议行 1（冗余确定性序更高）：过期截图，可点
       show_when: "staleScreenshotCount > 0（≥365 天截图张数，仅照片不含录屏）"
       text_key: org_story_stale_screenshots   # "N 张一年前截图 · X"
@@ -138,11 +153,13 @@ hub:
       color: primary
       chevron: { icon: keyboard_arrow_right, tint: primary }
       action: open_category_detail(SCREEN_CONTENT)   # → §3 SCREEN_CONTENT 类目
-    suggestion_app_noise:               # 建议行 2：LOW_VALUE 档来源账，M1 纯展示不进详情（方案面属 M2）
+    suggestion_app_noise:               # 建议行 2：LOW_VALUE 档来源账（IM 六家转存合计），可点展开来源列表（Task 7.5）
       show_when: "LOW_VALUE 档（WECHAT/QQ/WHATSAPP/TELEGRAM/INSTAGRAM/MESSENGER）来源 bytes 合计 > 0"
       text_key: org_story_app_noise     # "聊天与社交 App 转存 · X"
       font: bodySmall
-      color: onSurfaceVariant
+      color: primary
+      chevron: "keyboard_arrow_right ↔ keyboard_arrow_down（展开态），tint primary"
+      action: toggle_source_list_expanded   # 展开/收起来源列表（source_list_expanded，与 view_all 共用展开态）
     freshness_line:                     # 新鲜度行 + 手动入口
       last_analysis:
         show_when: "preAnalysisRanAt > 0（0 = 从未分析，左侧留白仅按钮）"
@@ -391,6 +408,49 @@ category_grid:
       outcome: "Trashed → 剔除已回收项；清空则进 cleaned 态；Cancelled → 留原地可重试"
 
 # ============================================================================
+# 3b. source_grid 屏（来源详情页，OrganizeSourceScreen，Task 7.5 2026-11-22）
+# ============================================================================
+# 路由：organize_source/{source}（NavHost 二级页，路由段为 domain AppSource 枚举名；非法段弹栈不崩溃）
+# 入口：hub 存储叙事区来源账 Top3 chip / 来源列表行（§2 source_top3 / source_list_expanded）
+source_grid:
+  data_scope: "appSourceOf(relativePath) == source 的全库快照（OrganizeRepository.loadItems 一次性），按 uri 去重；未入任何类目的媒体也在列——浏览视角非清理管线出口"
+  value_guard: "CategoryArbiter 定类后走 ValueGuard（仅低质两类受保护，未分类媒体无保护信号）——红线不因浏览视角放松：命中保护项排保护区不可选"
+  states: [loading, ready_grid, empty, cleaned]   # 与 category_grid 同构；empty 复用 org_empty_category
+  top_bar:
+    type: top_app_bar
+    title: "org_source_detail_title（参数 = org_source_<appsource 小写> 来源名）"   # "WeChat media / 微信 媒体"
+    navigation_icon: { icon: arrow_back, cd_key: back }
+    actions: none                       # 无「AI 预选」开关——selected 默认空集，全靠用户手选（AI 预选保守化裁定）
+  subtitle_row:
+    padding: { horizontal: 16, vertical: 4 }
+    left:
+      text_key: org_cat_meta            # "N items · X MB"（该来源全量，含 protected 与视频）
+      font: bodySmall
+      color: onSurfaceVariant
+      weight: 1
+    right: none                         # 无 AI 预选，不出选中计数
+  grid:                                 # 与 category_grid.grid 同规格（3 列/thumb/选中勾/盾牌角标/语义）
+    columns: 3
+    content_padding: { horizontal: 16, vertical: 8 }
+    spacing: 2
+    thumb: "同 category_grid.grid.thumb（OrganizeThumb 共享组件；Coil size 360 crossfade false）"
+    sections:                           # 两段分组（三段简化为两段，Task 7.5 裁定）
+      - id: all_media                   # 全部媒体 = 非保护项，拍摄日期降序（新→旧；captureDate=0 排段尾）
+        header_key: org_section_all_media   # "All media (N)"
+        header_style: { font: titleSmall, color: onSurface, padding_v: 8 }
+        preselected: never              # selected 默认空集
+      - id: protected                   # 可能是珍贵照片 = ValueGuard 命中（无论置信度/类目）
+        header_key: org_section_protected   # "Likely precious (N)"（复用类目页 key）
+        header_style: { font: titleSmall, color: tertiary, padding_v: 8 }
+        preselected: never
+        selectable: never               # 不可选：toggle 对保护项静默拒绝（VM 层红线，非仅 UI 置灰）
+        badge: protected_badge
+    selection_semantics:
+      toggle_guard: "保护项 toggle 无效果（VM firstOrNull + isProtected 拒绝）；未知 uri 同样忽略"
+  bottom_bar: "同 category_grid.bottom_bar（OrganizeDeleteBar/OrganizeUndoBar 共享组件）；trash tag = AppSource 枚举名"
+  trash_flow: "同 category_grid.trash_flow（TrashSessionController 系统回收站 + undo；禁止直连 MediaStore 删除）"
+
+# ============================================================================
 # 4. cleaned 屏（完成态，category_grid 的 trashed 分支）
 # ============================================================================
 cleaned:
@@ -480,6 +540,11 @@ i18n_keys:
   category_grid: [org_ai_preselect_on, org_ai_preselect_off, org_ai_preselected,
                   org_section_suggested, org_section_review, org_section_protected, org_protected_badge,
                   org_move_to_trash, org_trash_note, org_empty_category, org_partial_trash, org_trash_unsupported]
+  source_grid: [org_source_detail_title, org_section_all_media, org_section_protected,
+                org_sources_view_all, org_sources_collapse, org_sources_title,
+                org_source_camera, org_source_wechat, org_source_qq, org_source_whatsapp,
+                org_source_telegram, org_source_instagram, org_source_messenger,
+                org_source_download, org_source_screenshots, org_source_other]
   cleaned: [org_cleaned_title, org_cleaned_meta, org_cleaned_freed, org_undo,
             dedup_recycle_bin, dedup_auto_clear, dedup_more_count]
   swipe_review: [swipe_reason_screenshot, swipe_reason_blurry, swipe_reason_portrait, swipe_reason_recent,
@@ -510,6 +575,7 @@ platform_differences:
   capability_matrix:
     - { feature: "六类目互斥管线",  android: supported, ios: "TODO（iOS 整理页零实现，本 spec 即翻译 SSOT）" }
     - { feature: "hub + 详情页 + cleaned", android: supported, ios: "TODO" }
+    - { feature: "来源详情页 + hub 来源列表（Task 7.5，2026-11-22）", android: "supported（organize_source/{source} 路由 + hub 内展开来源列表；AI 预选保守化：来源页 selected 默认空集）", ios: "TODO" }
     - { feature: "swipe_review",   android: supported, ios: "TODO" }
     - { feature: "按月回顾入口（month_review_entry + 月份选择器 + 按月建队）", android: "supported（2026-11-19，SwipeMonths 本地月份分桶 + captureRange 建队过滤）", ios: "TODO" }
     - { feature: "清理战报分享卡（Done 态 PNG + FileProvider 分享）", android: "supported（2026-11-19，CleanupReportCard Canvas 1080×1350；deleted>0 才显示）", ios: "TODO" }

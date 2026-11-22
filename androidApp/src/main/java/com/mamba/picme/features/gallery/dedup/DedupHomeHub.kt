@@ -74,11 +74,14 @@ import com.mamba.picme.domain.organize.CategoryBoard
 import com.mamba.picme.domain.organize.OrganizeBoard
 import com.mamba.picme.domain.organize.OrganizeCategory
 import com.mamba.picme.domain.organize.SignalCoverage
+import com.mamba.picme.domain.organize.SourceLedger
 import com.mamba.picme.domain.organize.SourceTier
 import com.mamba.picme.domain.organize.StorageStory
 import com.mamba.picme.domain.organize.defaultTier
 import com.mamba.picme.domain.swipe.SwipeMonth
 import com.mamba.picme.domain.swipe.SwipeMonths
+import com.mamba.picme.features.gallery.organize.appSourceIcon
+import com.mamba.picme.features.gallery.organize.appSourceLabelRes
 import com.mamba.picme.features.gallery.organize.organizeCategoryIcon
 import com.mamba.picme.features.gallery.organize.organizeCategoryLabelRes
 import com.mamba.picme.features.gallery.swipe.swipeMonthLabel
@@ -115,6 +118,8 @@ fun DedupHubContent(
     onQuickTidy: () -> Unit,
     onOpenMonthReview: (Long) -> Unit,
     onOpenCategory: (OrganizeCategory) -> Unit,
+    /** hub 来源账行点击（Task 7.5：organize_source/{source} 路由进来源详情页）。 */
+    onOpenSource: (AppSource) -> Unit = {},
     onOpenScan: () -> Unit,
     onStartScan: (DedupScanConfig) -> Unit,
     onOpenKeepRules: () -> Unit,
@@ -146,6 +151,7 @@ fun DedupHubContent(
                 story = storageStory,
                 preAnalysisRanAt = preAnalysisRanAt,
                 onOpenCategory = onOpenCategory,
+                onOpenSource = onOpenSource,
                 onAnalyzeNow = onAnalyzeNow,
             )
         }
@@ -330,8 +336,9 @@ private fun OrgHeroCard(board: OrganizeBoard) {
 
 /**
  * 存储叙事区（Agent 清理 M1）：总账行（照片/视频/截图字节）→ 来源账 Top3（bytes 降序，
- * OTHER 不展示）→ 建议行（过期截图可点进 SCREEN_CONTENT 类目；LOW_VALUE 档来源账
- * M1 纯展示，不进详情——方案面属 M2）→ 新鲜度行（上次分析相对时间 + 「立即分析」
+ * OTHER 不展示；逐行可点进来源详情页，Task 7.5）→ 建议行（过期截图可点进 SCREEN_CONTENT
+ * 类目；LOW_VALUE 档来源账可点展开来源列表）→ 来源列表（hub 内展开形态：全部非零来源
+ * 完整行，种类 >3 时「查看全部/收起」入口）→ 新鲜度行（上次分析相对时间 + 「立即分析」
  * 手动入口，去重扫描活性时禁用）。数据口径 = StorageStory（与 hub 看板共享一次 board() 计算）。
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -340,6 +347,7 @@ private fun StorageStorySection(
     story: StorageStory,
     preAnalysisRanAt: Long,
     onOpenCategory: (OrganizeCategory) -> Unit,
+    onOpenSource: (AppSource) -> Unit,
     onAnalyzeNow: () -> Unit,
 ) {
     val sessionProgress by DedupScanService.sessionProgress.collectAsState()
@@ -347,6 +355,7 @@ private fun StorageStorySection(
         DedupScanState.RUNNING, DedupScanState.PAUSED -> true
         else -> false
     }
+    var sourcesExpanded by rememberSaveable { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -369,27 +378,13 @@ private fun StorageStorySection(
                 ),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            // 来源账 Top3：bytes 降序取前 3（sourceLedgers 已排序），OTHER 不展示
-            val topSources = story.sourceLedgers
-                .filter { ledger -> ledger.source != AppSource.OTHER }
-                .take(STORY_SOURCE_TOP_N)
-            if (topSources.isNotEmpty()) {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    topSources.forEach { ledger ->
-                        Text(
-                            text = stringResource(appSourceLabelRes(ledger.source)) + " " +
-                                FormatBytes.format(ledger.bytes),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-            }
+            // 来源账区（Task 7.5 可点导航 + 内嵌来源列表）
+            StorageStorySourcesArea(
+                story = story,
+                sourcesExpanded = sourcesExpanded,
+                onToggleExpanded = { sourcesExpanded = !sourcesExpanded },
+                onOpenSource = onOpenSource,
+            )
             // 建议行 1（冗余确定性序更高）：过期截图 → SCREEN_CONTENT 类目详情
             if (story.staleScreenshotCount > 0) {
                 Row(
@@ -418,19 +413,40 @@ private fun StorageStorySection(
                     )
                 }
             }
-            // 建议行 2：LOW_VALUE 档来源账（IM 六家转存合计），M1 纯展示不进详情
+            // 建议行 2：LOW_VALUE 档来源账（IM 六家转存合计），可点展开/收起来源列表
             val lowValueBytes = story.sourceLedgers
                 .filter { ledger -> ledger.source.defaultTier == SourceTier.LOW_VALUE }
                 .sumOf { ledger -> ledger.bytes }
             if (lowValueBytes > 0) {
-                Text(
-                    text = stringResource(
-                        R.string.org_story_app_noise,
-                        FormatBytes.format(lowValueBytes)
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { sourcesExpanded = !sourcesExpanded },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = stringResource(
+                            R.string.org_story_app_noise,
+                            FormatBytes.format(lowValueBytes)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = if (sourcesExpanded) {
+                            Icons.Rounded.KeyboardArrowDown
+                        } else {
+                            Icons.AutoMirrored.Rounded.KeyboardArrowRight
+                        },
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             // 新鲜度行：上次分析相对时间（0 = 从未，只留右侧手动入口）+「立即分析」
             Row(
@@ -463,22 +479,125 @@ private fun StorageStorySection(
     }
 }
 
+/**
+ * 来源账区（Task 7.5）：Top3 chip（bytes 降序，OTHER 不展示，逐行可点进来源详情页）+
+ * 种类 >3 时「查看全部/收起」入口 + 展开态全量来源行。展开态由调用方持有
+ * （LOW_VALUE 建议行共用同一开关）。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StorageStorySourcesArea(
+    story: StorageStory,
+    sourcesExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onOpenSource: (AppSource) -> Unit,
+) {
+    val namedSources = story.sourceLedgers.filter { ledger -> ledger.source != AppSource.OTHER }
+    if (namedSources.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            namedSources.take(STORY_SOURCE_TOP_N).forEach { ledger ->
+                Text(
+                    text = stringResource(appSourceLabelRes(ledger.source)) + " " +
+                        FormatBytes.format(ledger.bytes),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onOpenSource(ledger.source) }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+            // 来源种类 > 3：查看全部/收起入口（与 LOW_VALUE 行共用同一展开态）
+            if (namedSources.size > STORY_SOURCE_TOP_N) {
+                Text(
+                    text = stringResource(
+                        if (sourcesExpanded) {
+                            R.string.org_sources_collapse
+                        } else {
+                            R.string.org_sources_view_all
+                        }
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onToggleExpanded)
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
+        }
+        // 来源列表（hub 内展开形态，Task 7.5 裁定）：全部非零来源完整行（含 OTHER），每行进详情页
+        if (sourcesExpanded) {
+            Text(
+                text = stringResource(R.string.org_sources_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            story.sourceLedgers.forEach { ledger ->
+                SourceLedgerRow(
+                    ledger = ledger,
+                    onOpenSource = onOpenSource,
+                )
+            }
+        }
+    }
+}
+
+/** 来源列表行（hub 内展开形态）：图标 + 来源名 + N items · X + chevron，点击进来源详情页。 */
+@Composable
+private fun SourceLedgerRow(
+    ledger: SourceLedger,
+    onOpenSource: (AppSource) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable { onOpenSource(ledger.source) }
+            .padding(horizontal = 4.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = appSourceIcon(ledger.source),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp)
+        )
+        Text(
+            text = stringResource(appSourceLabelRes(ledger.source)),
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = stringResource(
+                R.string.org_cat_meta,
+                ledger.count,
+                FormatBytes.format(ledger.bytes)
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false
+        )
+        Icon(
+            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
 /** 来源账 Top3 展示条数（bytes 降序截断）。 */
 private const val STORY_SOURCE_TOP_N = 3
-
-/** 来源名五语映射（叙事区来源账徽标行；OTHER 无条目不进映射）。 */
-private fun appSourceLabelRes(source: AppSource): Int = when (source) {
-    AppSource.CAMERA -> R.string.org_source_camera
-    AppSource.WECHAT -> R.string.org_source_wechat
-    AppSource.QQ -> R.string.org_source_qq
-    AppSource.WHATSAPP -> R.string.org_source_whatsapp
-    AppSource.TELEGRAM -> R.string.org_source_telegram
-    AppSource.INSTAGRAM -> R.string.org_source_instagram
-    AppSource.MESSENGER -> R.string.org_source_messenger
-    AppSource.DOWNLOAD -> R.string.org_source_download
-    AppSource.SCREENSHOTS -> R.string.org_source_screenshots
-    AppSource.OTHER -> R.string.org_source_other
-}
 
 /**
  * 「重复与相似照片」单行卡（64dp 紧凑行）：图标块 + 标题/摘要 + chevron；点击展开/收起。

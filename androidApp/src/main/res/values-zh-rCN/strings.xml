@@ -493,6 +493,11 @@
     <string name="org_source_download">下载</string>
     <string name="org_source_screenshots">截图</string>
     <string name="org_source_other">其他</string>
+    <string name="org_sources_view_all">查看全部</string>
+    <string name="org_sources_collapse">收起</string>
+    <string name="org_sources_title">来源</string>
+    <string name="org_source_detail_title">%1$s 媒体</string>
+    <string name="org_section_all_media">全部媒体（%1$d）</string>
 
     <!-- Swipe review（F2 手势快速整理全屏页） -->
     <string name="swipe_title">快速整理</string>
