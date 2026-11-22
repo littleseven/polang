@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 /**
  * 去重扫描前台 Service——仿 TagGenerationService（service/tag）精简版。
@@ -44,7 +45,8 @@ import kotlinx.coroutines.launch
  *   dedup_hash 缓存保证重扫增量）。
  *
  * ## 生命周期
- * - 终态（COMPLETED/CANCELLED）后延迟 [STOP_DELAY_MS] 自灭；延迟窗口内新会话重启则放弃收摊；
+ * - 终态（COMPLETED/CANCELLED）或无会话（null，含会话失败兜底清空）后释放唤醒锁并延迟
+ *   [STOP_DELAY_MS] 自灭；延迟窗口内新会话重启则放弃收摊；
  * - onStartCommand 分发后无活跃会话（复活型 pause/cancel intent / START_STICKY 空重启）即刻 stopSelf；
  * - onDestroy 清空 [sessionProgress]，防服务死亡后残留 RUNNING 让 VM 卡在扫描态。
  */
@@ -59,6 +61,12 @@ class DedupScanService : Service() {
         private const val STOP_DELAY_MS = 1_000L
 
         private const val WAKE_LOCK_TAG = "PoLang:DedupScanWakeLock"
+
+        /**
+         * 唤醒锁超时兜底：正常路径在终态/无会话/服务销毁时显式释放，此超时防释放遗漏
+         * （如异常路径绕过 collect）后永久持锁；60min ≥ 全库冷缓存扫描预期时长。
+         */
+        private val WAKE_LOCK_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(60)
 
         // ── Intent Action 常量 ──────────────────────────────
         const val ACTION_START = "com.mamba.picme.dedup.START"
@@ -146,9 +154,15 @@ class DedupScanService : Service() {
                 if (!coroutineContext.isActive) return@collect // onDestroy 已取消；禁止残留写复活进度
                 sessionProgress.value = progress
                 updateNotification(progress)
-                if (progress?.state == DedupScanState.COMPLETED ||
-                    progress?.state == DedupScanState.CANCELLED
+                // 终态或无会话（null）都收摊：终态 = 扫描结束；null 含会话失败路径
+                //（Manager 异常兜底清空进度——若只盯终态，失败后 FGS + 唤醒锁会永久滞留）。
+                // 初次 null（服务刚建、ACTION_START 未达）同样安全：START 走同一主线程派发
+                // 突发，progress 在 1s 复查前已置 RUNNING，复查见活跃即放弃收摊。
+                if (progress == null ||
+                    progress.state == DedupScanState.COMPLETED ||
+                    progress.state == DedupScanState.CANCELLED
                 ) {
+                    releaseWakeLockIfHeld()
                     scheduleStopIfIdle()
                 }
             }
@@ -230,9 +244,9 @@ class DedupScanService : Service() {
         }
     }
 
-    /** 扫描期间持有 partial wake lock，防止息屏后 CPU 休眠挂起扫描。 */
+    /** 扫描期间持有 partial wake lock，防止息屏后 CPU 休眠挂起扫描；超时兜底防终态释放遗漏后永久持锁。 */
     private fun acquireWakeLock() {
-        if (!wakeLock.isHeld) wakeLock.acquire()
+        if (!wakeLock.isHeld) wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS)
     }
 
     /** onDestroy 安全网：正常路径在终态/服务销毁时释放，此处兜底强制释放。 */

@@ -1,7 +1,9 @@
 package com.mamba.picme.service.dedup
 
 import android.content.Context
+import android.content.Intent
 import androidx.core.content.ContextCompat
+import com.mamba.picme.core.common.Logger
 import com.mamba.picme.domain.dedup.DedupScanConfig
 import com.mamba.picme.domain.dedup.DedupScanProgress
 import com.mamba.picme.domain.dedup.DedupScanSession
@@ -23,16 +25,29 @@ class ServiceBackedDedupScanSession(
         ContextCompat.startForegroundService(context, DedupScanService.intentStart(context, config))
     }
 
-    /** 控制命令走普通 startService：FGS 存活时 app 处前台态可自由 startService；服务已死则这些命令本就是 no-op。 */
+    /**
+     * 控制命令尽力而为：FGS 存活时 app 计入前台态、startService 合法；但服务已死或 app
+     * 退后台时 startService 会抛 IllegalStateException（API 26+）——本就无会话可控制，
+     * 吞异常记警告即可，绝不让控制面命令 crash 调用方（VM/任务卡/通知动作等远端触发点）。
+     */
     override fun pauseScan() {
-        context.startService(DedupScanService.intentPause(context))
+        control(DedupScanService.intentPause(context), "pause")
     }
 
     override fun resumeScan() {
-        context.startService(DedupScanService.intentResume(context))
+        control(DedupScanService.intentResume(context), "resume")
     }
 
     override fun cancelScan() {
-        context.startService(DedupScanService.intentCancel(context))
+        control(DedupScanService.intentCancel(context), "cancel")
+    }
+
+    private fun control(intent: Intent, action: String) {
+        runCatching { context.startService(intent) }
+            .onFailure { error -> Logger.w(TAG, "dedup scan $action command dropped (service dead or app backgrounded)", error) }
+    }
+
+    private companion object {
+        const val TAG = "PoLang:DedupScan"
     }
 }

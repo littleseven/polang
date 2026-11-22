@@ -50,10 +50,11 @@ class DedupScanSessionManagerTest {
         keepUri = "$id-a",
     )
 
-    /** 假扫描器：按脚本流出事件，可选挂起（模拟扫描进行中）；记录调用计数。 */
+    /** 假扫描器：按脚本流出事件，可选抛错（模拟扫描失败）/挂起（模拟扫描进行中）；记录调用计数。 */
     private class FakeScanner(
         private val events: List<DedupScanEvent>,
         private val hang: Boolean = false,
+        private val failWith: Exception? = null,
     ) : DedupScanController {
         override var pauseRequested: Boolean = false
         var resumeCount: Int = 0
@@ -76,6 +77,7 @@ class DedupScanSessionManagerTest {
             lastConfig = config
             return flow {
                 for (event in events) emit(event)
+                failWith?.let { failure -> throw failure }
                 if (hang) awaitCancellation()
             }
         }
@@ -264,5 +266,26 @@ class DedupScanSessionManagerTest {
         // COMPLETED 不是重入守卫态：允许发起全新会话
         assertEquals(2, scanner.scanCount)
         assertEquals(2, mediaSource.callCount)
+    }
+
+    @Test
+    fun `scan failure clears progress instead of sticking in running`() = runTest {
+        // 失败兜底契约：取数/扫描异常 → progress 置 null（VM 侧 null → Scanning 退 Config；
+        // 服务侧 null 触发释放唤醒锁 + 延时自灭——若停在 RUNNING，FGS 与唤醒锁将永久滞留）
+        val scanner = FakeScanner(
+            events = listOf(DedupScanEvent.Progress(DedupLevel.EXACT, 5, 100)),
+            failWith = RuntimeException("mediastore boom"),
+        )
+        val manager = manager(scanner)
+
+        manager.startScan(DedupScanConfig())
+        settle()
+
+        assertNull(manager.progress.value)
+
+        // 失败后会话归 IDLE：可立即重新发起（非 RUNNING/PAUSED 守卫态）
+        manager.startScan(DedupScanConfig())
+        settle()
+        assertEquals(2, scanner.scanCount)
     }
 }
