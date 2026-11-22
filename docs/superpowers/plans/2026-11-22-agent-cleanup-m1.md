@@ -649,6 +649,55 @@ git commit -m "feat(organize): hub 存储叙事区（总账/来源账/过期截�
 
 ---
 
+## Task 7.5: 来源详情页（按 App 浏览 + 删除，2026-11-22 用户追加）
+
+**背景**：用户验收时发现整理模块无法按 App 查看截图/保存的图。M1 原 spec §7 有意将来源账定为纯展示（详情页划 M2），用户现裁定提前到本分支做掉。
+
+**Files:**
+- Modify: `androidApp/src/main/java/com/mamba/picme/features/gallery/dedup/DedupHomeHub.kt`（来源账行可点 + 查看全部）
+- Modify: `DedupHomeScreen.kt` / `features/gallery/organize/OrganizeHomeRoute.kt` / `features/main/MainPagerHost.kt` / `MainActivity.kt`（`onOpenSource` 穿透 + 路由，与 `onOpenCategory` 同模式）
+- New: `features/gallery/organize/OrganizeSourceViewModel.kt` + `OrganizeSourceScreen.kt`（按 AppSource 过滤的详情页）
+- Modify: `androidApp/src/main/res/values*/strings.xml`（五语）
+- Modify: `docs/08-UI-SPECS/screens/organize.yaml`（来源详情页契约）
+
+**Interfaces:**
+- Consumes: `appSourceOf`（Task 2）、`OrganizeRepository.observeItems()`、`ValueGuard` 保护规则、`TrashSessionController` 回收站删除链路（系统确认 + undo）。
+- Produces: `onOpenSource(AppSource)` 回调（hub→路由穿透）；`OrganizeSourceViewModel`（过滤/分组/删除）。
+
+- [ ] **Step 1: OrganizeSourceViewModel**
+
+按 `AppSource` 过滤 `observeItems()`（`appSourceOf(relativePath) == source`），产出与类目详情页同构的 UiState（Loading/Ready(items, selected, trashed…)）。保护规则走 `ValueGuard`（人脸/老照片红线不变）；**AI 预选保守化：selected 默认空集**（来源页不做「建议删除」预选，全靠用户手选——删除谨慎原则）。删除复用 `TrashSessionController`（系统确认弹窗 + undo）。
+
+- [ ] **Step 2: OrganizeSourceScreen**
+
+复用 `OrganizeCategoryScreen` 的网格/Section/删除栏组件；耦合过重则抽取共用子组件到同包。三段分组简化为两段：保护项（ValueGuard 命中）单独一段不可选，其余按日期降序一段。
+
+- [ ] **Step 3: hub 入口**
+
+来源账 Top3 行逐行可点 → `onOpenSource(对应 AppSource)`；LOW_VALUE 聚合行可点 → 来源列表（见 Step 4）；来源种类 >3 时「查看全部」入口。`boardLoaded` 同款 null 守卫不变。
+
+- [ ] **Step 4: 来源列表**
+
+全部非零来源的完整列表（图标/名称/件数/字节），每行进详情页。实现形态二选一由实现者裁定并记报告：hub 内展开 或 独立 `OrganizeSourceListScreen`。五语标题。
+
+- [ ] **Step 5: 穿透 + 路由**
+
+`onOpenSource: (AppSource) -> Unit` 沿 onOpenCategory 既有链路穿透；详情页导航目标登记（与类目详情页同一路由机制）。
+
+- [ ] **Step 6: 五语 + organize.yaml**
+
+新 key：`org_sources_view_all`、`org_source_detail_title`（带来源名参数）、来源列表页标题等；organize.yaml 登记来源列表/详情页契约（入口、数据口径、删除语义）。
+
+- [ ] **Step 7: 测试 + 编译**
+
+VM 过滤正确性（多来源混杂 → 只出目标 source）、保护项不可选、删除走 Trash 链路单测；`./gradlew :androidApp:testDebugUnitTest :androidApp:assembleDebug` 全绿。
+
+- [ ] **Step 8: Commit**
+
+`feat(organize): 来源详情页（按 App 浏览媒体 + 回收站删除，hub 来源账可点）`
+
+---
+
 ## Task 8: 文档同步 + 全量验证
 
 **Files:**
