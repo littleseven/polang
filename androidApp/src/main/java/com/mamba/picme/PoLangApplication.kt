@@ -405,6 +405,11 @@ class PoLangApplication : Application(), ImageLoaderFactory {
 
         // 一次性清理已下线的 smolvlm_500m 模型目录（幂等：不存在则空操作）
         purgeSmolVlmIfFirstRun()
+
+        // 遥测缓冲回收：上次运行可能残留未发出的事件（失败多发生在差网络），启动时补发
+        applicationScope.launch {
+            runCatching { container.telemetryReporter.flushPending() }
+        }
     }
 
     /**

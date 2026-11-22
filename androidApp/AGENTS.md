@@ -160,7 +160,9 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `local/` | `AppDatabase`（Room v28）、`MediaDao`、`ChatMessageDao`、`ChatSessionDao`、`PersonRelationDao`、`MemoryFactDao`、`RoomUserTaskStore`（UserTaskDao → shared UserTaskStore 适配，entity↔UserTaskRow 映射） | Room 数据库 + DAO；v13 新增 `person_relations`（人物关系边，FK→persons CASCADE）与 `memory_facts`（事实记忆），`persons` 加 `is_self` 列；v14 `person_relations` 加 `customLabel` 列（自定义称呼，可空，MIGRATION_13_14）；v15 新增 `chat_image_cache` 表（chat 编辑/优化结果图私有缓存登记，MIGRATION_14_15）；v16 `tag_scan_tasks.pass` 旧值 `QWEN_TAGGING` 改写为 `IMAGE_TAGGING`（枚举重命名，MIGRATION_15_16）；v17 `media_assets` 加 `city` 列（逆地理编码城市，MIGRATION_16_17）；v18 `media_assets` 加 `faceFocusY` 列（人脸纵向聚焦点，MIGRATION_17_18）；v19 `media_assets` 加 `aestheticScore`/`faceQualityScore` 列（美学/人脸质量分，MIGRATION_18_19）；v20 新增 `optimize_feedback` 表（AI 优化抽卡反馈，MIGRATION_19_20）；v21 新增 `dedup_hash` 表（去重 2.0 MD5/pHash 缓存，MIGRATION_20_21）；v22 `media_assets` 加 `blurScore`/`exposureScore`/`lastViewedAt` 列（整理中心 v2 信号，MIGRATION_21_22）；v23 `media_assets` 加 `uri` 非唯一索引（MIGRATION_22_23）；v24 新增 `user_task` 表（用户任务注册表身份行，MIGRATION_23_24）；v25/v26 纯 DDL（chat 表 partsJson/role 列，回填逻辑已随 v28 删除）；v27 parts-first 中间态（不入生产）；**v28 聊天表 DROP+重建重置**（chat_sessions/chat_messages 清库，partsJson 权威非空 + type/content/metadata 派生投影 `projectChatRow`，写路径 `insertPartsMessage`/`replacePartsMessage`；LegacyChatTypeMigration/MessagePartsConverter 全删，备份 v6 走 `BackupChatRestoreMapper` 粗映射；详见 ADR-016 D1 + spec 2026-11-08-chat-value-domain-ideal） |
 | `remote/openai/` | OpenAI API 客户端（Retrofit） | 远程 LLM 网络层 |
 | `remote/anthropic/` | Anthropic/Claude API 客户端（Retrofit） | 备用远程 LLM |
-| `download/` | `LlmModelDownloadManager`、`ModelDownloadForegroundService` | LLM 模型下载管理 + 前台服务 |
+| `remote/picme/` | picme-server 客户端族（`TelemetryClient`/`IssueReportClient`/`CloudAgentClient` 等） | 自建后端网络层；`TelemetryClient`（2026-11-22）：`POST /telemetry` 批量上报，X-Device-Id/X-Platform/X-App-Channel 头，`TelemetrySender` 接口隔离便于 mock |
+| `download/` | `LlmModelDownloadManager`、`ModelDownloadForegroundService` | LLM 模型下载管理 + 前台服务；下载终态遥测埋点（completed/failed(分 integrity/http/timeout/io/unknown)/cancelled，经 companion `telemetryReporter` 挂点——本类非单例，SettingsScreen 会另建实例；全部必备模型就位时一次性上报 `models_ready`，2026-11-22） |
+| `telemetry/` | `TelemetryReporter`、`TelemetryEventBuffer`、`ScanTelemetryCollector` | 转化漏斗遥测（2026-11-22）：装机→模型下载→必备模型就绪→扫描启动→扫描完成；公共字段（region/networkType/tz/appVersion/channel/platform）由 reporter 统一注入，**deviceId 不进 payload、只走 X-Device-Id 请求头**（服务端落独立列）；发送失败 JSONL 落盘缓冲（filesDir/telemetry/pending_events.jsonl，上限 200 丢最旧），启动时 `PoLangApplication.onCreate` flush 回收——防失败事件丢失致统计偏差；`ScanTelemetryCollector` 旁路订阅 `TagGenerationService.sessionProgress` 检测会话边界（引擎零侵入），经 `startUserTaskAdapters()` 接缝启动 |
 | `repository/` | 仓储接口的 Room/DataStore/Network 实现；`PersonRepository`（人物命名/"我"标记/关系图谱收口，2026-11-07 自 `domain/person/` 迁回——分层止血试点） | 数据源实现 |
 | `preferences/` | DataStore Preferences | 用户偏好持久化 |
 
@@ -292,5 +294,5 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-10-06
+> **最后更新**：2026-11-22
 > **状态**：生效中

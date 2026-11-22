@@ -775,6 +775,21 @@ fun Route.adminRoute(
         }
 
         // ── 问题诊断页（用户上报问题；AI 工程师白名单已迁至 /admin/settings）──
+        // 模型下载遥测（分地区成功率）：遥测事件经 POST /telemetry 入 telemetry_event 表，此页只做聚合展示
+        get("/telemetry/downloads") {
+            if (!call.adminGuard(adminToken)) return@get
+            val days = call.request.queryParameters["days"]?.toIntOrNull()?.coerceIn(1, 90) ?: 30
+            call.respondText(
+                AdminViews.downloadStatsPage(
+                    AdminQueries.modelDownloadStats(days),
+                    AdminQueries.modelDownloadStatsByModel(days),
+                    AdminQueries.telemetryFunnel(days),
+                    days,
+                ),
+                ContentType.Text.Html,
+            )
+        }
+
         get("/diagnosis") {
             if (!call.adminGuard(adminToken)) return@get
             val msg = call.request.queryParameters["msg"]

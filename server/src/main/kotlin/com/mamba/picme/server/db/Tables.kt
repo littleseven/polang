@@ -36,6 +36,8 @@ object TelemetryEvents : Table("telemetry_event") {
     val id = long("id").autoIncrement()
     val type = varchar("type", 64)
     val payloadJson = text("payload_json").nullable()
+    /** 访客设备标识（X-Device-Id）：转化漏斗按设备串事件用；payload 内不含，只在此列 */
+    val deviceId = varchar("device_id", 128).nullable()
     val createdAt = long("created_at")
     override val primaryKey = PrimaryKey(id)
 }

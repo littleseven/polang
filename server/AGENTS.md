@@ -13,9 +13,9 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.52
+**版本**：0.9.53
 
-**最后更新**：2026-11-18
+**最后更新**：2026-11-22
 
 **状态**：生效中 / 已上线
 
@@ -30,7 +30,7 @@
 - **账号体系**：`EmailService` + `AccountService` + `AppTokenAuth` — 邮箱注册、动态 Token、SHA-256 校验
 - **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量/渠道/设置/问题诊断/发包 + M2 推理追溯：调用流水/Agent 会话回放）
 - **推荐引擎**：`RuleEngine` — 纯规则型场景推荐（规避算法备案）
-- **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite
+- **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite；访客放行（`X-Device-Id` 作滥用闸门，首启下载阶段用户未注册，不放行则系统性丢失新装样本）；`device_id` 独立列（不进 payload）支撑设备维漏斗串联；转化漏斗统计（装机→模型下载→必备模型就绪→扫描启动→扫描完成）+ 分地区成功率走 `/admin/telemetry/downloads`（2026-11-22）
 - **COS 存储**：`CosService` — 腾讯 COS 上传/元数据/预签名 URL；APK 下载 URL 渠道路由（`apkPublicUrl(channel)`：debug 轨可经 `APK_DEBUG_PUBLIC_BASE` 指向北京轻量国内镜像，release 轨恒走 `cos.polang.net`）
 - **限流**：`RateLimiter` — per-IP 令牌桶 + 日预算熔断
 - **网页搜索**：`WebSearchRoute` + `WebSearchService`（websearch/）— 主聊天 `web_search` 工具上游：`POST /v1/web-search` 鉴权（X-App-Token / 访客 X-Device-Id，同 LLM 口径）→ DeepSeek Search API（`/v1/tools/search`，`need_content=true`，按次计费 5 元/千次成功请求）→ 服务端瘦身（Markdown 正文提取 https 配图 URL ≤3 条/结果 + 400 字符摘录 + ≤5 结果）回紧凑 JSON；key 走 env `DEEPSEEK_SEARCH_API_KEY`（空 = 路由 503 `web_search_unavailable` 降级，端侧能力层回不可用文案）；成功调用记 `llm_call_log`（model=`deepseek-web-search`，usage=null 成本列 0，按次成本见官方口径）
@@ -55,7 +55,7 @@ server/
 │   ├── routes/
 │   │   ├── HealthzRoute.kt       # GET /healthz — 存活探活
 │   │   ├── RecommendRoute.kt     # POST /recommend — 场景推荐
-│   │   ├── TelemetryRoute.kt     # POST /telemetry — 遥测收集
+│   │   ├── TelemetryRoute.kt     # POST /telemetry — 遥测收集（批量上限 400；device_id 落独立列）
 │   │   ├── AuthRoute.kt          # POST /auth/email/{send,verify}、GET /auth/quota、DELETE /auth/account、DELETE /guest/device
 │   │   ├── ClaudeChatRoute.kt    # POST /v1/claude-chat、/v1/claude-deliver、GET /v1/claude-engineer/available
 │   │   ├── ClaudeToolResultRoute.kt # POST /v1/claude-tool-result — App tool 结果回传
@@ -77,10 +77,10 @@ server/
 │   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理
 │   │   └── AiEngineerWhitelistService.kt # AI 工程师交付白名单
 │   ├── admin/
-│   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页 + M2 推理追溯三路由：/admin/llm/calls、/admin/agent/sessions[/{id}]）
+│   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页 + M2 推理追溯三路由：/admin/llm/calls、/admin/agent/sessions[/{id}] + /admin/telemetry/downloads 下载遥测）
 │   │   ├── AdminAuth.kt          # ADMIN_TOKEN + cookie 认证
-│   │   ├── AdminViews.kt         # kotlinx.html SSR 页面（含调用流水/Agent 会话回放页）
-│   │   └── AdminQueries.kt       # 运营数据查询（含 llmCalls 游标分页查询 / agent 会话与事件回放查询）
+│   │   ├── AdminViews.kt         # kotlinx.html SSR 页面（含调用流水/Agent 会话回放页/下载遥测漏斗页）
+│   │   └── AdminQueries.kt       # 运营数据查询（含 llmCalls 游标分页查询 / agent 会话与事件回放查询 / 遥测漏斗与分地区下载统计）
 │   ├── issue/
 │   │   ├── IssueReportService.kt # 问题上报存库 + GitHub 同步
 │   │   ├── IssueSanitizer.kt     # 隐私脱敏
@@ -150,6 +150,7 @@ server/
 │   ├── 011_browser_session.sql
 │   ├── 012_agent_session.sql     # 云端 Agent 会话域（ADR-018）
 │   ├── 013_llm_call_log_cached_tokens.sql  # prompt 前缀缓存命中列（2026-10-17）
+│   ├── 014_telemetry_device_id.sql  # telemetry_event.device_id 列（2026-11-22，漏斗设备串联）
 │   └── seed_rules.sql            # 初始推荐规则
 ├── src/test/kotlin/              # 测试基建（下列为示意，实际 75 个 *Test.kt + 4 个辅助类）
 │   ├── ChannelRepositoryTest.kt
@@ -172,7 +173,7 @@ server/
 |------|------|--------|------|------|------|
 | GET | `/healthz` | P0 | ✅ | 无 | 存活探活 |
 | POST | `/recommend` | P0 | ✅ | X-App-Token | 场景标签 → 参数包 |
-| POST | `/telemetry` | P0 | ✅ | X-App-Token | 批量匿名遥测 |
+| POST | `/telemetry` | P0 | ✅ | X-App-Token 或访客 X-Device-Id | 批量匿名遥测（模型下载/就绪/扫描漏斗事件） |
 | POST | `/v1/chat/completions` | P0 | ✅ | X-App-Token | LLM 代理（流式 SSE） |
 | POST | `/chat/completions` | P0 | ✅ | X-App-Token | 旧路径兼容 |
 | POST | `/agent/sessions` | P1 | ✅ | X-App-Token | 云端 Agent 建会话（channel=gateway\|byok，ADR-018） |
@@ -193,6 +194,7 @@ server/
 | POST | `/admin/settings/whitelist` | P1 | ✅ | ADMIN_TOKEN | 添加 AI 工程师白名单邮箱 |
 | POST | `/admin/settings/whitelist/revoke` | P1 | ✅ | ADMIN_TOKEN | 移除 AI 工程师白名单邮箱 |
 | GET | `/admin/diagnosis` | P1 | ✅ | ADMIN_TOKEN | 用户上报问题列表（状态流转 / 手动同步 GitHub） |
+| GET | `/admin/telemetry/downloads` | P1 | ✅ | ADMIN_TOKEN | 下载遥测（2026-11-22）：按 device_id 四级漏斗（下载→就绪→扫描启动→扫描完成，含级间转化率）+ 分地区成功率聚合 + 分模型×分地区成功率/平均耗时/速度（`AdminQueries.modelDownloadStatsByModel`），`days` 参数 1-90 默认 30 |
 | GET | `/admin/llm/calls` | P1 | ✅ | ADMIN_TOKEN | 调用流水（llm_call_log id 倒序游标 `before`，单页 50，满页才给下一页链接防末页死循环；`status`/`provider`/`model`/`account_id` 筛选；非法 `before`/`account_id` 回 400） |
 | GET | `/admin/agent/sessions` | P1 | ✅ | ADMIN_TOKEN | Agent 会话列表（seq 倒序游标 `before_seq`，单页 50；`account_id` 筛选；非法游标/参数回 400；stalled = running 且最后事件 >30min，状态列直显 stalled 不显示 running 徽标，2026-11-07） |
 | GET | `/admin/agent/sessions/{id}` | P1 | ✅ | ADMIN_TOKEN | 会话事件回放（事件 id 升序 `after` 游标，单页 200；未知 sessionId 回 404） |

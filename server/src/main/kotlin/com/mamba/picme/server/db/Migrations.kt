@@ -23,11 +23,11 @@ object Migrations {
                 // 云端 Agent 会话域（ADR-018）：会话元数据 + 事件流
                 AgentSessions, AgentEvents,
             )
-            // 给现存表补缺失列（如 llm_channel.default_model、apk_upload.channel），幂等
+            // 给现存表补缺失列（如 llm_channel.default_model、apk_upload.channel、telemetry_event.device_id），幂等
             SchemaUtils.createMissingTablesAndColumns(
                 Accounts, LlmChannels, LlmCallLogs, ServerSettings,
                 AiEngineerWhitelists, ReportedIssues, AnonymousDevices,
-                IosUdidRegistrations, ApkUploads,
+                IosUdidRegistrations, ApkUploads, TelemetryEvents,
             )
             seedRules()
         }

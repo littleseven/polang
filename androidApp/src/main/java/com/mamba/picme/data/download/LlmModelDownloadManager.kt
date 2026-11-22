@@ -72,6 +72,16 @@ class LlmModelDownloadManager(context: Context) {
         private const val STALE_PART_AGE_MS = 30L * 60 * 1000
 
         /**
+         * 下载遥测上报器（进程级装配，由 AppContainer 注入）。
+         *
+         * 必须 companion 级而非构造函数注入：本类并非单例（除 AppContainer 外，SettingsScreen
+         * 语音区每行进页都会 remember 新实例），构造函数注入会让非 AppContainer 实例的下载
+         * 事件漏报；companion 注入保证任何实例的终态事件统一上报（与 stalePartCleaned 同理）。
+         */
+        @Volatile
+        var telemetryReporter: com.mamba.picme.data.telemetry.TelemetryReporter? = null
+
+        /**
          * MNN-LLM 模型固定文件列表
          */
         private val LLM_MODEL_FILES = listOf(
@@ -835,6 +845,7 @@ fun isModelDownloaded(modelId: String): Boolean {
      * 恢复暂停的下载
      */
     fun resumeDownload(modelId: String, modelConfig: ModelConfig? = null): Flow<DownloadProgress> = flow {
+        val downloadStartMs = System.currentTimeMillis()
         val config = modelConfig ?: loadAvailableModels().find { it.id == modelId }
             ?: throw IllegalArgumentException("Unknown model: $modelId")
 
@@ -977,6 +988,8 @@ fun isModelDownloaded(modelId: String): Boolean {
             updateServiceState()
             emit(DownloadProgress(modelId, actualTotalBytes, actualTotalBytes, DownloadStatus.COMPLETED))
             Logger.i(TAG, "Model download completed: $modelId")
+            telemetryReporter?.reportModelCompleted(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = true)
+            reportModelsReadyIfAllDownloaded()
 
         } catch (e: Exception) {
             // 数据完整性错误（大小/SHA256 不符）不是暂停：必须优先于暂停意图判定，
@@ -987,6 +1000,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
+                telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, "integrity", resumed = true)
                 return@flow
             }
             // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
@@ -1004,6 +1018,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
+                telemetryReporter?.reportModelCancelled(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = true)
                 return@flow
             }
             val errorMsg = e.message ?: e.javaClass.simpleName
@@ -1011,6 +1026,7 @@ fun isModelDownloaded(modelId: String): Boolean {
             _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
             updateServiceState()
             emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
+            telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, classifyDownloadError(e), resumed = true)
         }
     }.flowOn(Dispatchers.IO)
 
@@ -1023,6 +1039,7 @@ fun isModelDownloaded(modelId: String): Boolean {
      * @return Flow<DownloadProgress> 下载进度流
      */
     fun downloadModel(modelId: String, modelConfig: ModelConfig? = null): Flow<DownloadProgress> = flow {
+        val downloadStartMs = System.currentTimeMillis()
         val config = modelConfig ?: loadAvailableModels().find { it.id == modelId }
             ?: throw IllegalArgumentException("Unknown model: $modelId")
 
@@ -1242,6 +1259,8 @@ fun isModelDownloaded(modelId: String): Boolean {
             updateServiceState()
             emit(DownloadProgress(modelId, actualTotalBytes, actualTotalBytes, DownloadStatus.COMPLETED))
             Logger.i(TAG, "Model download completed: $modelId")
+            telemetryReporter?.reportModelCompleted(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = false)
+            reportModelsReadyIfAllDownloaded()
 
         } catch (e: Exception) {
             // 数据完整性错误（大小/SHA256 不符）不是暂停：必须优先于暂停意图判定，
@@ -1252,6 +1271,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
+                telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, "integrity", resumed = false)
                 return@flow
             }
             // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
@@ -1269,6 +1289,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
+                telemetryReporter?.reportModelCancelled(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = false)
                 return@flow
             }
             val errorMsg = e.message ?: e.javaClass.simpleName
@@ -1276,6 +1297,7 @@ fun isModelDownloaded(modelId: String): Boolean {
             _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
             updateServiceState()
             emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
+            telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, classifyDownloadError(e), resumed = false)
         }
     }.flowOn(Dispatchers.IO)
 
@@ -1297,6 +1319,31 @@ fun isModelDownloaded(modelId: String): Boolean {
      * 否则用户在 UI 上反复 resume 反复静默失败。
      */
     private class DownloadIntegrityException(message: String) : IOException(message)
+
+    /**
+     * 漏斗节点「模型关通过」：必备模型全部就绪时上报 models_ready。
+     * 幂等性由 reporter 内部旗标保证（每安装只报一次），此处可放心重复调用。
+     */
+    private fun reportModelsReadyIfAllDownloaded() {
+        val reporter = telemetryReporter ?: return
+        runCatching {
+            if (ModelConfig.REQUIRED_MODEL_IDS.all { isModelDownloaded(it) }) {
+                reporter.reportModelsReadyOnce(ModelConfig.REQUIRED_MODEL_IDS.size)
+            }
+        }.onFailure { Logger.w(TAG, "reportModelsReady check failed", it) }
+    }
+
+    /**
+     * 下载失败的遥测错误分类（只分类不上传原始 message——message 可能含 URL/路径等实现细节）。
+     * 分类口径与 server 端 DownloadRegionStatRow 的消费对齐，改动须双向同步。
+     */
+    private fun classifyDownloadError(e: Throwable): String = when {
+        e is DownloadIntegrityException -> "integrity"
+        e.message?.startsWith("HTTP ") == true -> "http"
+        e is java.net.SocketTimeoutException -> "timeout"
+        e is IOException -> "io"
+        else -> "unknown"
+    }
 
     private fun verifyDownloadedFile(
         destFile: File,

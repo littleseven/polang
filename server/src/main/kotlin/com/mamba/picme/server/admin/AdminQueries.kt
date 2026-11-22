@@ -13,12 +13,21 @@ import com.mamba.picme.server.db.BrowserSessions
 import com.mamba.picme.server.db.Db
 import com.mamba.picme.server.db.IosUdidRegistrations
 import com.mamba.picme.server.db.LlmCallLogs
+import com.mamba.picme.server.db.TelemetryEvents
+import com.mamba.picme.server.routes.TELEMETRY_TYPE_GALLERY_SCAN
+import com.mamba.picme.server.routes.TELEMETRY_TYPE_MODELS_READY
+import com.mamba.picme.server.routes.TELEMETRY_TYPE_MODEL_DOWNLOAD
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.Op
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.count
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNotNull
 import org.jetbrains.exposed.sql.max
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.SortOrder
@@ -209,6 +218,78 @@ data class RangeStats(
     val totals: DayBucket,
     val costSplit: CostSplit = CostSplit(0.0, 0.0),
 )
+
+// ── 模型下载遥测（分地区成功率，2026-11-22）─────────────────────
+
+/** 一条 model_download 遥测事件的解析结果（payload 契约见 TelemetryRoute/客户端 DownloadTelemetryReporter） */
+data class ModelDownloadEvent(
+    val modelId: String,
+    val outcome: String,          // completed | failed | cancelled
+    val errorClass: String?,      // integrity | http | io | unknown（failed 时）
+    val bytes: Long,
+    val durationMs: Long,
+    val networkType: String,      // wifi | cellular | other
+    val region: String,           // 端侧 Locale.country（网络出口地区的代理指标）
+    val appVersion: String,
+    val channel: String,
+)
+
+/** 分地区聚合行：successRate 只按 completed/failed 计，cancelled（用户主动）单列不计入分母 */
+data class DownloadRegionStatRow(
+    val region: String,
+    val completed: Long,
+    val failed: Long,
+    val cancelled: Long,
+    val integrityFailed: Long,
+    val avgSpeedKbps: Double,     // 仅 completed 事件的 bytes/durationMs 均值；无样本为 0
+) {
+    val successRate: Double
+        get() = if (completed + failed == 0L) 0.0 else completed.toDouble() / (completed + failed)
+}
+
+/** 转化漏斗一级：到达设备数 + 相对上一级的转化率（第一级为 null） */
+data class FunnelRow(
+    val stage: String,
+    val label: String,
+    val devices: Long,
+    val conversionFromPrev: Double?,
+)
+
+/** 分地区×分模型聚合行（2026-11-22）：定位「哪个模型在哪个地区卡下载」 */
+data class DownloadModelStatRow(
+    val modelId: String,
+    val region: String,
+    val completed: Long,
+    val failed: Long,
+    val cancelled: Long,
+    val avgDurationMs: Long,    // 仅 completed 事件均值；无样本为 0
+    val avgSpeedKbps: Double,   // 仅 completed 事件均值；无样本为 0
+) {
+    val successRate: Double
+        get() = if (completed + failed == 0L) 0.0 else completed.toDouble() / (completed + failed)
+}
+
+/** 解析 model_download 事件 payload；缺 modelId/outcome 或 JSON 非法返回 null（坏事件静默跳过，不拖垮整页统计） */
+internal fun parseModelDownloadEvent(payloadJson: String?): ModelDownloadEvent? {
+    if (payloadJson.isNullOrBlank()) return null
+    val obj = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(payloadJson) as? JsonObject }
+        .getOrNull() ?: return null
+    fun str(key: String): String? = (obj[key] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
+    fun num(key: String): Long = (obj[key] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+    val modelId = str("modelId") ?: return null
+    val outcome = str("outcome") ?: return null
+    return ModelDownloadEvent(
+        modelId = modelId,
+        outcome = outcome,
+        errorClass = str("errorClass"),
+        bytes = num("bytes"),
+        durationMs = num("durationMs"),
+        networkType = str("networkType") ?: "other",
+        region = str("region") ?: "unknown",
+        appVersion = str("appVersion") ?: "",
+        channel = str("channel") ?: "",
+    )
+}
 
 // ── Queries（自然日按 UTC+8；内部后台够用。聚合在内存做，trial 规模毫秒级）──
 
@@ -578,6 +659,157 @@ object AdminQueries {
 
     suspend fun devicesCount(): Long = newSuspendedTransaction(Dispatchers.IO, Db.instance) {
         AnonymousDevices.selectAll().count()
+    }
+
+    /**
+     * 模型下载遥测聚合：读 [TelemetryEvents] 中 type=model_download 的行，内存解析 payload 分组。
+     * 不走 SQL json_extract：事件量小（每模型每次下载一行），内存聚合换来 payload 契约解析的
+     * 类型安全与可测性；days 限定窗口防表无限增长后的慢查询。
+     */
+    suspend fun modelDownloadStats(days: Int = 30, now: Long = System.currentTimeMillis()): List<DownloadRegionStatRow> =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            val since = now - days * DAY_MS
+            val acc = linkedMapOf<String, RegionAcc>()
+            TelemetryEvents.selectAll()
+                .where { (TelemetryEvents.type eq TELEMETRY_TYPE_MODEL_DOWNLOAD) and (TelemetryEvents.createdAt greaterEq since) }
+                .forEach { row ->
+                    val ev = parseModelDownloadEvent(row[TelemetryEvents.payloadJson]) ?: return@forEach
+                    val a = acc.getOrPut(ev.region) { RegionAcc() }
+                    when (ev.outcome) {
+                        "completed" -> {
+                            a.completed++
+                            if (ev.durationMs > 0 && ev.bytes > 0) {
+                                a.speedSumKbps += ev.bytes / 1024.0 / (ev.durationMs / 1000.0)
+                                a.speedSamples++
+                            }
+                        }
+                        "failed" -> {
+                            a.failed++
+                            if (ev.errorClass == "integrity") a.integrityFailed++
+                        }
+                        "cancelled" -> a.cancelled++
+                    }
+                }
+            acc.map { (region, a) ->
+                DownloadRegionStatRow(
+                    region = region,
+                    completed = a.completed,
+                    failed = a.failed,
+                    cancelled = a.cancelled,
+                    integrityFailed = a.integrityFailed,
+                    avgSpeedKbps = if (a.speedSamples == 0L) 0.0 else a.speedSumKbps / a.speedSamples,
+                )
+            }.sortedByDescending { it.completed + it.failed }
+        }
+
+    private class RegionAcc {
+        var completed = 0L
+        var failed = 0L
+        var cancelled = 0L
+        var integrityFailed = 0L
+        var speedSumKbps = 0.0
+        var speedSamples = 0L
+    }
+
+    /**
+     * 分地区×分模型聚合（2026-11-22）：与 [modelDownloadStats] 同数据源同口径，
+     * 分组键多一维 modelId，回答「哪个模型在哪个地区成功率低/耗时长」。
+     */
+    suspend fun modelDownloadStatsByModel(days: Int = 30, now: Long = System.currentTimeMillis()): List<DownloadModelStatRow> =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            val since = now - days * DAY_MS
+            val acc = linkedMapOf<Pair<String, String>, ModelAcc>()
+            TelemetryEvents.selectAll()
+                .where { (TelemetryEvents.type eq TELEMETRY_TYPE_MODEL_DOWNLOAD) and (TelemetryEvents.createdAt greaterEq since) }
+                .forEach { row ->
+                    val ev = parseModelDownloadEvent(row[TelemetryEvents.payloadJson]) ?: return@forEach
+                    val a = acc.getOrPut(ev.modelId to ev.region) { ModelAcc() }
+                    when (ev.outcome) {
+                        "completed" -> {
+                            a.completed++
+                            if (ev.durationMs > 0) {
+                                a.durationSumMs += ev.durationMs
+                                a.durationSamples++
+                            }
+                            if (ev.durationMs > 0 && ev.bytes > 0) {
+                                a.speedSumKbps += ev.bytes / 1024.0 / (ev.durationMs / 1000.0)
+                                a.speedSamples++
+                            }
+                        }
+                        "failed" -> a.failed++
+                        "cancelled" -> a.cancelled++
+                    }
+                }
+            acc.map { (key, a) ->
+                DownloadModelStatRow(
+                    modelId = key.first,
+                    region = key.second,
+                    completed = a.completed,
+                    failed = a.failed,
+                    cancelled = a.cancelled,
+                    avgDurationMs = if (a.durationSamples == 0L) 0L else a.durationSumMs / a.durationSamples,
+                    avgSpeedKbps = if (a.speedSamples == 0L) 0.0 else a.speedSumKbps / a.speedSamples,
+                )
+            }.sortedWith(compareBy({ it.modelId }, { -(it.completed + it.failed) }, { it.region }))
+        }
+
+    private class ModelAcc {
+        var completed = 0L
+        var failed = 0L
+        var cancelled = 0L
+        var durationSumMs = 0L
+        var durationSamples = 0L
+        var speedSumKbps = 0.0
+        var speedSamples = 0L
+    }
+
+    /**
+     * 转化漏斗：装机后「模型下载 → 必备模型就绪 → 扫描启动 → 扫描完成」的按设备到达数。
+     * 设备串联靠 telemetry_event.device_id（X-Device-Id）；无 deviceId 的历史行不参与。
+     * 漏斗读数口径：到达过该级即计入（不严格按时序——events 按设备聚合后时序噪声不影响级间差值结论）。
+     */
+    suspend fun telemetryFunnel(days: Int = 30, now: Long = System.currentTimeMillis()): List<FunnelRow> =
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            val since = now - days * DAY_MS
+            val deviceStages = mutableMapOf<String, MutableSet<String>>()
+            TelemetryEvents.selectAll()
+                .where {
+                    (TelemetryEvents.type inList listOf(
+                        TELEMETRY_TYPE_MODEL_DOWNLOAD, TELEMETRY_TYPE_MODELS_READY, TELEMETRY_TYPE_GALLERY_SCAN,
+                    )) and (TelemetryEvents.createdAt greaterEq since) and (TelemetryEvents.deviceId.isNotNull())
+                }
+                .forEach { row ->
+                    val device = row[TelemetryEvents.deviceId] ?: return@forEach
+                    val stages = deviceStages.getOrPut(device) { mutableSetOf() }
+                    when (row[TelemetryEvents.type]) {
+                        TELEMETRY_TYPE_MODEL_DOWNLOAD -> stages.add("download")
+                        TELEMETRY_TYPE_MODELS_READY -> stages.add("ready")
+                        TELEMETRY_TYPE_GALLERY_SCAN -> {
+                            val phase = scanPhaseOf(row[TelemetryEvents.payloadJson])
+                            if (phase == "started") stages.add("scan_started")
+                            if (phase == "completed") stages.add("scan_completed")
+                        }
+                    }
+                }
+            val counts = listOf("download", "ready", "scan_started", "scan_completed")
+                .map { stage -> deviceStages.values.count { stage in it }.toLong() }
+            val labels = listOf("开始下载模型", "必备模型就绪", "扫描启动", "扫描完成")
+            counts.mapIndexed { i, n ->
+                FunnelRow(
+                    stage = listOf("download", "ready", "scan_started", "scan_completed")[i],
+                    label = labels[i],
+                    devices = n,
+                    conversionFromPrev = if (i == 0 || counts[i - 1] == 0L) null else n.toDouble() / counts[i - 1],
+                )
+            }
+        }
+
+    /** 提取 gallery_scan 事件的 phase 字段；坏事件返回 null */
+    private fun scanPhaseOf(payloadJson: String?): String? {
+        if (payloadJson.isNullOrBlank()) return null
+        val obj = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(payloadJson) as? JsonObject }
+            .getOrNull() ?: return null
+        return (obj["phase"] as? JsonPrimitive)?.content
     }
 
     private class DayAcc {

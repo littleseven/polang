@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.mamba.picme.BuildConfig
 import com.mamba.picme.R
 import com.mamba.picme.agent.core.platform.voice.KeywordSpotterEngine
 import com.mamba.picme.beauty.api.PhotoProcessor
@@ -68,6 +69,9 @@ import com.mamba.picme.data.download.DownloadState
 import com.mamba.picme.data.download.LlmModelDownloadManager
 import com.mamba.picme.data.download.ModelConfig
 import com.mamba.picme.data.download.ModelPathConfig
+import com.mamba.picme.data.remote.appChannelValue
+import com.mamba.picme.data.telemetry.ScanTelemetryCollector
+import com.mamba.picme.data.telemetry.TelemetryReporter
 import com.mamba.picme.domain.backup.BackupTagDataUseCase
 import com.mamba.picme.domain.backup.RestoreTagDataUseCase
 import com.mamba.picme.domain.backup.TagDataBackupRepository
@@ -334,6 +338,8 @@ interface AppContainer {
     val imageProcessor: ImageProcessor
     val faceDetector: FaceDetector
     val llmModelDownloadManager: LlmModelDownloadManager
+    /** 遥测上报器（转化漏斗：模型下载/模型就绪/扫描会话）；进程级注入 downloadManager companion */
+    val telemetryReporter: TelemetryReporter
     /** 用户任务注册表（spec §5）：任务中心后台任务 Tab 与顶栏角标的数据源 */
     val userTaskRegistry: UserTaskRegistry
     val kwsEngine: KeywordSpotterEngine?
@@ -758,8 +764,20 @@ class AppContainerImpl(
         ImageProcessorImpl(beautyProcessor, photoProcessor, faceDetector)
     }
 
+    /** 遥测上报器：进程级注入 [LlmModelDownloadManager] companion，覆盖全部实例 */
+    override val telemetryReporter: TelemetryReporter by lazy {
+        TelemetryReporter(
+            appContext = context,
+            deviceIdProvider = { (context.applicationContext as? com.mamba.picme.PoLangApplication)?.cachedDeviceIdProvider() },
+            appVersion = BuildConfig.VERSION_NAME,
+            channel = appChannelValue,
+        )
+    }
+
     override val llmModelDownloadManager: LlmModelDownloadManager by lazy {
-        LlmModelDownloadManager(context)
+        LlmModelDownloadManager(context).also {
+            LlmModelDownloadManager.telemetryReporter = telemetryReporter
+        }
     }
 
     override val appUpdateClient: AppUpdateClient by lazy { AppUpdateClient() }
@@ -795,6 +813,8 @@ class AppContainerImpl(
     override fun startUserTaskAdapters() {
         if (userTaskAdaptersStarted) return
         userTaskAdaptersStarted = true
+        // 扫描会话遥测（旁路订阅进度流，与 TagScanTaskAdapter 同「引擎零侵入」约定）
+        ScanTelemetryCollector(reporter = telemetryReporter, scope = userTaskScope).start()
         userTaskRegistry.registerAdapter(
             TagScanTaskAdapter(
                 registry = userTaskRegistry,

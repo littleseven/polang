@@ -2744,6 +2744,108 @@ object AdminViews {
         }
     }
 
+    /** 模型下载遥测页（2026-11-22）：转化漏斗 + 分地区成功率，数据源 telemetry_event */
+    fun downloadStatsPage(
+        rows: List<DownloadRegionStatRow>,
+        modelRows: List<DownloadModelStatRow>,
+        funnel: List<FunnelRow>,
+        days: Int,
+    ): String = createHTML().html {
+        adminHead("下载遥测 · PoLang 管理后台")
+        body {
+            navBar()
+            h1 { +"模型下载遥测" }
+            p("meta") {
+                +"近 $days 天 · 地区 = 端侧 Locale.country（网络出口代理指标）· 成功率分母 = 完成+失败（用户主动取消不计入）"
+            }
+            h2 { +"转化漏斗（按设备）" }
+            if (funnel.all { it.devices == 0L }) {
+                div("empty-state") { +"暂无漏斗数据（客户端上报 model_download/models_ready/gallery_scan 事件后可见）" }
+            } else {
+                table {
+                    tr {
+                        th { +"阶段" }
+                        th { +"到达设备数" }
+                        th { +"级间转化率" }
+                    }
+                    funnel.forEach { f ->
+                        tr {
+                            td { +f.label }
+                            td { +f.devices.toString() }
+                            td { +(f.conversionFromPrev?.let { "%.1f%%".format(it * 100) } ?: "—") }
+                        }
+                    }
+                }
+            }
+            h2 { +"分地区下载成功率" }
+            if (rows.isEmpty()) {
+                div("empty-state") { +"暂无下载遥测数据（客户端 0.9.x+ 上报 model_download 事件后可见）" }
+            } else {
+                table {
+                    tr {
+                        th { +"地区" }
+                        th { +"成功" }
+                        th { +"失败" }
+                        th { +"取消" }
+                        th { +"成功率" }
+                        th { +"完整性失败" }
+                        th { +"平均速度" }
+                    }
+                    rows.forEach { r ->
+                        tr {
+                            td { +r.region }
+                            td { +r.completed.toString() }
+                            td { +r.failed.toString() }
+                            td { +r.cancelled.toString() }
+                            td {
+                                val pct = r.successRate * 100
+                                span(if (r.failed > 0 && r.successRate < 0.9) "badge badge-revoked" else "badge badge-active") {
+                                    +"%.1f%%".format(pct)
+                                }
+                            }
+                            td { +r.integrityFailed.toString() }
+                            td { +if (r.avgSpeedKbps > 0) "%.0f KB/s".format(r.avgSpeedKbps) else "—" }
+                        }
+                    }
+                }
+            }
+            h2 { +"分模型 × 分地区" }
+            if (modelRows.isEmpty()) {
+                div("empty-state") { +"暂无分模型数据" }
+            } else {
+                table {
+                    tr {
+                        th { +"模型" }
+                        th { +"地区" }
+                        th { +"成功" }
+                        th { +"失败" }
+                        th { +"取消" }
+                        th { +"成功率" }
+                        th { +"平均耗时" }
+                        th { +"平均速度" }
+                    }
+                    modelRows.forEach { r ->
+                        tr {
+                            td { +r.modelId }
+                            td { +r.region }
+                            td { +r.completed.toString() }
+                            td { +r.failed.toString() }
+                            td { +r.cancelled.toString() }
+                            td {
+                                val pct = r.successRate * 100
+                                span(if (r.failed > 0 && r.successRate < 0.9) "badge badge-revoked" else "badge badge-active") {
+                                    +"%.1f%%".format(pct)
+                                }
+                            }
+                            td { +if (r.avgDurationMs > 0) "%.1f s".format(r.avgDurationMs / 1000.0) else "—" }
+                            td { +if (r.avgSpeedKbps > 0) "%.0f KB/s".format(r.avgSpeedKbps) else "—" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun diagnosisPage(
         issues: List<IssueReportService.IssueRow>,
         message: String? = null,
@@ -2890,6 +2992,7 @@ object AdminViews {
         "diagnosis" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M2.5 3.5h11v7h-6l-3 3v-3h-2z"/></svg>""",
         "release" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 2l5.5 3v6L8 14 2.5 11V5z"/><path d="M2.5 5 8 8l5.5-3M8 8v6"/></svg>""",
         "settings" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 5h10M3 11h10"/><circle cx="6" cy="5" r="1.6" fill="var(--c-surface)"/><circle cx="10.5" cy="11" r="1.6" fill="var(--c-surface)"/></svg>""",
+        "download" to """<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5"/><path d="M2.5 12.5h11"/></svg>""",
     )
 
     /** 侧边栏导航项（href, 图标 key, 文案）——顺序对齐 Ardot 设计稿 Sidebar 组件。 */
@@ -2898,6 +3001,7 @@ object AdminViews {
         Triple("/admin/users", "users", "用户管理"),
         Triple("/admin/traffic", "traffic", "流量分析"),
         Triple("/admin/llm/calls", "calls", "调用流水"),
+        Triple("/admin/telemetry/downloads", "download", "下载遥测"),
         Triple("/admin/agent/sessions", "agent", "Agent 会话"),
         Triple("/admin/channels", "channels", "渠道管理"),
         Triple("/admin/skills", "skills", "技能中心"),

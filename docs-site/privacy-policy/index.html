@@ -225,6 +225,21 @@
             </tr>
         </table>
 
+        <h3>1.6 匿名运行统计（模型下载与扫描）</h3>
+        <table>
+            <tr><th>数据类型</th><th>用途</th><th>处理方式</th></tr>
+            <tr>
+                <td><span class="data-type">模型下载事件（模型名称、完成/失败结果、数据量、耗时、网络类型、所在地区[时区/系统区域]）</span></td>
+                <td>统计分地区的模型下载成功率，改善分发体验</td>
+                <td>发送至 <strong>api.polang.net</strong>，经设备标识（见 1.5）关联为匿名统计；<strong>不含任何照片、文件路径或账号信息</strong></td>
+            </tr>
+            <tr>
+                <td><span class="data-type">相册扫描进度事件（扫描启动/完成、处理张数、失败数）</span></td>
+                <td>统计功能到达率与扫描完成率，发现体验卡点</td>
+                <td>同上：仅计数指标，<strong>不含照片内容、名称或标签</strong></td>
+            </tr>
+        </table>
+
         <h2>2. 应用权限说明</h2>
         <p>PoLang 申请以下 Android 系统权限，每项权限均与具体功能直接对应：</p>
 

@@ -156,9 +156,12 @@ fun Application.module(config: AppConfig) {
         //  /v1/skills 是端侧 load_skill 执行器的资产源（0.9.44 放行）——skill 是全局公共资产
         //  （SkillRoute 无 per-user 判定），不放行则未登录端侧技能同步恒 401 = 技能面整体降级，
         //  2026-11-08 iOS 真机实证访客 load_skill 恒 unknown_skill；与 Android SkillClient
-        //  「LLM 系路径放行访客」注释的设计意图对齐）
+        //  「LLM 系路径放行访客」注释的设计意图对齐；
+        //  /telemetry（2026-11-22 放行）：模型下载遥测（分地区成功率）的多数事件发生在
+        //  首启模型下载阶段——用户此刻尚未注册，不放行则统计系统性丢失新装样本；
+        //  事件体不含任何用户内容，X-Device-Id 仅作滥用闸门不落库）
         val isLlmPath = uri == "/chat/completions" || uri == "/v1/chat/completions" || uri == "/v1/web-search" ||
-            uri == "/v1/skills" || uri.startsWith("/v1/skills/")
+            uri == "/v1/skills" || uri.startsWith("/v1/skills/") || uri == "/telemetry"
         val deviceId = call.request.headers[DEVICE_ID_HEADER]
         if (isLlmPath && !deviceId.isNullOrBlank()) {
             call.attributes.put(DeviceIdKey, deviceId)
