@@ -199,6 +199,33 @@ class OrganizeCategoryViewModelTest {
     }
 
     @Test
+    fun `toggle on protected item is silently rejected, non-protected toggles normally`() = runTest {
+        val now = System.currentTimeMillis()
+        val repo = FakeRepo().apply {
+            items = listOf(
+                blurPhoto("a", captureDate = now, blurScore = strongBlur),
+                // protected（OLD_PHOTO）：单点勾选红线不可选（spec §6.3 保护区恒不可选，
+                // 对齐 OrganizeSourceViewModel.toggle 守卫）
+                blurPhoto("p", captureDate = oldCaptureDate(now), blurScore = strongBlur),
+            )
+        }
+        val vm = viewModel(this, repo, FakeBackend(), OrganizeCategory.LOW_QUALITY_PHOTOS)
+        advanceUntilIdle()
+        // 基线：预选只含非保护项 a
+        assertEquals(setOf("a"), ready(vm).selected)
+        // 保护项连点两次：不进选中集，也不影响既有选中
+        vm.toggle("p")
+        assertEquals(setOf("a"), ready(vm).selected)
+        vm.toggle("p")
+        assertEquals(setOf("a"), ready(vm).selected)
+        // 非保护项正常切换（回归）
+        vm.toggle("a")
+        assertTrue(ready(vm).selected.isEmpty())
+        vm.toggle("a")
+        assertEquals(setOf("a"), ready(vm).selected)
+    }
+
+    @Test
     fun `selectAll and deselectAll`() = runTest {
         val now = System.currentTimeMillis()
         val repo = FakeRepo().apply {

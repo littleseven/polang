@@ -145,9 +145,12 @@ class OrganizeCategoryViewModel(
             .distinctBy { entry -> entry.item.uri }
     }
 
+    /** 勾选切换；保护项（ValueGuard 命中）红线不可选，静默拒绝（同 OrganizeSourceViewModel）。 */
     fun toggle(uri: String) {
         val ready = currentReady() ?: return
         if (ready.trashed) return
+        val entry = ready.items.firstOrNull { entry -> entry.item.uri == uri } ?: return
+        if (entry.isProtected) return
         _uiState.value = ready.copy(
             selected = if (uri in ready.selected) ready.selected - uri else ready.selected + uri
         )
