@@ -161,7 +161,7 @@ di/                       ← AppContainer 手动 DI（无 Hilt/Dagger）
 | `remote/openai/` | OpenAI API 客户端（Retrofit） | 远程 LLM 网络层 |
 | `remote/anthropic/` | Anthropic/Claude API 客户端（Retrofit） | 备用远程 LLM |
 | `remote/picme/` | picme-server 客户端族（`TelemetryClient`/`IssueReportClient`/`CloudAgentClient` 等） | 自建后端网络层；`TelemetryClient`（2026-11-22）：`POST /telemetry` 批量上报，X-Device-Id/X-Platform/X-App-Channel 头，`TelemetrySender` 接口隔离便于 mock |
-| `download/` | `LlmModelDownloadManager`、`ModelDownloadForegroundService` | LLM 模型下载管理 + 前台服务；下载终态遥测埋点（completed/failed(分 integrity/http/timeout/io/unknown)/cancelled，经 companion `telemetryReporter` 挂点——本类非单例，SettingsScreen 会另建实例；全部必备模型就位时一次性上报 `models_ready`，2026-11-22） |
+| `download/` | `LlmModelDownloadManager`、`ModelDownloadForegroundService` | LLM 模型下载管理 + 前台服务；下载终态遥测埋点（completed/failed(分 integrity/http/timeout/io/unknown)/cancelled，含 `source` 字段 modelscope/hf-mirror，经 companion `telemetryReporter` 挂点——本类非单例，SettingsScreen 会另建实例；全部必备模型就位时一次性上报 `models_ready`，2026-11-22） |
 | `telemetry/` | `TelemetryReporter`、`TelemetryEventBuffer`、`ScanTelemetryCollector` | 转化漏斗遥测（2026-11-22）：装机→模型下载→必备模型就绪→扫描启动→扫描完成；公共字段（region/networkType/tz/appVersion/channel/platform）由 reporter 统一注入，**deviceId 不进 payload、只走 X-Device-Id 请求头**（服务端落独立列）；发送失败 JSONL 落盘缓冲（filesDir/telemetry/pending_events.jsonl，上限 200 丢最旧），启动时 `PoLangApplication.onCreate` flush 回收——防失败事件丢失致统计偏差；`ScanTelemetryCollector` 旁路订阅 `TagGenerationService.sessionProgress` 检测会话边界（引擎零侵入），经 `startUserTaskAdapters()` 接缝启动 |
 | `repository/` | 仓储接口的 Room/DataStore/Network 实现；`PersonRepository`（人物命名/"我"标记/关系图谱收口，2026-11-07 自 `domain/person/` 迁回——分层止血试点） | 数据源实现 |
 | `preferences/` | DataStore Preferences | 用户偏好持久化 |

@@ -24,7 +24,7 @@ class DownloadStatsTest {
         val ev = parseModelDownloadEvent(
             """{"modelId":"florence2_base","outcome":"failed","errorClass":"integrity",""" +
                 """"bytes":278936295,"durationMs":61000,"networkType":"wifi","region":"CN",""" +
-                """"appVersion":"0.9.52","channel":"release"}""",
+                """"appVersion":"0.9.52","channel":"release","source":"modelscope"}""",
         )
         assertNotNull(ev)
         ev!!
@@ -35,6 +35,7 @@ class DownloadStatsTest {
         assertEquals(61000L, ev.durationMs)
         assertEquals("wifi", ev.networkType)
         assertEquals("CN", ev.region)
+        assertEquals("modelscope", ev.source)
     }
 
     @Test
@@ -53,6 +54,7 @@ class DownloadStatsTest {
         assertEquals("unknown", ev!!.region)
         assertEquals("other", ev.networkType)
         assertNull(ev.errorClass)
+        assertNull(ev.source) // 旧客户端事件无 source 字段
     }
 
     @Test
@@ -92,13 +94,13 @@ class DownloadStatsTest {
     @Test
     fun `modelDownloadStatsByModel groups by model and region with duration`() = runBlocking {
         TestDb.init(TelemetryEvents)
-        // model a × CN：2 成功（50s + 100s → 平均 75s；速度均 2048KB/s）+ 1 失败
-        insert(now, """{"modelId":"a","outcome":"completed","bytes":104857600,"durationMs":50000,"region":"CN"}""")
-        insert(now, """{"modelId":"a","outcome":"completed","bytes":209715200,"durationMs":100000,"region":"CN"}""")
+        // model a × CN：2 成功（50s + 100s → 平均 75s；速度均 2048KB/s；大小取 max bytes；双源）+ 1 失败
+        insert(now, """{"modelId":"a","outcome":"completed","bytes":104857600,"durationMs":50000,"region":"CN","source":"modelscope"}""")
+        insert(now, """{"modelId":"a","outcome":"completed","bytes":209715200,"durationMs":100000,"region":"CN","source":"hf-mirror"}""")
         insert(now, """{"modelId":"a","outcome":"failed","errorClass":"http","region":"CN"}""")
         // model a × US：1 成功（10s）
-        insert(now, """{"modelId":"a","outcome":"completed","bytes":10485760,"durationMs":10000,"region":"US"}""")
-        // model b × CN：1 取消（不计入成功率分母）
+        insert(now, """{"modelId":"a","outcome":"completed","bytes":10485760,"durationMs":10000,"region":"US","source":"modelscope"}""")
+        // model b × CN：1 取消（不计入成功率分母；无 bytes/source → 大小 0、源为空）
         insert(now, """{"modelId":"b","outcome":"cancelled","region":"CN"}""")
 
         val rows = AdminQueries.modelDownloadStatsByModel(days = 30, now = now)
@@ -112,15 +114,21 @@ class DownloadStatsTest {
         assertEquals(2.0 / 3.0, aCn.successRate, 0.0001)
         assertEquals(75000L, aCn.avgDurationMs)
         assertEquals(2048.0, aCn.avgSpeedKbps, 1.0)
+        assertEquals(209715200L, aCn.sizeBytes)
+        assertEquals(listOf("hf-mirror", "modelscope"), aCn.sources)
 
         val aUs = rows[1]
         assertEquals(10000L, aUs.avgDurationMs)
         assertEquals(1.0, aUs.successRate, 0.0001)
+        assertEquals(10485760L, aUs.sizeBytes)
+        assertEquals(listOf("modelscope"), aUs.sources)
 
         val bCn = rows[2]
         assertEquals(0L, bCn.completed)
         assertEquals(1L, bCn.cancelled)
         assertEquals(0L, bCn.avgDurationMs)
+        assertEquals(0L, bCn.sizeBytes)
+        assertEquals(emptyList<String>(), bCn.sources)
     }
 
     @Test
@@ -157,7 +165,7 @@ class DownloadStatsTest {
             DownloadRegionStatRow("CN", completed = 9, failed = 1, cancelled = 2, integrityFailed = 1, avgSpeedKbps = 2048.0),
         )
         val modelRows = listOf(
-            DownloadModelStatRow("qwen3_vl_2b", "CN", completed = 8, failed = 1, cancelled = 0, avgDurationMs = 61000, avgSpeedKbps = 2048.0),
+            DownloadModelStatRow("qwen3_vl_2b", "CN", completed = 8, failed = 1, cancelled = 0, avgDurationMs = 61000, avgSpeedKbps = 2048.0, sizeBytes = 209715200, sources = listOf("modelscope")),
         )
         val funnel = listOf(
             FunnelRow("download", "开始下载模型", 100, null),
@@ -174,6 +182,8 @@ class DownloadStatsTest {
         assertTrue(html.contains("分模型 × 分地区"))
         assertTrue(html.contains("qwen3_vl_2b"))
         assertTrue(html.contains("61.0 s"))
+        assertTrue(html.contains("200.00 MB"))
+        assertTrue(html.contains("modelscope"))
 
         val empty = AdminViews.downloadStatsPage(emptyList(), emptyList(), emptyList(), days = 30)
         assertTrue(empty.contains("暂无下载遥测数据"))

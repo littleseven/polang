@@ -2816,6 +2816,8 @@ object AdminViews {
                 table {
                     tr {
                         th { +"模型" }
+                        th { +"大小" }
+                        th { +"源" }
                         th { +"地区" }
                         th { +"成功" }
                         th { +"失败" }
@@ -2827,6 +2829,8 @@ object AdminViews {
                     modelRows.forEach { r ->
                         tr {
                             td { +r.modelId }
+                            td { +if (r.sizeBytes > 0) formatBytes(r.sizeBytes) else "—" }
+                            td { +if (r.sources.isNotEmpty()) r.sources.joinToString(", ") else "—" }
                             td { +r.region }
                             td { +r.completed.toString() }
                             td { +r.failed.toString() }

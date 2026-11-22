@@ -988,7 +988,7 @@ fun isModelDownloaded(modelId: String): Boolean {
             updateServiceState()
             emit(DownloadProgress(modelId, actualTotalBytes, actualTotalBytes, DownloadStatus.COMPLETED))
             Logger.i(TAG, "Model download completed: $modelId")
-            telemetryReporter?.reportModelCompleted(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = true)
+            telemetryReporter?.reportModelCompleted(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = true, source = telemetrySource(config.sources))
             reportModelsReadyIfAllDownloaded()
 
         } catch (e: Exception) {
@@ -1000,7 +1000,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
-                telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, "integrity", resumed = true)
+                telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, "integrity", resumed = true, source = telemetrySource(config.sources))
                 return@flow
             }
             // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
@@ -1018,7 +1018,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
-                telemetryReporter?.reportModelCancelled(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = true)
+                telemetryReporter?.reportModelCancelled(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = true, source = telemetrySource(config.sources))
                 return@flow
             }
             val errorMsg = e.message ?: e.javaClass.simpleName
@@ -1026,7 +1026,7 @@ fun isModelDownloaded(modelId: String): Boolean {
             _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
             updateServiceState()
             emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
-            telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, classifyDownloadError(e), resumed = true)
+            telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, classifyDownloadError(e), resumed = true, source = telemetrySource(config.sources))
         }
     }.flowOn(Dispatchers.IO)
 
@@ -1259,7 +1259,7 @@ fun isModelDownloaded(modelId: String): Boolean {
             updateServiceState()
             emit(DownloadProgress(modelId, actualTotalBytes, actualTotalBytes, DownloadStatus.COMPLETED))
             Logger.i(TAG, "Model download completed: $modelId")
-            telemetryReporter?.reportModelCompleted(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = false)
+            telemetryReporter?.reportModelCompleted(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = false, source = "modelscope")
             reportModelsReadyIfAllDownloaded()
 
         } catch (e: Exception) {
@@ -1271,7 +1271,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
-                telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, "integrity", resumed = false)
+                telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, "integrity", resumed = false, source = "modelscope")
                 return@flow
             }
             // 优先按暂停意图判定：OkHttp 取消消息不定（"stream was reset: CANCEL" 等），
@@ -1289,7 +1289,7 @@ fun isModelDownloaded(modelId: String): Boolean {
                 _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.CANCELLED, 0, actualTotalBytes)) }
                 updateServiceState()
                 emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.CANCELLED))
-                telemetryReporter?.reportModelCancelled(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = false)
+                telemetryReporter?.reportModelCancelled(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, resumed = false, source = "modelscope")
                 return@flow
             }
             val errorMsg = e.message ?: e.javaClass.simpleName
@@ -1297,7 +1297,7 @@ fun isModelDownloaded(modelId: String): Boolean {
             _downloadStates.update { it + (modelId to DownloadState(modelId, DownloadStatus.FAILED, 0, actualTotalBytes)) }
             updateServiceState()
             emit(DownloadProgress(modelId, 0, actualTotalBytes, DownloadStatus.FAILED))
-            telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, classifyDownloadError(e), resumed = false)
+            telemetryReporter?.reportModelFailed(modelId, actualTotalBytes, System.currentTimeMillis() - downloadStartMs, classifyDownloadError(e), resumed = false, source = "modelscope")
         }
     }.flowOn(Dispatchers.IO)
 
@@ -1394,6 +1394,10 @@ fun isModelDownloaded(modelId: String): Boolean {
         if (msRepo != null) return buildModelScopeUrl(msRepo, fileName)
         throw IOException("No valid source (HuggingFace/ModelScope) for file: $fileName")
     }
+
+    /** 遥测下载源标识：与 [buildDownloadUrl] 同口径（HF 源实际走 hf-mirror 镜像，否则 ModelScope） */
+    private fun telemetrySource(sources: Map<String, String>): String =
+        if (sources["HuggingFace"] != null || sources["huggingface"] != null) "hf-mirror" else "modelscope"
 
     private suspend fun fetchFileInfos(sources: Map<String, String>): List<ModelFileInfo> {
         val hfRepo = sources["HuggingFace"] ?: sources["huggingface"]

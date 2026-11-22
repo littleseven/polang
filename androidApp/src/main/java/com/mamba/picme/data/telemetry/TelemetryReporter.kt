@@ -53,14 +53,14 @@ class TelemetryReporter(
 
     // ── 模型下载事件 ──────────────────────────────────────────
 
-    fun reportModelCompleted(modelId: String, bytes: Long, durationMs: Long, resumed: Boolean) =
-        reportModelTerminal(modelId, "completed", null, bytes, durationMs, resumed)
+    fun reportModelCompleted(modelId: String, bytes: Long, durationMs: Long, resumed: Boolean, source: String) =
+        reportModelTerminal(modelId, "completed", null, bytes, durationMs, resumed, source)
 
-    fun reportModelFailed(modelId: String, bytes: Long, durationMs: Long, errorClass: String, resumed: Boolean) =
-        reportModelTerminal(modelId, "failed", errorClass, bytes, durationMs, resumed)
+    fun reportModelFailed(modelId: String, bytes: Long, durationMs: Long, errorClass: String, resumed: Boolean, source: String) =
+        reportModelTerminal(modelId, "failed", errorClass, bytes, durationMs, resumed, source)
 
-    fun reportModelCancelled(modelId: String, bytes: Long, durationMs: Long, resumed: Boolean) =
-        reportModelTerminal(modelId, "cancelled", null, bytes, durationMs, resumed)
+    fun reportModelCancelled(modelId: String, bytes: Long, durationMs: Long, resumed: Boolean, source: String) =
+        reportModelTerminal(modelId, "cancelled", null, bytes, durationMs, resumed, source)
 
     private fun reportModelTerminal(
         modelId: String,
@@ -69,12 +69,14 @@ class TelemetryReporter(
         bytes: Long,
         durationMs: Long,
         resumed: Boolean,
+        source: String,
     ) = recordEvent(EVENT_TYPE_MODEL_DOWNLOAD, JSONObject()
         .put("modelId", modelId)
         .put("outcome", outcome)
         .put("bytes", bytes)
         .put("durationMs", durationMs)
         .put("resumed", resumed)
+        .put("source", source)
         .apply { if (errorClass != null) put("errorClass", errorClass) })
 
     /** 必备模型首次全部就绪（漏斗「过下载关」节点）；prefs 旗标保证每安装只报一次 */

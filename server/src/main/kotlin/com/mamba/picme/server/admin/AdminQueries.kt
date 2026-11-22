@@ -232,6 +232,7 @@ data class ModelDownloadEvent(
     val region: String,           // 端侧 Locale.country（网络出口地区的代理指标）
     val appVersion: String,
     val channel: String,
+    val source: String?,          // modelscope | hf-mirror（客户端 0.9.53+ 上报；旧事件为 null）
 )
 
 /** 分地区聚合行：successRate 只按 completed/failed 计，cancelled（用户主动）单列不计入分母 */
@@ -264,6 +265,8 @@ data class DownloadModelStatRow(
     val cancelled: Long,
     val avgDurationMs: Long,    // 仅 completed 事件均值；无样本为 0
     val avgSpeedKbps: Double,   // 仅 completed 事件均值；无样本为 0
+    val sizeBytes: Long,        // 模型体积：全事件 bytes 最大值（终态事件上报的是模型总大小）；无样本为 0
+    val sources: List<String>,  // 观测到的下载源（modelscope / hf-mirror）；旧客户端事件无 source 时为空
 ) {
     val successRate: Double
         get() = if (completed + failed == 0L) 0.0 else completed.toDouble() / (completed + failed)
@@ -288,6 +291,7 @@ internal fun parseModelDownloadEvent(payloadJson: String?): ModelDownloadEvent? 
         region = str("region") ?: "unknown",
         appVersion = str("appVersion") ?: "",
         channel = str("channel") ?: "",
+        source = str("source"),
     )
 }
 
@@ -724,6 +728,8 @@ object AdminQueries {
                 .forEach { row ->
                     val ev = parseModelDownloadEvent(row[TelemetryEvents.payloadJson]) ?: return@forEach
                     val a = acc.getOrPut(ev.modelId to ev.region) { ModelAcc() }
+                    if (ev.bytes > 0) a.sizeBytes = maxOf(a.sizeBytes, ev.bytes)
+                    ev.source?.let { a.sources += it }
                     when (ev.outcome) {
                         "completed" -> {
                             a.completed++
@@ -749,6 +755,8 @@ object AdminQueries {
                     cancelled = a.cancelled,
                     avgDurationMs = if (a.durationSamples == 0L) 0L else a.durationSumMs / a.durationSamples,
                     avgSpeedKbps = if (a.speedSamples == 0L) 0.0 else a.speedSumKbps / a.speedSamples,
+                    sizeBytes = a.sizeBytes,
+                    sources = a.sources.toList(),
                 )
             }.sortedWith(compareBy({ it.modelId }, { -(it.completed + it.failed) }, { it.region }))
         }
@@ -761,6 +769,8 @@ object AdminQueries {
         var durationSamples = 0L
         var speedSumKbps = 0.0
         var speedSamples = 0L
+        var sizeBytes = 0L
+        val sources = sortedSetOf<String>()
     }
 
     /**

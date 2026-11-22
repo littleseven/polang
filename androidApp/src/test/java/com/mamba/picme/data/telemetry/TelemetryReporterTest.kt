@@ -93,7 +93,7 @@ class TelemetryReporterTest {
     fun `reportModelFailed buffers event with error class and context fields`() {
         val sender = FakeSender()
         val reporter = reporter(sender, networkAvailable = false)
-        reporter.reportModelFailed("florence2_base", bytes = 278936295, durationMs = 61000, errorClass = "integrity", resumed = false)
+        reporter.reportModelFailed("florence2_base", bytes = 278936295, durationMs = 61000, errorClass = "integrity", resumed = false, source = "modelscope")
 
         val lines = TelemetryEventBuffer(bufferFile).readAll()
         assertEquals(1, lines.size)
@@ -103,6 +103,7 @@ class TelemetryReporterTest {
         assertEquals("florence2_base", payload.getString("modelId"))
         assertEquals("failed", payload.getString("outcome"))
         assertEquals("integrity", payload.getString("errorClass"))
+        assertEquals("modelscope", payload.getString("source"))
         assertEquals("CN", payload.getString("region"))
         assertEquals("wifi", payload.getString("networkType"))
         assertEquals("0.9.52", payload.getString("appVersion"))
@@ -126,7 +127,7 @@ class TelemetryReporterTest {
     fun `flush clears buffer only on success`() = runBlocking {
         val sender = FakeSender(succeed = true)
         val reporter = reporter(sender, networkAvailable = false)
-        reporter.reportModelCompleted("m", bytes = 100, durationMs = 10, resumed = false)
+        reporter.reportModelCompleted("m", bytes = 100, durationMs = 10, resumed = false, source = "modelscope")
         assertEquals(1, TelemetryEventBuffer(bufferFile).readAll().size)
 
         reporter.flushPending() // 无网络：保留
