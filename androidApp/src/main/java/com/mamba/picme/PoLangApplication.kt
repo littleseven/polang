@@ -32,6 +32,7 @@ import com.mamba.picme.data.local.insertPartsMessage
 import com.mamba.picme.data.remote.picme.BrowserSessionClient
 import com.mamba.picme.data.remote.picme.SkillClient
 import com.mamba.picme.data.remote.picme.WebSearchClient
+import com.mamba.picme.data.repository.MediaMetadataBackfiller
 import com.mamba.picme.di.AppContainer
 import com.mamba.picme.di.AppContainerImpl
 import com.mamba.picme.domain.memory.MemoryContextProviderImpl
@@ -79,6 +80,7 @@ import com.mamba.picme.domain.repository.MediaRepository
 import com.mamba.picme.beauty.internal.facedetect.adapter.FaceLandmarkAdapterRegistry
 import com.mamba.picme.beauty.log.BeautyLogProxy
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
@@ -93,7 +95,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlin.math.roundToInt
 import java.io.File
-import java.util.UUID
 
 class PoLangApplication : Application(), ImageLoaderFactory {
 
@@ -305,6 +306,20 @@ class PoLangApplication : Application(), ImageLoaderFactory {
                 LocationIndexer(this@PoLangApplication).runPass()
             } catch (e: Exception) {
                 Logger.w(TAG, "location index pass failed: ${e.message}")
+            }
+        }
+
+        // media_assets.relativePath/sizeBytes 存量回填（Room v29，Agent 清理 M1 数据基础）：
+        // 只补 null 行，MediaStore 已删的行不写不重试；增量幂等，首启跑完后后续启动 no-op。
+        applicationScope.launch(Dispatchers.IO) {
+            try {
+                val mediaDao = AppDatabase.getDatabase(this@PoLangApplication).mediaDao()
+                val written = MediaMetadataBackfiller
+                    .create(this@PoLangApplication, mediaDao)
+                    .runUntilDone()
+                if (written > 0) Logger.i(TAG, "media metadata backfill done: $written rows")
+            } catch (e: Exception) {
+                Logger.w(TAG, "media metadata backfill failed: ${e.message}")
             }
         }
 

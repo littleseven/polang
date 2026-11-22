@@ -30,7 +30,8 @@ private const val DEDUP_HASH_BATCH_SIZE = 500
 
 /**
  * 整理中心（F1）类目数据源生产实现：Room `media_assets` 轻量投影 + MediaStore 批量 meta
- * （path/sizeBytes/尺寸）按 **content uri 字符串** 合并为 [OrganizeItem] 快照。
+ * （isFavorite/尺寸）按 **content uri 字符串** 合并为 [OrganizeItem] 快照；path/sizeBytes
+ * 以 Room 持久化列（v29）优先，MediaStore 仅兜底与补 isFavorite/pixelArea。
  *
  * join key 不能用媒体 id：`MediaAsset.id` 是 MediaRepositoryImpl 的负值合成编码，
  * 与 MediaStore `_ID` 不相等（与 MediaStoreDedupMediaSource 同一约束）。
@@ -75,8 +76,10 @@ class OrganizeRepositoryImpl(
                 // isVideo 以 Room type 为准（MediaStore collection 来源仅作 meta 补充）
                 isVideo = row.type == MediaType.VIDEO.name,
                 captureDate = row.captureDate,
-                sizeBytes = meta?.sizeBytes ?: 0L,
-                relativePath = meta?.path,
+                // path/size Room 列（v29 持久化）优先，null 回退 MediaStore meta 兜底
+                //（老行未回填窗口期）；MediaStore 查询仍保留——isFavorite/pixelArea 无 Room 列
+                sizeBytes = row.sizeBytes ?: meta?.sizeBytes ?: 0L,
+                relativePath = row.relativePath ?: meta?.path,
                 ocrText = row.ocrText,
                 pixelArea = pixelAreaByUri[row.uri] ?: meta?.pixelArea,
                 labels = row.labels,

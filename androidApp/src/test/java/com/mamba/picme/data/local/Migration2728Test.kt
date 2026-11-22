@@ -90,8 +90,9 @@ class Migration2728Test {
         downgradeToV27Fixture()
 
         // ── Step 3：Room 重开——执行 MIGRATION_27_28 并做全库 schema 校验（DDL 不匹配即抛）──
+        // 库版本 29 起须补挂 MIGRATION_28_29（media_assets 加两列，对 chat 重置语义无影响）
         val db = Room.databaseBuilder(context, AppDatabase::class.java, DB_NAME)
-            .addMigrations(AppDatabase.MIGRATION_27_28)
+            .addMigrations(AppDatabase.MIGRATION_27_28, AppDatabase.MIGRATION_28_29)
             .allowMainThreadQueries()
             .build()
         val messageDao = db.chatMessageDao()
@@ -131,11 +132,13 @@ class Migration2728Test {
         db.close()
     }
 
-    /** 把 v28 库降回 v27 存量形态：版本号、chat_messages 形状与 legacy 行、room_master 身份。 */
+    /** 把 v28 库降回 v27 存量形态：版本号、chat_messages 形状与 legacy 行、room_master 身份；media_assets 去 v29 两列。 */
     private fun downgradeToV27Fixture() {
         val db = SQLiteDatabase.openDatabase(context.getDatabasePath(DB_NAME).absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
         db.use { raw ->
             raw.execSQL("PRAGMA user_version = 27")
+            // media_assets 回到 v28 前形态（relativePath/sizeBytes 是 v29 才加的列）
+            MediaAssetsPreV29Downgrader.downgrade(raw)
             // chat_sessions 为 v28 形态即可（27→28 对它无条件 DROP，形状不影响结果），保留 Step 1 行。
             raw.execSQL("DROP TABLE IF EXISTS `chat_messages`")
             raw.execSQL(

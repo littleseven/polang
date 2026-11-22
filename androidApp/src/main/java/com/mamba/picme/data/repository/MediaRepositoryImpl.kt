@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import android.app.RecoverableSecurityException
 import android.content.IntentSender
+import android.database.Cursor
 
 @OptIn(coil.annotation.ExperimentalCoilApi::class)
 class MediaRepositoryImpl(
@@ -89,7 +90,8 @@ class MediaRepositoryImpl(
         // 懒加载：首次收集时查询系统媒体库并缓存
         // 后续仅通过 refreshMediaLibrary() 更新缓存，避免每次 Room Flow 发射都重新查询
         if (!systemMediaLoaded) {
-            systemMediaCache.value = loadSystemMedia()
+            val rows = loadSystemMediaRows()
+            systemMediaCache.value = rows.map { row -> row.asset }
             systemMediaLoaded = true
         }
         mergeMedia(dbMedia = dbMedia, systemMedia = systemMediaCache.value)
@@ -331,39 +333,40 @@ class MediaRepositoryImpl(
 
     override suspend fun refreshMediaLibrary() {
         withContext(Dispatchers.IO) {
-            val systemMedia = loadSystemMedia()
+            val rows = loadSystemMediaRows()
             // 先更新缓存再同步 Room：避免 Room 变更触发的 Flow 发射
             // 在缓存更新前就执行 mergeMedia，产生中间态不一致数据
-            systemMediaCache.value = systemMedia
+            systemMediaCache.value = rows.map { row -> row.asset }
             systemMediaLoaded = true
-            syncSystemMediaToDb(systemMedia)
+            syncSystemMediaToDb(rows)
         }
         refreshVersion.value = refreshVersion.value + 1
     }
 
     /**
      * 将系统媒体库中的照片/视频同步到 Room 数据库。
-     * 只插入新照片，不覆盖已有数据（保护 hasFace/faceId 等聚类结果）。
+     * 只插入新照片（新行直接带 relativePath/sizeBytes 列），不覆盖已有数据（保护
+     * hasFace/faceId 等聚类结果与已回填的元数据列——存量缺口由 MediaMetadataBackfiller 补）。
      * 同时清理 Room 中已不存在于系统媒体库的过期条目（解决脏数据引起的黑块问题）。
      *
-     * @param systemMedia 已从 MediaStore 查询的系统媒体列表（由调用方传入避免重复查询）
+     * @param rows 已从 MediaStore 查询的系统媒体行（由调用方传入避免重复查询）
      */
-    private suspend fun syncSystemMediaToDb(systemMedia: List<MediaAsset>) {
+    private suspend fun syncSystemMediaToDb(rows: List<SystemMediaRow>) {
         // 轻量投影（id+uri）：全列 SELECT * 在万级媒体库直接 OOM（2026-11-19 真机 8148 行实证）
         val dbMedia = mediaDao.getAllMediaIdUris()
         val dbUriSet = dbMedia.map { it.uri }.toSet()
-        val systemUriSet = systemMedia.map { it.uri }.toHashSet()
+        val systemUriSet = rows.map { row -> row.asset.uri }.toHashSet()
 
-        // 1. 插入新照片
+        // 1. 插入新照片（新行直接带 relativePath/sizeBytes 列；已有行不覆盖，保持既有语义）
         var inserted = 0
-        for (asset in systemMedia) {
-            if (asset.uri !in dbUriSet) {
-                mediaDao.insertMedia(asset.toEntity())
+        for (row in rows) {
+            if (row.asset.uri !in dbUriSet) {
+                mediaDao.insertMedia(row.toEntity())
                 inserted++
             }
         }
         if (inserted > 0) {
-            Logger.i(TAG, "Synced $inserted new media to database (total system: ${systemMedia.size})")
+            Logger.i(TAG, "Synced $inserted new media to database (total system: ${rows.size})")
         }
 
         // 2. 清理过期条目：文件已被外部删除但 Room 中仍有记录
@@ -392,15 +395,15 @@ class MediaRepositoryImpl(
         }
     }
 
-    private suspend fun loadSystemMedia(): List<MediaAsset> = withContext(Dispatchers.IO) {
-        val media = mutableListOf<MediaAsset>()
+    private suspend fun loadSystemMediaRows(): List<SystemMediaRow> = withContext(Dispatchers.IO) {
+        val rows = mutableListOf<SystemMediaRow>()
         if (hasImageReadPermission()) {
-            media += queryImagesFromMediaStore()
+            rows += queryImagesFromMediaStore()
         }
         if (hasVideoReadPermission()) {
-            media += queryVideosFromMediaStore()
+            rows += queryVideosFromMediaStore()
         }
-        media.sortedByDescending { asset -> asset.captureDate }
+        rows.sortedByDescending { row -> row.asset.captureDate }
     }
 
     /**
@@ -417,15 +420,27 @@ class MediaRepositoryImpl(
             null
         }
 
-    private fun queryImagesFromMediaStore(): List<MediaAsset> {
-        val projection = arrayOf(
+    @Suppress("DEPRECATION") // DATA 列 API 29 起废弃，低版本作 relativePath 兜底（判法同 OrganizeRepositoryImpl）
+    private fun queryImagesFromMediaStore(): List<SystemMediaRow> {
+        val hasQColumns = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        // RELATIVE_PATH 是 Q-only 列，低版本入 projection 会抛 IllegalArgumentException，回退 DATA
+        val projection = mutableListOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_TAKEN,
             MediaStore.Images.Media.DATE_ADDED,
             MediaStore.Images.Media.LATITUDE,
-            MediaStore.Images.Media.LONGITUDE
-        )
+            MediaStore.Images.Media.LONGITUDE,
+            MediaStore.MediaColumns.SIZE,
+        ).apply {
+            add(
+                if (hasQColumns) {
+                    MediaStore.MediaColumns.RELATIVE_PATH
+                } else {
+                    MediaStore.Images.Media.DATA
+                }
+            )
+        }.toTypedArray()
         return runCatching {
             appContext.contentResolver.query(
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -440,6 +455,15 @@ class MediaRepositoryImpl(
                 val dateAddedIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_ADDED)
                 val latIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.LATITUDE)
                 val lonIndex = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.LONGITUDE)
+                // 可选列防御性取 -1（OEM 裁剪可能缺列），不让单列缺失拖垮整次查询
+                val sizeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                val pathIndex = cursor.getColumnIndex(
+                    if (hasQColumns) {
+                        MediaStore.MediaColumns.RELATIVE_PATH
+                    } else {
+                        MediaStore.Images.Media.DATA
+                    }
+                )
                 buildList {
                     while (cursor.moveToNext()) {
                         val mediaStoreId = cursor.getLong(idIndex)
@@ -450,17 +474,21 @@ class MediaRepositoryImpl(
                         val lat = if (cursor.isNull(latIndex)) null else cursor.getDouble(latIndex)
                         val lon = if (cursor.isNull(lonIndex)) null else cursor.getDouble(lonIndex)
                         add(
-                            MediaAsset(
-                                id = syntheticMediaId(mediaStoreId, MediaType.PHOTO),
-                                uri = uri.toString(),
-                                type = MediaType.PHOTO,
-                                captureDate = resolveCaptureDate(
-                                    dateTakenMs = cursor.getLong(dateTakenIndex),
-                                    dateAddedSeconds = cursor.getLong(dateAddedIndex)
+                            SystemMediaRow(
+                                asset = MediaAsset(
+                                    id = syntheticMediaId(mediaStoreId, MediaType.PHOTO),
+                                    uri = uri.toString(),
+                                    type = MediaType.PHOTO,
+                                    captureDate = resolveCaptureDate(
+                                        dateTakenMs = cursor.getLong(dateTakenIndex),
+                                        dateAddedSeconds = cursor.getLong(dateAddedIndex)
+                                    ),
+                                    fileName = cursor.getString(nameIndex) ?: uri.lastPathSegment.orEmpty(),
+                                    latitude = lat,
+                                    longitude = lon
                                 ),
-                                fileName = cursor.getString(nameIndex) ?: uri.lastPathSegment.orEmpty(),
-                                latitude = lat,
-                                longitude = lon
+                                relativePath = readPathColumn(cursor, pathIndex),
+                                sizeBytes = readSizeColumn(cursor, sizeIndex),
                             )
                         )
                     }
@@ -471,14 +499,26 @@ class MediaRepositoryImpl(
         }.getOrDefault(emptyList())
     }
 
-    private fun queryVideosFromMediaStore(): List<MediaAsset> {
-        val projection = arrayOf(
+    @Suppress("DEPRECATION") // DATA 列 API 29 起废弃，低版本作 relativePath 兜底（判法同 OrganizeRepositoryImpl）
+    private fun queryVideosFromMediaStore(): List<SystemMediaRow> {
+        val hasQColumns = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        // RELATIVE_PATH 是 Q-only 列，低版本入 projection 会抛 IllegalArgumentException，回退 DATA
+        val projection = mutableListOf(
             MediaStore.Video.Media._ID,
             MediaStore.Video.Media.DISPLAY_NAME,
             MediaStore.Video.Media.DATE_TAKEN,
             MediaStore.Video.Media.DATE_ADDED,
-            MediaStore.Video.Media.DURATION
-        )
+            MediaStore.Video.Media.DURATION,
+            MediaStore.MediaColumns.SIZE,
+        ).apply {
+            add(
+                if (hasQColumns) {
+                    MediaStore.MediaColumns.RELATIVE_PATH
+                } else {
+                    MediaStore.Video.Media.DATA
+                }
+            )
+        }.toTypedArray()
         return runCatching {
             appContext.contentResolver.query(
                 MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
@@ -492,6 +532,15 @@ class MediaRepositoryImpl(
                 val dateTakenIndex = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_TAKEN)
                 val dateAddedIndex = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
                 val durationIndex = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                // 可选列防御性取 -1（OEM 裁剪可能缺列），不让单列缺失拖垮整次查询
+                val sizeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                val pathIndex = cursor.getColumnIndex(
+                    if (hasQColumns) {
+                        MediaStore.MediaColumns.RELATIVE_PATH
+                    } else {
+                        MediaStore.Video.Media.DATA
+                    }
+                )
                 buildList {
                     while (cursor.moveToNext()) {
                         val mediaStoreId = cursor.getLong(idIndex)
@@ -500,16 +549,20 @@ class MediaRepositoryImpl(
                             mediaStoreId
                         )
                         add(
-                            MediaAsset(
-                                id = syntheticMediaId(mediaStoreId, MediaType.VIDEO),
-                                uri = uri.toString(),
-                                type = MediaType.VIDEO,
-                                captureDate = resolveCaptureDate(
-                                    dateTakenMs = cursor.getLong(dateTakenIndex),
-                                    dateAddedSeconds = cursor.getLong(dateAddedIndex)
+                            SystemMediaRow(
+                                asset = MediaAsset(
+                                    id = syntheticMediaId(mediaStoreId, MediaType.VIDEO),
+                                    uri = uri.toString(),
+                                    type = MediaType.VIDEO,
+                                    captureDate = resolveCaptureDate(
+                                        dateTakenMs = cursor.getLong(dateTakenIndex),
+                                        dateAddedSeconds = cursor.getLong(dateAddedIndex)
+                                    ),
+                                    fileName = cursor.getString(nameIndex) ?: uri.lastPathSegment.orEmpty(),
+                                    duration = cursor.getLong(durationIndex).takeIf { duration -> duration > 0L }
                                 ),
-                                fileName = cursor.getString(nameIndex) ?: uri.lastPathSegment.orEmpty(),
-                                duration = cursor.getLong(durationIndex).takeIf { duration -> duration > 0L }
+                                relativePath = readPathColumn(cursor, pathIndex),
+                                sizeBytes = readSizeColumn(cursor, sizeIndex),
                             )
                         )
                     }
@@ -519,6 +572,14 @@ class MediaRepositoryImpl(
             Logger.e(TAG, "Failed to query system videos", error)
         }.getOrDefault(emptyList())
     }
+
+    /** 相对路径列读取（列缺失/OEM 裁剪时 -1 → null，不拖垮整次查询）。 */
+    private fun readPathColumn(cursor: Cursor, index: Int): String? =
+        if (index >= 0) cursor.getString(index) else null
+
+    /** SIZE 列读取（列缺失/值为 null → null，交由 MediaMetadataBackfiller 兜底回填）。 */
+    private fun readSizeColumn(cursor: Cursor, index: Int): Long? =
+        if (index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else null
 
     private fun mergeMedia(dbMedia: List<MediaAsset>, systemMedia: List<MediaAsset>): List<MediaAsset> {
         val dbByUri = dbMedia.associateBy { asset -> asset.uri }
@@ -677,4 +738,21 @@ class MediaRepositoryImpl(
         aestheticScore = aestheticScore,
         faceQualityScore = faceQualityScore
     )
+
+    /** 同步插入落库：asset 行 + MediaStore 元数据列（relativePath/sizeBytes，Room v29）。 */
+    private fun SystemMediaRow.toEntity(): MediaEntity = asset.toEntity().copy(
+        relativePath = relativePath,
+        sizeBytes = sizeBytes,
+    )
 }
+
+/**
+ * MediaStore 查询行载体：领域 [MediaAsset] + 同步插入需要落库的元数据列。
+ * 不把两列塞进 shared MediaAsset——shared 模型是 iOS/端云共用契约面，纯 Android
+ * 持久化字段止步于 data 层（Room v29，Agent 清理 M1）。
+ */
+private data class SystemMediaRow(
+    val asset: MediaAsset,
+    val relativePath: String?,
+    val sizeBytes: Long?,
+)

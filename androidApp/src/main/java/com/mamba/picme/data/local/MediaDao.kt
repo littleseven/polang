@@ -471,9 +471,18 @@ interface MediaDao {
      */
     @Query(
         "SELECT uri, type, captureDate, ocrText, labels, hasFace, aestheticScore, " +
-            "faceQualityScore, blurScore, exposureScore, lastViewedAt, faceId FROM media_assets"
+            "faceQualityScore, blurScore, exposureScore, lastViewedAt, faceId, " +
+            "relativePath, sizeBytes FROM media_assets"
     )
     fun observeOrganizeRows(): Flow<List<OrganizeRow>>
+
+    /** 元数据回填候选：relativePath 未回填的行 uri（Room v29 存量回填，Agent 清理 M1）。 */
+    @Query("SELECT uri FROM media_assets WHERE relativePath IS NULL LIMIT :limit")
+    suspend fun getMediaNeedingMetaBackfill(limit: Int): List<String>
+
+    /** 回写 MediaStore 元数据列（relativePath/sizeBytes，存量回填专用）。 */
+    @Query("UPDATE media_assets SET relativePath = :path, sizeBytes = :size WHERE uri = :uri")
+    suspend fun updateMediaMeta(uri: String, path: String?, size: Long)
 
     /** 回写模糊/曝光分（整理中心 v2 惰性补算产出）。 */
     @Query("UPDATE media_assets SET blurScore = :blur, exposureScore = :exposure WHERE uri = :uri")
@@ -764,6 +773,8 @@ data class OrganizeRow(
     val exposureScore: Float?,
     val lastViewedAt: Long?,
     val faceId: String?,
+    val relativePath: String?,
+    val sizeBytes: Long?,
 )
 
 /** 人物聚类照片计数投影（整理中心 v2 人物稀缺信号）。 */

@@ -64,7 +64,12 @@ data class MediaEntity(
     val lastTagScanAt: Long? = null,
 
     // 最近一次成功扫描覆盖的 Pass 阶段 JSON，如 {"1":ts,"2":ts,"3":ts}
-    val lastTagScanPasses: String? = null
+    val lastTagScanPasses: String? = null,
+
+    /** MediaStore 相对路径（RELATIVE_PATH，API 29+；低 API 回退 DATA 绝对路径）；null=未回填。 */
+    val relativePath: String? = null,
+    /** 文件字节数（MediaStore SIZE）；null=未回填。 */
+    val sizeBytes: Long? = null
 ) {
     /**
      * 按 UI 语言取对应标签 JSON：英文/西语/法语 UI→[labelsEn]，其余→[labelsZh]；

@@ -60,7 +60,7 @@ import com.mamba.picme.data.model.MediaEntity
         UserTaskEntity::class,
         LocalHandleEntity::class
     ],
-    version = 28,
+    version = 29,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -104,7 +104,7 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23,
                         MIGRATION_23_24, MIGRATION_24_25,
                         MIGRATION_25_26, MIGRATION_26_27,
-                        MIGRATION_27_28
+                        MIGRATION_27_28, MIGRATION_28_29
                     )
                     .build()
                 INSTANCE = instance
@@ -616,6 +616,19 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent()
                 )
+            }
+        }
+
+        /**
+         * Migration 28 → 29：media_assets 新增 relativePath / sizeBytes 列（MediaStore
+         * 元数据持久化，Agent 清理 M1 数据基础）。只 ADD COLUMN（全版本 SQLite 安全）：
+         * 存量行 NULL 由 MediaMetadataBackfiller 启动回填，新行随 MediaRepositoryImpl
+         * 同步插入路径直接带列。
+         */
+        internal val MIGRATION_28_29 = object : Migration(28, 29) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `media_assets` ADD COLUMN `relativePath` TEXT")
+                db.execSQL("ALTER TABLE `media_assets` ADD COLUMN `sizeBytes` INTEGER")
             }
         }
     }
