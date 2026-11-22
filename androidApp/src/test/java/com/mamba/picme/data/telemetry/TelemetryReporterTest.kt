@@ -156,4 +156,14 @@ class TelemetryReporterTest {
         noId.flushPending()
         assertEquals(1, TelemetryEventBuffer(bufferFile).readAll().size) // 无 deviceId 不发
     }
+
+    @Test
+    fun `flush retains events when deviceId is blank`() = runBlocking {
+        val sender = FakeSender()
+        val reporter = reporter(sender, deviceId = "  ")
+        reporter.reportScanStarted(total = 100)
+        reporter.flushPending()
+        assertEquals(0, sender.sentBatches.size) // 空串 deviceId 不发
+        assertEquals(1, TelemetryEventBuffer(bufferFile).readAll().size) // 事件保留待下次
+    }
 }

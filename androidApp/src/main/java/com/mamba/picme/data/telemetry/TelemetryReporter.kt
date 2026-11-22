@@ -122,7 +122,7 @@ class TelemetryReporter(
         if (!flushing.compareAndSet(false, true)) return
         try {
             if (!networkAvailableProvider()) return
-            val deviceId = deviceIdProvider() ?: return
+            val deviceId = deviceIdProvider()?.takeIf { it.isNotBlank() } ?: return
             val pending = buffer.readAll()
             if (pending.isEmpty()) return
             val chunk = pending.take(FLUSH_BATCH_SIZE)
