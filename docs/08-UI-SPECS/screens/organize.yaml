@@ -153,7 +153,7 @@ hub:
         text_key: org_story_analyze_now # "立即分析"
         style: text_button
         disabled_when: "DedupScanService.sessionProgress?.state ∈ {RUNNING, PAUSED}（去重扫描活性）"
-        action: "MainActivity 注入 AppContainer.preAnalysisScheduler.runNowWithCompletion(TRIGGER_MANUAL)；执行与否仍由 PreAnalysisConditions 裁定（条件不满足静默跳过，详见 M1 遗留）"
+        action: "MainActivity 注入 AppContainer.preAnalysisScheduler.runNowWithCompletion(TRIGGER_MANUAL)；manual 豁免充电/亮屏守卫（Task 7 评审 R-1），仅 TAG 扫描活跃时静默跳过（I/O 互斥）；去重会话活跃时只补元数据不重触发"
 
   # ---- 主按钮 ----
   quick_tidy_button:

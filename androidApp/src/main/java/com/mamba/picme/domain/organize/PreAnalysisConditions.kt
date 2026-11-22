@@ -1,11 +1,13 @@
 package com.mamba.picme.domain.organize
 
 /**
- * 后台预分析触发条件纯函数（Agent 清理 M1 Task 6）。
+ * 后台预分析触发条件纯函数（Agent 清理 M1 Task 6；Task 7 评审 R-1 补 manual 豁免）。
  *
  * 决策序（短路，前序优先）：
- * 1. 非充电 ∨ 亮屏 ∨ TAG 扫描活跃 → [PreAnalysisDecision.SKIP]
- *    （避开用户在用相册/打标资源冲突的时段）；
+ * 1. [manual] = false（自动触发：插电/闲时闹钟）：非充电 ∨ 亮屏 ∨ TAG 扫描活跃 →
+ *    [PreAnalysisDecision.SKIP]（避开用户在用相册/打标资源冲突的时段）；
+ *    manual = true（hub「立即分析」）：豁免充电与亮屏守卫（点击时亮屏是物理必然），
+ *    仅保留 TAG 扫描活跃 → SKIP（与打标抢 I/O 对手动同样成立）；
  * 2. 去重扫描会话活跃（RUNNING/PAUSED）→ [PreAnalysisDecision.RUN_METADATA_ONLY]
  *    （进行中不重触发去重；元数据回填与之无资源冲突，照常补）；
  * 3. 去重无完成记录或结果已过期（距今 ≥ [PreAnalysisConditions.DEDUP_STALE_MS]）
@@ -28,8 +30,8 @@ object PreAnalysisConditions {
     /** 去重扫描结果视为过期的窗口（24h，与每日闲时闹钟节奏对齐）。 */
     const val DEDUP_STALE_MS: Long = 24L * 3600 * 1000
 
-    fun decide(inputs: PreAnalysisInputs): PreAnalysisDecision {
-        if (!inputs.isCharging || inputs.isScreenOn || inputs.tagScanActive) {
+    fun decide(inputs: PreAnalysisInputs, manual: Boolean = false): PreAnalysisDecision {
+        if ((!manual && !inputs.isCharging) || (!manual && inputs.isScreenOn) || inputs.tagScanActive) {
             return PreAnalysisDecision.SKIP
         }
         if (inputs.dedupScanActive) {

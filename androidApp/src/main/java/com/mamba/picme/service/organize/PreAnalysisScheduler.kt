@@ -43,6 +43,8 @@ import java.util.Calendar
  * 充电 = sticky `ACTION_BATTERY_CHANGED`；亮屏 = `PowerManager.isInteractive`；
  * TAG 活跃 = [TagGenerationService.isScanning]；去重活跃 = [DedupScanService.sessionProgress]；
  * 上次去重完成 = DEDUP_SCAN 用户任务行（COMPLETED 终态的 completedAt，Room 持久化）。
+ * [TRIGGER_MANUAL]（hub「立即分析」）豁免充电/亮屏守卫（Task 7 评审 R-1），
+ * 仅保留 TAG 扫描互斥与去重会话互斥。
  *
  * ## 结束记录
  * 实际执行（非 SKIP）后经 [UserSettingsRepository.updateOrganizePreAnalysisRanAt] 落
@@ -88,7 +90,11 @@ class PreAnalysisScheduler(
         val now = System.currentTimeMillis()
         val lastPreAnalysisRanAt = readLastPreAnalysisRanAt()
         val inputs = collectInputs(now)
-        val decision = PreAnalysisConditions.decide(inputs)
+        // manual（hub「立即分析」）豁免充电/亮屏自动守卫；TRIGGER_MANUAL 收口在本类伴生常量
+        val decision = PreAnalysisConditions.decide(
+            inputs,
+            manual = trigger == TRIGGER_MANUAL,
+        )
         Logger.i(
             TAG,
             "pre-analysis [$trigger]: charging=${inputs.isCharging} screenOn=${inputs.isScreenOn} " +

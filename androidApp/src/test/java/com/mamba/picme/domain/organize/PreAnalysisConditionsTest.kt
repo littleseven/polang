@@ -6,8 +6,9 @@ import org.junit.Test
 /**
  * 后台预分析条件守卫（Agent 清理 M1 Task 6）纯函数单测。
  *
- * 决策序：非充电∨亮屏∨TAG 扫描活跃 → SKIP；去重会话活跃 → RUN_METADATA_ONLY；
- * 去重结果缺失或过期（≥24h）→ RUN_METADATA_AND_DEDUP；否则 RUN_METADATA_ONLY。
+ * 决策序：非充电∨亮屏∨TAG 扫描活跃 → SKIP（manual 豁免充电/亮屏，Task 7 评审 R-1）；
+ * 去重会话活跃 → RUN_METADATA_ONLY；去重结果缺失或过期（≥24h）→ RUN_METADATA_AND_DEDUP；
+ * 否则 RUN_METADATA_ONLY。
  */
 class PreAnalysisConditionsTest {
 
@@ -77,5 +78,35 @@ class PreAnalysisConditionsTest {
     fun `tag scan active wins over stale dedup`() {
         val d = PreAnalysisConditions.decide(inputs(isCharging = true, isScreenOn = false, tagActive = true))
         assertEquals(PreAnalysisDecision.SKIP, d)
+    }
+
+    // ── manual 豁免（Task 7 评审 R-1）：hub「立即分析」豁免充电/亮屏，保留 TAG 互斥 ──
+    // 非 manual（插电/闲时闹钟）+ 亮屏 → SKIP 的回归锚点 = 上方 `screen on skips even when charging`（manual 默认 false）。
+
+    @Test
+    fun `manual trigger runs despite screen on and not charging`() {
+        val d = PreAnalysisConditions.decide(
+            inputs(isCharging = false, isScreenOn = true, lastDedup = null),
+            manual = true,
+        )
+        assertEquals(PreAnalysisDecision.RUN_METADATA_AND_DEDUP, d)
+    }
+
+    @Test
+    fun `manual trigger still skips when tag scan active`() {
+        val d = PreAnalysisConditions.decide(
+            inputs(isCharging = false, isScreenOn = true, tagActive = true),
+            manual = true,
+        )
+        assertEquals(PreAnalysisDecision.SKIP, d)
+    }
+
+    @Test
+    fun `manual trigger with dedup running stays metadata only`() {
+        val d = PreAnalysisConditions.decide(
+            inputs(isCharging = false, isScreenOn = true, dedupActive = true),
+            manual = true,
+        )
+        assertEquals(PreAnalysisDecision.RUN_METADATA_ONLY, d)
     }
 }
