@@ -513,8 +513,10 @@ private fun StorageStorySourcesArea(
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 )
             }
-            // 来源种类 > 3：查看全部/收起入口（与 LOW_VALUE 行共用同一展开态）
-            if (namedSources.size > STORY_SOURCE_TOP_N) {
+            // 来源种类 > 3：查看全部/收起入口（与 LOW_VALUE 行共用同一展开态）。
+            // 计数含 OTHER（fix round 1）：完整列表是 OTHER 的唯一入口，命名来源 ≤3 且无 IM
+            // 时不能让 OTHER 不可达
+            if (shouldShowSourceListEntry(story.sourceLedgers)) {
                 Text(
                     text = stringResource(
                         if (sourcesExpanded) {
@@ -598,6 +600,14 @@ private fun SourceLedgerRow(
 
 /** 来源账 Top3 展示条数（bytes 降序截断）。 */
 private const val STORY_SOURCE_TOP_N = 3
+
+/**
+ * 「查看全部」入口判定（fix round 1 收口为纯函数可测）：非零来源总数（含 OTHER）>
+ * [STORY_SOURCE_TOP_N] 即出现。计数含 OTHER——完整列表是 OTHER 的唯一入口，
+ * 命名来源 ≤3 且无 IM（LOW_VALUE 行不渲染）时不能让 OTHER 不可达。
+ */
+internal fun shouldShowSourceListEntry(ledgers: List<SourceLedger>): Boolean =
+    ledgers.size > STORY_SOURCE_TOP_N
 
 /**
  * 「重复与相似照片」单行卡（64dp 紧凑行）：图标块 + 标题/摘要 + chevron；点击展开/收起。

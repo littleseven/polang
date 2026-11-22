@@ -134,7 +134,7 @@ hub:
       tap_action: open_source_detail(source)   # → §3b 来源详情页（每 chip 独立点击区，clip 8dp 圆角 + 4/2dp 内 padding）
     source_list_expanded:               # 来源列表（Task 7.5：hub 内展开形态，非独立页——复杂度裁定）
       toggle_entries:                   # 两个入口共用同一展开态（rememberSaveable）
-        - view_all_button:              # 命名来源（剔 OTHER）种类 > 3 时渲染
+        - view_all_button:              # 非零来源总数（含 OTHER）> Top3 展示数（3）时渲染（fix round 1：计数含 OTHER——完整列表是 OTHER 详情页唯一入口，命名来源 ≤3 且无 IM 时不得不可达；判定收口纯函数 shouldShowSourceListEntry）
             text_key: "org_sources_view_all ↔ org_sources_collapse（展开态）"
             font: labelSmall
             color: primary
