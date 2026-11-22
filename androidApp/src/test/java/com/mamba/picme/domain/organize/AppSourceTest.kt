@@ -43,4 +43,17 @@ class AppSourceTest {
         assertEquals(AppSource.WECHAT, appSourceOf("/storage/emulated/0/Pictures/WeChat/img.jpg"))
         assertEquals(AppSource.CAMERA, appSourceOf("/storage/emulated/0/DCIM/Camera/IMG_1.jpg"))
     }
+
+    @Test
+    fun `qq and messenger are low value sources`() {
+        assertEquals(AppSource.QQ, appSourceOf("Pictures/QQ Images"))
+        assertEquals(SourceTier.LOW_VALUE, AppSource.QQ.defaultTier)
+        assertEquals(AppSource.MESSENGER, appSourceOf("Android/media/com.facebook.orca"))
+        assertEquals(SourceTier.LOW_VALUE, AppSource.MESSENGER.defaultTier)
+    }
+
+    @Test
+    fun `path matching is case insensitive`() {
+        assertEquals(AppSource.CAMERA, appSourceOf("dcim/camera"))
+    }
 }
