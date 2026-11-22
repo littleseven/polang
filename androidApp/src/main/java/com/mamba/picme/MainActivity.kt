@@ -387,9 +387,8 @@ class MainActivity : ComponentActivity() {
                                     },
                                     // hub 存储叙事区「立即分析」（Agent 清理 M1）：调度器自身 scope 异步执行
                                     onAnalyzeNow = {
-                                        app.container.preAnalysisScheduler.runNowWithCompletion(
+                                        app.container.preAnalysisScheduler.runNowAsync(
                                             PreAnalysisScheduler.TRIGGER_MANUAL,
-                                            onFinished = {},
                                         )
                                     },
                                     onNavigateToMemoryDetail = { memoryId ->

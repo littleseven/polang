@@ -10,9 +10,10 @@ import com.mamba.picme.PoLangApplication
  * - `ACTION_POWER_CONNECTED`：插电即评估（充电是硬前置，插电时刻最接近全条件满足）；
  * - [ACTION_PRE_ANALYSIS_ALARM]：每日 03:00 闲时闹钟 fire。
  *
- * 两者同走 [PreAnalysisScheduler.runNow]，条件不满足时内部静默跳过（不弹不扰）。
- * goAsync 持住广播至链条收尾（元数据回填通常已被启动回填排空，秒级完成）；
- * 闹钟触发后重排次日闹钟维持日节奏（进程存活期不依赖 onCreate 重排）。
+ * 两者同走 [PreAnalysisScheduler.runNowAsync]，条件不满足时内部静默跳过（不弹不扰）。
+ * 不持 goAsync：广播 ~10s 超窗扛不住首启大库回填排队，回填幂等增量、被杀可续，
+ * 无需广播背书（fire-and-forget 即可）；闹钟触发后重排次日闹钟维持日节奏
+ * （进程存活期不依赖 onCreate 重排）。
  */
 class PreAnalysisReceiver : BroadcastReceiver() {
 
@@ -23,11 +24,9 @@ class PreAnalysisReceiver : BroadcastReceiver() {
             ACTION_PRE_ANALYSIS_ALARM -> PreAnalysisScheduler.TRIGGER_DAILY_ALARM
             else -> return
         }
-        val scheduler = app.preAnalysisScheduler
-        val pendingResult = goAsync()
-        scheduler.runNowWithCompletion(trigger, onFinished = { pendingResult.finish() })
+        app.preAnalysisScheduler.runNowAsync(trigger)
         if (trigger == PreAnalysisScheduler.TRIGGER_DAILY_ALARM) {
-            scheduler.scheduleDailyAlarm()
+            app.preAnalysisScheduler.scheduleDailyAlarm()
         }
     }
 

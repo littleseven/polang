@@ -73,16 +73,13 @@ class PreAnalysisScheduler(
     }
 
     /**
-     * goAsync 桥（[PreAnalysisReceiver] 专用）：在调度器自身 [scope] 上执行 [runNow]，
-     * 结束（含异常/取消）后回调 [onFinished]（消费 pendingResult.finish()）。
+     * fire-and-forget 桥（[PreAnalysisReceiver] / 手动入口）：在调度器自身 [scope] 上
+     * 执行 [runNow]，不回执完成——广播 goAsync ~10s 超窗扛不住首启大库回填排队
+     * （RUN_MUTEX 等待），回填幂等增量、被杀可续，无需广播背书。
      */
-    fun runNowWithCompletion(trigger: String, onFinished: () -> Unit) {
+    fun runNowAsync(trigger: String) {
         scope.launch {
-            try {
-                runNow(trigger)
-            } finally {
-                onFinished()
-            }
+            runNow(trigger)
         }
     }
 
