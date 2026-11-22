@@ -68,12 +68,15 @@ class CloudAgentTurnRunner(
         sessionId: String,
         text: String,
         byokApiKey: String?,
+        /** App 界面语言（shared `ReplyLanguage.name`；null 走服务端简中缺省）。 */
+        replyLanguage: String? = null,
         onEvent: (CloudTurnEvent) -> Unit,
     ): Result<Unit> = api.postMessage(
         appToken,
         sessionId,
         text,
         byokApiKey?.takeIf { key -> key.isNotBlank() },
+        replyLanguage,
     ) { frame ->
         when (frame) {
             is CloudFrame.Event -> handleEvent(frame.event, onEvent)

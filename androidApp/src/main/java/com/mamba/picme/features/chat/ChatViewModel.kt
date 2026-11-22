@@ -2143,6 +2143,10 @@ class ChatViewModel(
      */
     private suspend fun runCloudTurn(sessionId: String, text: String) {
         val prepared = prepareCloudTurn(sessionId) ?: return
+        // 界面语言（OpenUI 多语言，2026-11-22）：每次发消息现读（设置变更下条消息即生效），
+        // 与本地远程链路 AgentContext.replyLanguage 同一解析规则
+        val replyLanguage = userSettingsRepository.appLanguageFlow.first()
+            .toReplyLanguage(Locale.getDefault().toLanguageTag()).name
 
         try {
             val answer = StringBuilder()
@@ -2151,7 +2155,7 @@ class ChatViewModel(
             _openUiStreamProgram.value = null // 防上回合异常残留（openui P2 流式预览）
             cloudStepTimeline.clear() // 步骤时间线同为回合级瞬态，开局清空
             var result = runCloudTurnOnce(
-                prepared.runner, prepared.token, prepared.session, text, answer, cards
+                prepared.runner, prepared.token, prepared.session, text, answer, cards, replyLanguage
             ) { serverError = it }
             // 会话失效（服务端过期/重启丢映射）→ 丢弃映射、重建一次重试
             if (result.isFailure && isCloudSessionInvalid(result.exceptionOrNull())) {
@@ -2170,7 +2174,7 @@ class ChatViewModel(
                 val fresh = ensureCloudSession(prepared.api, prepared.token, sessionId, prepared.choice)
                 if (fresh != null) {
                     result = runCloudTurnOnce(
-                        prepared.runner, prepared.token, fresh, text, answer, cards
+                        prepared.runner, prepared.token, fresh, text, answer, cards, replyLanguage
                     ) { serverError = it }
                 }
             }
@@ -2348,8 +2352,9 @@ class ChatViewModel(
         text: String,
         answer: StringBuilder,
         cards: CloudTurnCardFlush,
+        replyLanguage: String,
         onServerError: (String) -> Unit,
-    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey) { event ->
+    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey, replyLanguage) { event ->
         when (event) {
             is CloudTurnEvent.AssistantText -> {
                 if (answer.isNotEmpty()) answer.append("\n\n")

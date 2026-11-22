@@ -96,6 +96,8 @@ interface CloudAgentApi {
         sessionId: String,
         content: String,
         byokApiKey: String?,
+        /** App 界面语言（shared `ReplyLanguage.name`，2026-11-22 OpenUI 多语言批次）：经 X-App-Language 头上报。 */
+        replyLanguage: String? = null,
         onFrame: (CloudFrame) -> Unit,
     ): Result<Unit>
     suspend fun postToolResult(token: String, sessionId: String, requestId: String, ok: Boolean, result: String): Result<Unit>
@@ -203,6 +205,7 @@ class CloudAgentClient(
         sessionId: String,
         content: String,
         byokApiKey: String?,
+        replyLanguage: String?,
         onFrame: (CloudFrame) -> Unit,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         // 不用 runCatching：协程取消必须穿透（停止按钮语义，ClaudeChatClient.chat 先例）
@@ -213,6 +216,8 @@ class CloudAgentClient(
                 .url("$baseUrl/agent/sessions/$sessionId/messages")
                 .header("X-App-Token", token)
                 .apply { if (!byokApiKey.isNullOrBlank()) header("X-User-Api-Key", byokApiKey) }
+                // 界面语言头（OpenUI 多语言）：服务端据此追加语言规则段 + 兜底文案五语化
+                .apply { if (!replyLanguage.isNullOrBlank()) header("X-App-Language", replyLanguage) }
                 .post(body.toRequestBody(jsonMedia))
                 .build()
             val call = sseClient.newCall(req)

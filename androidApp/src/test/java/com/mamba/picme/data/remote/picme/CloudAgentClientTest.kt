@@ -126,6 +126,22 @@ class CloudAgentClientTest {
         server.shutdown()
     }
 
+    // 2026-11-22 OpenUI 多语言批次：界面语言经 X-App-Language 上报，null 不带头
+    @Test
+    fun `postMessage sends app language header only when provided`() = runTest {
+        val server = MockWebServer()
+        repeat(2) {
+            server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody("data: {\"kind\":\"done\"}\n\n"))
+        }
+        server.start()
+        val client = CloudAgentClient(server.url("/").toString().removeSuffix("/"))
+        client.postMessage("tok", "s_1", "hi", byokApiKey = null, replyLanguage = "ENGLISH", onFrame = {})
+        client.postMessage("tok", "s_1", "hi", byokApiKey = null, replyLanguage = null, onFrame = {})
+        assertEquals("ENGLISH", server.takeRequest().getHeader("X-App-Language"))
+        assertEquals(null, server.takeRequest().getHeader("X-App-Language"))
+        server.shutdown()
+    }
+
     @Test
     fun `postToolResult posts ok and result`() = runTest {
         val server = MockWebServer()

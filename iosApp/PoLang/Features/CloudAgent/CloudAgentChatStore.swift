@@ -152,7 +152,8 @@ final class CloudAgentChatStore: ObservableObject {
             do {
                 // 注：每帧独立 Task 派发 @MainActor，actor 对独立 Task 无严格 FIFO；
                 // 服务端 Koog loop 串行发帧使乱序概率极低（审查 🟡3 登记，暂不引 AsyncChannel）。
-                try await client.postMessage(token: token, sessionId: sid, content: text, byokApiKey: key) { frame in
+                try await client.postMessage(token: token, sessionId: sid, content: text, byokApiKey: key,
+                                             replyLanguage: ChatViewModel.currentReplyLanguage()) { frame in
                     Task { @MainActor [weak self] in self?.onFrame(frame) }
                 }
                 // 流干净结束但无 done 帧的兜底（done 已清则为幂等 no-op）
