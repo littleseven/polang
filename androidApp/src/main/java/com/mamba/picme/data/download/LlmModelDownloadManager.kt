@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.mamba.picme.R
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.ModelCategory
 import com.mamba.picme.domain.model.TagTranslations
 import kotlinx.coroutines.CoroutineScope
@@ -37,7 +38,14 @@ import java.util.concurrent.TimeUnit
  * 从 MNN 官方模型市场获取模型列表，支持从 ModelScope（魔搭）下载 MNN-LLM 模型。
  * 参考 MNN Chat 官方实现：使用 https://meta.alicdn.com/data/mnn/apis/model_market.json 获取模型配置。
  */
-class LlmModelDownloadManager(context: Context) {
+class LlmModelDownloadManager(
+    context: Context,
+    /**
+     * 中文标签需求判定（系统语言或应用语言任一为中文）。
+     * 决定 en→zh 汉化模型是否进入语言条件化必备集合；默认 true（保守，与旧行为一致）。
+     */
+    private val needsChineseLabels: suspend () -> Boolean = { true },
+) {
 
     companion object {
         private const val TAG = "Download"
@@ -329,7 +337,7 @@ class LlmModelDownloadManager(context: Context) {
      */
     suspend fun loadMarketData(): ModelMarketData = withContext(Dispatchers.IO) {
         val localModels = loadLocalModels()
-        return@withContext ModelMarketData(localModels, defaultTagTranslations())
+        return@withContext ModelMarketData(localModels, defaultTagTranslations(), requiredIds = effectiveRequiredIds())
     }
 
     /**
@@ -339,7 +347,7 @@ class LlmModelDownloadManager(context: Context) {
      */
     suspend fun refreshMarketData(): ModelMarketData = withContext(Dispatchers.IO) {
         val localModels = loadLocalModels()
-        ModelMarketData(localModels, defaultTagTranslations())
+        ModelMarketData(localModels, defaultTagTranslations(), requiredIds = effectiveRequiredIds())
     }
 
     /**
@@ -1323,15 +1331,21 @@ fun isModelDownloaded(modelId: String): Boolean {
     /**
      * 漏斗节点「模型关通过」：必备模型全部就绪时上报 models_ready。
      * 幂等性由 reporter 内部旗标保证（每安装只报一次），此处可放心重复调用。
+     * 必备集合按语言条件化：非中文用户不等待 en→zh 汉化模型（否则漏斗永远到不了 ready）。
      */
-    private fun reportModelsReadyIfAllDownloaded() {
+    private suspend fun reportModelsReadyIfAllDownloaded() {
         val reporter = telemetryReporter ?: return
         runCatching {
-            if (ModelConfig.REQUIRED_MODEL_IDS.all { isModelDownloaded(it) }) {
-                reporter.reportModelsReadyOnce(ModelConfig.REQUIRED_MODEL_IDS.size)
+            val required = ModelConfig.requiredModelIds(needsChineseLabels())
+            if (required.all { isModelDownloaded(it) }) {
+                reporter.reportModelsReadyOnce(required.size)
             }
         }.onFailure { Logger.w(TAG, "reportModelsReady check failed", it) }
     }
+
+    /** 当前语言上下文下的必备模型集合（中文条件模型按需含入） */
+    private suspend fun effectiveRequiredIds(): Set<String> =
+        ModelConfig.requiredModelIds(needsChineseLabels())
 
     /**
      * 下载失败的遥测错误分类（只分类不上传原始 message——message 可能含 URL/路径等实现细节）。
@@ -1647,6 +1661,34 @@ data class ModelConfig(
         )
 
         /**
+         * 中文条件必备模型（2026-11-22 用户决策）：en→zh 汉化的产出仅中文 UI 可见，
+         * 非中文用户（系统语言非中文 且 应用语言非中文）免除该项下载（423MB，占原必备总量 27%）。
+         */
+        val REQUIRED_MODEL_IDS_ZH = setOf(ModelPathConfig.MODEL_ID_OPUS_MT_EN_ZH)
+
+        /** 语言无关的核心必备集合 */
+        val REQUIRED_MODEL_IDS_CORE: Set<String> = REQUIRED_MODEL_IDS - REQUIRED_MODEL_IDS_ZH
+
+        /**
+         * 语言条件化必备集合：[needsChineseLabels] 为 false 时免除中文条件模型。
+         * 判定入口统一走 [isChineseLanguageContext]。
+         */
+        fun requiredModelIds(needsChineseLabels: Boolean): Set<String> =
+            if (needsChineseLabels) REQUIRED_MODEL_IDS else REQUIRED_MODEL_IDS_CORE
+
+        /**
+         * 中文标签需求判定：应用语言显式选了中文，或应用跟随系统且系统语言为中文。
+         * 用户规则（2026-11-22）：「系统语言非中文 且 应用语言非中文」才算非中文用户。
+         */
+        fun isChineseLanguageContext(
+            appLanguage: AppLanguage,
+            systemLocale: java.util.Locale = java.util.Locale.getDefault(),
+        ): Boolean = when (appLanguage) {
+            AppLanguage.CHINESE, AppLanguage.TRADITIONAL_CHINESE -> true
+            else -> systemLocale.language == java.util.Locale.CHINESE.language
+        }
+
+        /**
          * 聊天/语音输入相关模型 ID 集合（Tier 2：次高优先）
          *
          * 不在相册必须列表中，仅在聊天页提醒下载。
@@ -1712,7 +1754,12 @@ data class ModelConfig(
  */
 data class ModelMarketData(
     val models: List<ModelConfig>,
-    val tagTranslations: TagTranslations
+    val tagTranslations: TagTranslations,
+    /**
+     * 语言条件化后的必备集合（must-have 分类归属依据）：
+     * 由 LlmModelDownloadManager 构造时按当前语言上下文注入；默认全集（保守兼容）。
+     */
+    val requiredIds: Set<String> = ModelConfig.REQUIRED_MODEL_IDS,
 ) {
     /**
      * 服务功能分类标签集合（用于顶部 Tab 分类）
@@ -1732,7 +1779,7 @@ data class ModelMarketData(
         // 未分类的模型放入 "All"
         val assignedIds = categories.flatMap { category ->
             when (category.tag) {
-                "must-have" -> models.filter { it.isRequired }.map { it.id }
+                "must-have" -> models.filter { it.id in requiredIds }.map { it.id }
                 "recommended" -> models.filter { it.isRecommended }.map { it.id }
                 else -> models.filter { category.tag in it.tags }.map { it.id }
             }
@@ -1748,13 +1795,14 @@ data class ModelMarketData(
     /**
      * 按服务功能分类标签分组模型
      * 允许同一模型出现在多个分类中（如 must-have + beauty-camera）。
+     * must-have 分类按语言条件化：非中文用户的「必须」不含 en→zh 汉化模型（落入 photo-tagging 分类）。
      */
     fun groupByCategory(): Map<ModelCategory, List<ModelConfig>> {
         val result = mutableMapOf<ModelCategory, List<ModelConfig>>()
 
         for (categoryTag in serviceCategoryTags) {
             val categoryModels = when (categoryTag) {
-                "must-have" -> models.filter { it.isRequired }
+                "must-have" -> models.filter { it.id in requiredIds }
                 "recommended" -> models.filter { it.isRecommended }
                 else -> models.filter { categoryTag in it.tags }
             }

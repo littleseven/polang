@@ -146,6 +146,7 @@ fun ModelCenterScreen(
     val downloadedModels by viewModel.downloadedModels.collectAsState()
     val tagTranslations by viewModel.tagTranslations.collectAsState()
     val autoDownloadRecommended by viewModel.autoDownloadRecommendedOnWifi.collectAsState()
+    val requiredModelIds by viewModel.requiredModelIdsFlow.collectAsState()
     var modelToDelete by remember { mutableStateOf<ModelConfig?>(null) }
     var modelToShowProperties by remember { mutableStateOf<ModelConfig?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -202,6 +203,7 @@ fun ModelCenterScreen(
                     downloadedIds = downloadedModels.map { it.id }.toSet(),
                     downloadStates = downloadStates,
                     tagTranslations = tagTranslations,
+                    requiredIds = requiredModelIds,
                     autoDownloadRecommended = autoDownloadRecommended,
                     onDownload = { model ->
                         if (downloadStates[model.id]?.status == DownloadStatus.PAUSED) {
@@ -288,6 +290,7 @@ private fun ModelCategoryPage(
     downloadedIds: Set<String>,
     downloadStates: Map<String, DownloadState>,
     tagTranslations: Map<String, String>,
+    requiredIds: Set<String>,
     autoDownloadRecommended: Boolean,
     onDownload: (ModelConfig) -> Unit,
     onCancel: (ModelConfig) -> Unit,
@@ -337,6 +340,7 @@ private fun ModelCategoryPage(
                 model = model,
                 downloadState = downloadState,
                 isDownloaded = isDownloaded,
+                isRequired = model.id in requiredIds,
                 tagTranslations = tagTranslations,
                 onDownload = { onDownload(model) },
                 onCancel = { onCancel(model) },
@@ -559,6 +563,8 @@ internal fun ModelCardWithBadge(
     model: ModelConfig,
     downloadState: DownloadState?,
     isDownloaded: Boolean = false,
+    /** 语言条件化后的「必须」徽标（由调用方按当前语言上下文的必备集合计算） */
+    isRequired: Boolean = false,
     tagTranslations: Map<String, String>,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
@@ -645,7 +651,7 @@ internal fun ModelCardWithBadge(
                             LightweightBadge()
                         }
 
-                        if (model.isRequired) {
+                        if (isRequired) {
                             RequiredBadge()
                         }
                     }

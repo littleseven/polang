@@ -775,7 +775,14 @@ class AppContainerImpl(
     }
 
     override val llmModelDownloadManager: LlmModelDownloadManager by lazy {
-        LlmModelDownloadManager(context).also {
+        LlmModelDownloadManager(
+            context,
+            needsChineseLabels = {
+                val appLang = runCatching { userPreferencesRepository.getAppLanguageBlocking() }
+                    .getOrDefault(AppLanguage.SYSTEM)
+                ModelConfig.isChineseLanguageContext(appLang)
+            },
+        ).also {
             LlmModelDownloadManager.telemetryReporter = telemetryReporter
         }
     }

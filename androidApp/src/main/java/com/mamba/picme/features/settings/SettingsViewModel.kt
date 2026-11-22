@@ -17,6 +17,7 @@ import com.mamba.picme.data.download.DownloadState
 import com.mamba.picme.data.download.DownloadStatus
 import com.mamba.picme.data.download.LlmModelDownloadManager
 import com.mamba.picme.data.download.ModelConfig
+import com.mamba.picme.data.download.ModelPathConfig
 import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.model.DetectionModelType
 import com.mamba.picme.domain.model.DetectionStage
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -53,14 +55,6 @@ class SettingsViewModel(
         private const val TAG = "Settings"
 
         /**
-         * Tier 1：相册扫描/创建 TAG 必须的模型（最高优先）。
-         * 单一事实来源：派生自 [ModelConfig.REQUIRED_MODEL_IDS]。
-         * 进入相册且自动扫描任务启动前必须全部已下载，否则弹出下载提醒。
-         */
-        val GALLERY_REQUIRED_MODEL_IDS: List<String> =
-            ModelConfig.REQUIRED_MODEL_IDS.toList()
-
-        /**
          * Tier 2：聊天/语音输入相关模型（次高优先）。
          * 已从相册必须列表中移出，仅在聊天页提醒下载。
          * 端侧文本 LLM（qwen3_5_2b）已移除，聊天改走远程推理；仅保留 ASR 语音输入。
@@ -70,6 +64,22 @@ class SettingsViewModel(
             "sherpa-onnx-zipformer-zh-en" // ASR 语音输入
         )
     }
+
+    /**
+     * Tier 1：相册扫描/创建 TAG 必须的模型（最高优先）。
+     * 单一事实来源：[ModelConfig.requiredModelIds]（语言条件化，2026-11-22）——
+     * 非中文用户（系统语言非中文 且 应用语言非中文）免除 en→zh 汉化模型（423MB）。
+     * 进入相册且自动扫描任务启动前必须全部已下载，否则弹出下载提醒。
+     */
+    private suspend fun galleryRequiredModelIds(): List<String> {
+        val appLang = runCatching { repository.getAppLanguageBlocking() }.getOrDefault(AppLanguage.SYSTEM)
+        return ModelConfig.requiredModelIds(ModelConfig.isChineseLanguageContext(appLang)).toList()
+    }
+
+    /** 当前语言上下文下的必备模型 ID 集合（模型中心「必须」徽标用） */
+    val requiredModelIdsFlow: StateFlow<Set<String>> = repository.appLanguageFlow
+        .map { lang -> ModelConfig.requiredModelIds(ModelConfig.isChineseLanguageContext(lang)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ModelConfig.REQUIRED_MODEL_IDS)
 
     val themeMode: StateFlow<ThemeMode> = repository.themeModeFlow
         .stateIn(
@@ -387,7 +397,7 @@ class SettingsViewModel(
      */
     suspend fun areGalleryRequiredModelsDownloaded(): Boolean {
         return withContext(Dispatchers.IO) {
-            GALLERY_REQUIRED_MODEL_IDS.all { id ->
+            galleryRequiredModelIds().all { id ->
                 modelDownloadManager.isModelDownloaded(id)
             }
         }
@@ -401,7 +411,7 @@ class SettingsViewModel(
         if (!NetworkUtils.isCellularConnected(appContext)) return
         if (_isBatchDownloading.value || _showGalleryRequiredModelsPrompt.value) return
         val missingAny = withContext(Dispatchers.IO) {
-            GALLERY_REQUIRED_MODEL_IDS.any { id ->
+            galleryRequiredModelIds().any { id ->
                 !modelDownloadManager.isModelDownloaded(id)
             }
         }
@@ -457,7 +467,7 @@ class SettingsViewModel(
         }
         if (_isBatchDownloading.value) return
         viewModelScope.launch {
-            val allModelIds = GALLERY_REQUIRED_MODEL_IDS + CHAT_REQUIRED_MODEL_IDS
+            val allModelIds = galleryRequiredModelIds() + CHAT_REQUIRED_MODEL_IDS
             val missingAny = withContext(Dispatchers.IO) {
                 allModelIds.any { id ->
                     !modelDownloadManager.isModelDownloaded(id)
@@ -475,7 +485,9 @@ class SettingsViewModel(
      * 一键下载相册扫描必须的 Tier 1 模型。
      */
     fun startGalleryRequiredModelsDownload() {
-        startBatchDownload(GALLERY_REQUIRED_MODEL_IDS, "gallery")
+        viewModelScope.launch {
+            startBatchDownload(galleryRequiredModelIds(), "gallery")
+        }
     }
 
     /**
@@ -723,7 +735,8 @@ class SettingsViewModel(
      */
     fun downloadAllRequiredModels() {
         viewModelScope.launch {
-            val requiredModels = _allModels.value.filter { it.isRequired }
+            val requiredIds = galleryRequiredModelIds()
+            val requiredModels = _allModels.value.filter { it.id in requiredIds }
             val downloadedIds = modelDownloadManager.getDownloadedModels().map { it.id }.toSet()
             val missingModels = requiredModels.filter { it.id !in downloadedIds }
             Logger.i("Settings", "Batch downloading ${missingModels.size} required models")
@@ -838,6 +851,24 @@ class SettingsViewModel(
     fun setAppLanguage(language: AppLanguage) {
         viewModelScope.launch {
             repository.updateAppLanguage(language)
+            // 切到中文：en→zh 汉化模型转为必备（非中文用户的必备清单不含它）；
+            // WiFi 下静默补下，蜂窝网络走相册必备模型弹窗提醒
+            if (language == AppLanguage.CHINESE || language == AppLanguage.TRADITIONAL_CHINESE) {
+                ensureZhTranslationModelDownload()
+            }
+        }
+    }
+
+    /** 切换中文后补下 en→zh 汉化模型（必备集合语言条件化，见 [ModelConfig.requiredModelIds]） */
+    private suspend fun ensureZhTranslationModelDownload() {
+        val modelId = ModelPathConfig.MODEL_ID_OPUS_MT_EN_ZH
+        val missing = withContext(Dispatchers.IO) { !modelDownloadManager.isModelDownloaded(modelId) }
+        if (!missing) return
+        if (NetworkUtils.isWifiConnected(appContext)) {
+            Logger.i(TAG, "Language switched to Chinese, silent downloading $modelId on WiFi")
+            startBatchDownload(listOf(modelId), "lang-switch-zh")
+        } else {
+            _showGalleryRequiredModelsPrompt.value = true
         }
     }
 

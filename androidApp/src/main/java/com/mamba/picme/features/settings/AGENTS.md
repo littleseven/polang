@@ -124,6 +124,7 @@
   - `florence2_base`（图片打标，默认 tagger）
   - `mobileclip-onnx`（语义搜索/相册打标）
   - `opus-mt-zh-en`（中文查询翻译）/ `opus-mt-en-zh`（英文 summary 汉化）
+  - **必备清单语言条件化（2026-11-22）**：`opus-mt-en-zh` 为中文条件必备（`ModelConfig.REQUIRED_MODEL_IDS_ZH`）——非中文用户（系统语言非中文 且 应用语言非中文，`ModelConfig.isChineseLanguageContext` 判定）的必备集合经 `ModelConfig.requiredModelIds(false)` 免除该模型（423MB），模型中心「必须」Tab 与徽标同步隐藏（落入「相册打标」分类）；切换到中文时 `SettingsViewModel.setAppLanguage` 触发补下（WiFi 静默 / 蜂窝弹相册必备模型提醒）
 - **推荐模型含语音**：`sherpa-onnx-zipformer-zh-en`（ASR）、`sherpa-onnx-kws-zipformer-wenetspeech`（KWS）均在 `RECOMMENDED_MODEL_IDS`，按需下载
 
 **语音开关组（设置 → 沙盒与权限 → 语音，2026-08-19 全面默认关闭）**
