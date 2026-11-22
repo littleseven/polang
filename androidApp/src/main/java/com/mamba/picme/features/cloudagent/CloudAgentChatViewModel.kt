@@ -3,6 +3,7 @@ package com.mamba.picme.features.cloudagent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mamba.picme.BuildConfig
+import com.mamba.picme.agent.core.model.context.toReplyLanguage
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfigs
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.core.common.Logger
@@ -157,11 +158,15 @@ class CloudAgentChatViewModel(
             stepTimeline.clear()
             _steps.value = emptyList()
             try {
+                // 界面语言（OpenUI 多语言，2026-11-22）：与主聊天 runCloudTurn 同一解析规则
+                val replyLanguage = settingsRepository.appLanguageFlow.first()
+                    .toReplyLanguage(java.util.Locale.getDefault().toLanguageTag()).name
                 val result = turnRunner.runTurn(
                     appToken,
                     chat.sessionId,
                     text,
                     byokApiKey,
+                    replyLanguage,
                 ) { event ->
                     when (event) {
                         is CloudTurnEvent.AssistantText ->

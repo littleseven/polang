@@ -133,12 +133,15 @@ struct CloudAgentClient {
 
     /// POST /agent/sessions/{id}/messages（SSE 长连接）。
     /// 🔴 BYOK 零留存锚点：[byokApiKey] 只在本方法的 X-User-Api-Key 头出现。
+    /// replyLanguage（2026-11-22 OpenUI 多语言批次）：ReplyLanguage 枚举 name 经
+    /// X-App-Language 头上报，服务端据此追加语言规则段 + 兜底文案五语化；nil 走简中缺省。
     /// 取消语义：外层 Task 取消 → bytes 迭代中断（停止按钮穿透断流）。
     func postMessage(
         token: String,
         sessionId: String,
         content: String,
         byokApiKey: String?,
+        replyLanguage: String? = nil,
         onFrame: @escaping (CloudAgentFrame) -> Void
     ) async throws {
         var req = URLRequest(url: Self.baseURL.appendingPathComponent("/agent/sessions/\(sessionId)/messages"))
@@ -148,6 +151,9 @@ struct CloudAgentClient {
         req.setValue("ios", forHTTPHeaderField: "X-Platform")
         if let byokApiKey, !byokApiKey.isEmpty {
             req.setValue(byokApiKey, forHTTPHeaderField: "X-User-Api-Key")
+        }
+        if let replyLanguage, !replyLanguage.isEmpty {
+            req.setValue(replyLanguage, forHTTPHeaderField: "X-App-Language")
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: ["content": content])
 

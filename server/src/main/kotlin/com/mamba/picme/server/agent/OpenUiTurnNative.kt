@@ -1,5 +1,9 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.agent.core.model.context.ReplyLanguage
+import com.mamba.picme.agent.core.model.context.openUiHardFallbackMessage
+import com.mamba.picme.agent.core.model.context.openUiHardFallbackSummaryLabel
+import com.mamba.picme.agent.core.model.context.openUiWrappedSummaryLabel
 import org.slf4j.LoggerFactory
 
 private val turnNativeLogger = LoggerFactory.getLogger("picme-agent")
@@ -66,15 +70,20 @@ Query 取数语句）：
      * 终结消息兜底变换（AgentRunner 终结落流前无条件内联调用，spec§3.2 双保险）：
      * 合法 → normalize 后原样放行；非法（ProgramGuard 纠正用尽）→ 兜底包成
      * Markdown 程序，端上永远收到合法树。
+     *
+     * [language]：兜底文案语言（2026-11-22 OpenUI 多语言批次）——Markdown 包装 summary
+     * 标签与硬降级错误卡随用户界面语言五语化（shared `ReplyLanguage.kt` SSOT），
+     * 缺省简中兼容管理后台 skill 调试等无语言头路径。
      */
-    fun ensureValidProgram(text: String): String {
+    fun ensureValidProgram(text: String, language: ReplyLanguage = ReplyLanguage.SIMPLIFIED_CHINESE): String {
         val normalized = OpenUiLayoutNormalizer.normalize(text)
         if (RenderOpenUiValidator.validate(normalized).isEmpty() &&
             OpenUiLayoutValidator.validate(normalized).isEmpty()
         ) {
             return normalized
         }
-        val wrapped = "// summary: 文本回复\nroot = Markdown(\"${escapeOpenUiString(text)}\")"
+        val wrapped = "// summary: ${openUiWrappedSummaryLabel(language)}\n" +
+            "root = Markdown(\"${escapeOpenUiString(text)}\")"
         // 防御分支：兜底包装自身复验（整程序扫描的违规——媒体路径/非法 handle/quoted
         // action 等——在字符串包装后仍存活时命中），仍失败则硬编码保底。
         // 2026-11-08 真机事故：该分支曾静默吞掉 ECharts 卡回复，无从定位——
@@ -88,7 +97,8 @@ Query 取数语句）：
                 wrapError,
                 text.replace("\n", "\\n").take(500),
             )
-            return "// summary: 错误\nroot = Markdown(\"回复生成失败，请重试\")"
+            return "// summary: ${openUiHardFallbackSummaryLabel(language)}\n" +
+                "root = Markdown(\"${openUiHardFallbackMessage(language)}\")"
         }
         turnNativeLogger.info(
             "终结兜底：原始输出非合法程序，Markdown 包装放行。rawLen={}, rawPreview={}",

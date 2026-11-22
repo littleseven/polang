@@ -4,6 +4,7 @@ import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.EventHandler
 import ai.koog.prompt.streaming.StreamFrame
+import com.mamba.picme.agent.core.model.context.ReplyLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -68,6 +69,11 @@ class AgentRunner(
         onOpenUiProgramDelta: suspend (programPrefix: String) -> Unit = {},
         /** 回合用量累计出参（done 帧性能数据源）：逐次累加 tokens、成功收尾回填耗时；缺省独立实例 = 无人观测。 */
         turnUsage: TurnUsage = TurnUsage(),
+        /**
+         * 用户界面语言（2026-11-22 OpenUI 多语言批次）：仅用于终结兜底文案五语化
+         * （ensureValidProgram 包装/硬降级卡），缺省简中兼容旧端与管理后台调试路径。
+         */
+        replyLanguage: ReplyLanguage = ReplyLanguage.SIMPLIFIED_CHINESE,
         onEvent: suspend (AgentEvent) -> Unit = {},
     ): AgentEvent {
         // 1. 投影（先于本轮用户消息落流）
@@ -195,7 +201,7 @@ class AgentRunner(
                 AgentEventRepository.append(
                     session.id, AgentEventSource.AGENT, AgentEventRole.ASSISTANT,
                     // 终结兜底（GenUI 唯一化）：合法 normalize 放行 / 非法兜底 Markdown 包装
-                    payload = AgentEventPayload.Message(OpenUiTurnNative.ensureValidProgram(result)),
+                    payload = AgentEventPayload.Message(OpenUiTurnNative.ensureValidProgram(result, replyLanguage)),
                 ),
             )
             val finish = AgentEventRepository.append(

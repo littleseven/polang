@@ -2,6 +2,8 @@ package com.mamba.picme.server.agent
 
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.reflect.asToolsByClass
+import com.mamba.picme.agent.core.model.context.openUiReplyLanguageRuleSegment
+import com.mamba.picme.agent.core.model.context.replyLanguageFromName
 import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.admin.SKILL_DEBUG_MODEL
@@ -32,6 +34,13 @@ import kotlinx.serialization.json.putJsonObject
 
 /** BYOK 透传头（ADR-018 决策 4：请求级透传，零留存）。 */
 const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
+
+/**
+ * App 界面语言头（2026-11-22 OpenUI 多语言批次）：端侧上报 shared `ReplyLanguage.name`，
+ * 服务端据此给 system prompt 追加 OpenUI 语言规则段 + 终结兜底文案五语化；
+ * 缺失/非法回落简中（向后兼容旧端）。值域解析收口 shared `replyLanguageFromName`。
+ */
+const val APP_LANGUAGE_HEADER = "X-App-Language"
 
 /**
  * 单轮跑轮超时上限（M2.7 安全网）：15 分钟。
@@ -245,6 +254,9 @@ fun Route.agentRoute(
             val body = call.receive<JsonObject>()
             val content = (body["content"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "content_required"))
+            // 界面语言（2026-11-22 OpenUI 多语言批次）：语言规则段追加进 system prompt 尾部
+            // + 终结兜底文案五语化；旧端不带头回落简中，行为与历史一致
+            val replyLanguage = replyLanguageFromName(call.request.headers[APP_LANGUAGE_HEADER])
 
             // per-user 跑轮并发闸（M2.6）：须在配额扣减之前占位，busy 拒绝不消耗配额
             if (!roundGate.tryAcquire(tokenHash)) {
@@ -325,7 +337,9 @@ fun Route.agentRoute(
                                 // skill 清单段（spike）：渐进披露——只注 name+description，
                                 // 正文经 load_skill 按需加载；空清单 = 空串，prompt 零变化
                                 systemPrompt = OpenUiTurnNative.SYSTEM_PROMPT +
-                                    (skillCenter?.promptSection() ?: ""),
+                                    (skillCenter?.promptSection() ?: "") +
+                                    "\n\n" + openUiReplyLanguageRuleSegment(replyLanguage),
+                                replyLanguage = replyLanguage,
                                 toolRegistry = toolRegistry,
                                 // openui 流式预览：program 前缀瞬态帧（不落事件流，与
                                 // event/done/error 共用同一 writer 保序；旧端忽略未知 kind）

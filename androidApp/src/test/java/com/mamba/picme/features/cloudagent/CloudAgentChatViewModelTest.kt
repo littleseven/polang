@@ -6,6 +6,7 @@ import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
 import com.mamba.picme.domain.chat.AgentStepStatus
+import com.mamba.picme.domain.model.AppLanguage
 import com.mamba.picme.domain.repository.UserSettingsRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -40,6 +41,8 @@ class CloudAgentChatViewModelTest {
         every { aiAgentRemoteModelConfigsFlow } answers { configsFlow }
         every { aiAgentSelectedRemoteModelFlow } answers { selectedFlow }
         every { cloudAgentByokConsentFlow } answers { consentFlow }
+        // send() 现读界面语言上报 X-App-Language（2026-11-22 OpenUI 多语言批次）
+        every { appLanguageFlow } answers { MutableStateFlow(AppLanguage.SYSTEM) }
     }
 
     /** 假客户端：记录调用，frames 脚本化。 */
@@ -74,6 +77,7 @@ class CloudAgentChatViewModelTest {
             sessionId: String,
             content: String,
             byokApiKey: String?,
+            replyLanguage: String?,
             onFrame: (CloudFrame) -> Unit,
         ): Result<Unit> {
             postCount++

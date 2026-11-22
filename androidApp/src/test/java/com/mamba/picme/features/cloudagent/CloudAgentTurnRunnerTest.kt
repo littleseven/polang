@@ -35,6 +35,7 @@ class CloudAgentTurnRunnerTest {
             sessionId: String,
             content: String,
             byokApiKey: String?,
+            replyLanguage: String?,
             onFrame: (CloudFrame) -> Unit,
         ): Result<Unit> {
             sentByokKey = byokApiKey

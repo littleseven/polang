@@ -219,8 +219,9 @@ final class ChatViewModel: ObservableObject {
         return "[用户选择了图片：\(uri)，请基于这张图片处理] \(text)"
     }
 
-    /// App 界面语言 → ReplyLanguage 枚举 name（与 Android commonMain `toReplyLanguage` 同规则）
-    private static func currentReplyLanguage() -> String {
+    /// App 界面语言 → ReplyLanguage 枚举 name（与 Android commonMain `toReplyLanguage` 同规则；
+    /// 非 private：CloudAgentChatStore 调试页同源复用，2026-11-22 OpenUI 多语言批次）
+    static func currentReplyLanguage() -> String {
         switch AppSettings.shared.appLanguage {
         case "english": return "ENGLISH"
         case "chinese_simplified": return "SIMPLIFIED_CHINESE"
@@ -496,7 +497,9 @@ final class ChatViewModel: ObservableObject {
         }
         do {
             try await CloudAgentClient.shared.postMessage(
-                token: token, sessionId: sessionId, content: text, byokApiKey: byokKey
+                token: token, sessionId: sessionId, content: text, byokApiKey: byokKey,
+                // 界面语言（OpenUI 多语言）：与 ChatAgentBridge replyLanguage 同一解析规则
+                replyLanguage: Self.currentReplyLanguage()
             ) { frame in
                 pipe.send(frame)
             }

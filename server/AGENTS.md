@@ -114,7 +114,7 @@ server/
 │   │   ├── AgentRoundGate.kt     # per-user 跑轮并发=1 内存租约（M2.6；故意无 TTL，一轮最长 20 迭代×(LLM+120s 工具)，重启即清）
 │   │   ├── DeviceToolService.kt  # 端侧只读四件套云端桥（tool_request 帧 + 120s 挂起；2026-11-07 分层 runtime M2 起**目录驱动**：@Tool 反射方法退役，CatalogBridgeTool 按 shared CloudAgentToolCatalog.localTools() 生成编程式 Tool<JsonObject,String>——LLM 可见 schema（名称/描述/参数集）自 descriptorFor 派生，桥层零工具知识、args 原样入帧；M1 起描述只承诺投影面、工具名/error: 前缀真引用 shared CloudAgentToolContract const；search_media display 参数已退役（2026-11-08 原生横滑图集卡下线）：现 6 参（query/person/fromMs/toMs/hasFace/mediaType），取数只回计数+handle，图集展示走端侧出卡（photo-browse/album-maker 技能））
 │   │   ├── CloudAgentStrategy.kt # 单跑 ReAct 策略的云端配置组装（2026-11-07 分层 runtime M1 起图结构收口 shared `poLangSingleRunStrategy` 配置化工厂：流式节点 + correctInvalidProgram 节点——2026-11-06 起 ProgramGuard 无条件启用，出边 = 程序校验 → finish；假发卡节点已摘除）
-│   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish（2026-11-06 GenUI 唯一化收编：删 forwardContentDeltas/finalMessageTransformer/onHtmlCard/actionGate/argsTransformer 接线，content delta 无条件透传 + ensureValidProgram 终结落流内联 + ProgramGuard 无条件；2026-11-03 回合用量改从流式 End 帧 metaInfo 累加）
+│   │   ├── AgentRunner.kt        # 一轮执行：投影→落流→pending 重放→Koog loop→Finish（2026-11-06 GenUI 唯一化收编：删 forwardContentDeltas/finalMessageTransformer/onHtmlCard/actionGate/argsTransformer 接线，content delta 无条件透传 + ensureValidProgram 终结落流内联 + ProgramGuard 无条件；2026-11-03 回合用量改从流式 End 帧 metaInfo 累加；2026-11-22 增 replyLanguage 参——终结兜底文案随 X-App-Language 五语化）
 │   │   ├── SkillCenter.kt        # Skill 中心（2026-11-07）：SKILL.md 磁盘资产管理——frontmatter 解析/名称闭集+canonical 双闸防穿越/32K 截断/每轮重扫热更新；upsert/delete 写通路（后台 CRUD）；promptSection() 清单段注入（2026-11-08 模板收口 shared AgentSkillContract.buildPromptSection，端云逐字节一致）；versionedManifest()/versionOf()（2026-11-08 内容版本 = 原文 sha256 前 16 位，端侧同步用）；OverlaySkillCenter（0.9.28 技能调试）：草稿内存覆盖同名磁盘技能（manifest/content 覆写，promptSection 虚分派生效），不落盘
 │   │   ├── SkillTools.kt         # load_skill Koog 工具（@Tool annotation 同 server_time 范式；Koog 无框架级 Skill 抽象，走官方 Tool 扩展点；2026-11-08 工具名/描述/参数描述/error 前缀真引用 shared AgentSkillContract，与端侧 ChatToolService.loadSkill 逐字节一致）
 │   │   ├── TurnUsage.kt          # 回合级 LLM 用量累计（done 帧 elapsed_ms/usage 数据源；流式 End 帧 metaInfo 与非流式 onLLMCallCompleted 两路互斥累加）
@@ -180,7 +180,7 @@ server/
 | GET | `/agent/sessions` | P1 | ✅ | X-App-Token | 我的云端会话列表 |
 | GET | `/agent/sessions/{id}/events` | P1 | ✅ | X-App-Token | 事件流分页回放（after/limit） |
 | GET | `/agent/sessions/{id}/final-program` | P1 | ✅ | X-App-Token | OpenUI 扫码预览取数（0.9.35）：返回会话最终 assistant 程序文本；owner 会话同 /events 口径，skill-debug 合成会话对任意有效 token 放行（程序文本无隐私，照片句柄 id 跨设备无意义）；无最终程序 404 `no_final_program` |
-| POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存；per-user 并发=1，占用回 409 `round_in_flight` 不耗配额） |
+| POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存；per-user 并发=1，占用回 409 `round_in_flight` 不耗配额；**2026-11-22 起读 `X-App-Language` 头**（shared `ReplyLanguage.name`）——system prompt 尾部追加 `openUiReplyLanguageRuleSegment` 语言规则段（程序内一切用户可见文案跟随界面语言，DSL 词汇/handle id 不翻译）+ `ensureValidProgram` 兜底文案五语化，缺失/非法回落简中兼容旧端） |
 | POST | `/agent/sessions/{id}/tool-results` | P1 | ✅ | X-App-Token | 端侧工具结果上行（409 tool_request_not_pending；ADR-018 工具桥） |
 | POST | `/agent/sessions/{id}/finish` | P1 | ✅ | X-App-Token | 关闭会话（终态） |
 | POST | `/auth/email/send` | P0 | ✅ | 无 | 发送验证码（Play 审核邮箱命中 env 旁路时直接回 sent+dev 不发信） |

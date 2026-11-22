@@ -1,5 +1,6 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.agent.core.model.context.ReplyLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -121,6 +122,28 @@ class OpenUiTurnNativeTest {
             "// summary: 相册月度趋势\nroot = Card([Html(html = \"$bad\")])",
         )
         assertEquals("// summary: 错误\nroot = Markdown(\"回复生成失败，请重试\")", out)
+    }
+
+    // 2026-11-22 OpenUI 多语言批次：终结兜底文案随 X-App-Language 五语化（shared SSOT）
+    @Test
+    fun `ensureValidProgram hard fallback follows reply language`() {
+        val bad = echartsBody + "<img src='content://media/external/images/12345'>"
+        val program = "// summary: 相册月度趋势\nroot = Card([Html(html = \"$bad\")])"
+        assertEquals(
+            "// summary: Error\nroot = Markdown(\"Failed to generate the reply, please try again\")",
+            OpenUiTurnNative.ensureValidProgram(program, ReplyLanguage.ENGLISH),
+        )
+        assertEquals(
+            "// summary: Erreur\nroot = Markdown(\"Échec de la génération de la réponse, veuillez réessayer\")",
+            OpenUiTurnNative.ensureValidProgram(program, ReplyLanguage.FRENCH),
+        )
+    }
+
+    @Test
+    fun `ensureValidProgram markdown wrap summary label follows reply language`() {
+        val wrapped = OpenUiTurnNative.ensureValidProgram("plain chat text", ReplyLanguage.SPANISH)
+        assertTrue(wrapped.startsWith("// summary: Respuesta de texto\n"))
+        assertNull(RenderOpenUiValidator.validateProgramToError(wrapped))
     }
 
     @Test
