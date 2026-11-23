@@ -32,6 +32,10 @@ data class ResolvedPersons(
  *    已被更长自定义称呼覆盖的称谓跳过（"二儿子"命中后不再用"儿子"取并集）
  * 4. "我"：仅在出现合拍电影 Pattern（"我和/和我/与我"）且已有其他人物命中时，
  *    才将本人计入（避免"我想看猫"这类第一人称查询误带本人照片）
+ * 5. 单人物主格「我」：前面步骤零命中时，query 含物主/自称 Pattern（"我的""我自己"
+ *    "本人""my"）或整句即自称（"我"/"自己"，chat person 槽位原样透传形态）→ 计入本人。
+ *    与第 4 步互补：第 4 步管"我和X"合拍共现，本步管"我的自拍"单人物主格；
+ *    已命中其他人物时跳过（"我的儿子的照片"只查儿子，不升级共现）
  */
 class PersonQueryResolver(
     private val personRepository: PersonRepository
@@ -110,11 +114,36 @@ class PersonQueryResolver(
             }
         }
 
+        // 5. 单人物主格「我」：零命中时物主/自称 Pattern 或整句自称 → 计入本人
+        if (personIds.isEmpty() && isSelfReference(query)) {
+            val self = personRepository.getSelfPerson()
+            if (self != null) {
+                personIds.add(self.personId)
+                descriptions.add("我")
+            }
+        }
+
         return ResolvedPersons(personIds, descriptions, isAmbiguous, matchedTerms)
     }
 
     companion object {
         /** 合拍意图 Pattern："X 和我/我和 X/与我" */
         private val SELF_JOIN_PATTERNS = listOf("我和", "和我", "与我", "我跟", "跟我")
+
+        /** 物主/自称 Pattern：子串命中即视为主格自拍引用（"我的自拍""我自己""本人"） */
+        private val SELF_POSSESSIVE_PATTERNS = listOf("我的", "我自己", "本人")
+
+        /** 英文物主 Pattern：词边界匹配防 "army" 等子串误伤 */
+        private val SELF_POSSESSIVE_REGEX = Regex("\\bmy\\b", RegexOption.IGNORE_CASE)
+
+        /** 整句自称词（chat person 槽位透传形态："我"/"自己"） */
+        private val SELF_EXACT_TERMS = setOf("我", "自己", "me", "myself")
+
+        /** 单人物主格「我」判定：物主/自称 Pattern 子串命中，或整句即自称词 */
+        private fun isSelfReference(query: String): Boolean {
+            if (SELF_POSSESSIVE_PATTERNS.any { pattern -> query.contains(pattern) }) return true
+            if (SELF_POSSESSIVE_REGEX.containsMatchIn(query)) return true
+            return query.trim().lowercase() in SELF_EXACT_TERMS
+        }
     }
 }

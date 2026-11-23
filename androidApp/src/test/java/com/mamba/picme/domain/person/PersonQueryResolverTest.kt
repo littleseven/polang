@@ -253,6 +253,54 @@ class PersonQueryResolverTest {
     }
 
     @Test
+    fun `possessive 我的 without other persons resolves to self`() = runTest {
+        // 生产 bug（2026-11-23）：「查看全部我的自拍照片」0 人物命中，
+        // 退化为全库人脸查询，别人的照片混入结果
+        stubDefaults(self = person(9, "我", isSelf = true))
+
+        val result = resolver.resolve("查看全部我的自拍照片")
+
+        assertEquals(setOf(9L), result.personIds)
+        assertTrue(result.descriptions.contains("我"))
+    }
+
+    @Test
+    fun `exact self term query resolves to self`() = runTest {
+        // chat 链路 LLM 常把 person 槽位填成"我"/"自己"，经 personName 透传为整句查询
+        stubDefaults(self = person(9, null, isSelf = true))
+
+        assertEquals(setOf(9L), resolver.resolve("我").personIds)
+        assertEquals(setOf(9L), resolver.resolve("自己").personIds)
+    }
+
+    @Test
+    fun `english my selfies resolves to self`() = runTest {
+        stubDefaults(self = person(9, null, isSelf = true))
+
+        assertEquals(setOf(9L), resolver.resolve("my selfies").personIds)
+    }
+
+    @Test
+    fun `possessive 我的 with another person hit does not add self`() = runTest {
+        // 「我的儿子的照片」物主格限定的是儿子，不得升级为共现查询
+        stubDefaults(
+            kinship = mapOf("儿子" to listOf(person(1, "大宝"))),
+            self = person(9, "我", isSelf = true)
+        )
+
+        val result = resolver.resolve("我的儿子的照片")
+
+        assertEquals(setOf(1L), result.personIds)
+    }
+
+    @Test
+    fun `possessive query without marked self yields empty`() = runTest {
+        stubDefaults(self = null)
+
+        assertTrue(resolver.resolve("我的自拍").personIds.isEmpty())
+    }
+
+    @Test
     fun `kinship term without declared relation falls back to named person whose name contains term`() = runTest {
         // 用户未声明 SON 关系，但把人物簇命名为"大儿子"：称谓解析空手而归时
         // 应回退到"簇名包含称谓"的命名簇，而不是返回空
