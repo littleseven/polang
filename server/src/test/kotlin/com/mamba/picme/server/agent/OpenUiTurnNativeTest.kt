@@ -65,6 +65,18 @@ class OpenUiTurnNativeTest {
         assertNull(RenderOpenUiValidator.validateProgramToError(OpenUiTurnNative.GOLDEN_CHAT_PROGRAM))
     }
 
+    // 2026-11-24 follow-up 批次：形态定位段放宽——对话回复有自然后续时 root 可
+    // 升级为 Column([Markdown, Buttons]) 补选项排；没有后续保持裸 Markdown
+    @Test
+    fun `system prompt pins follow-up options guidance`() {
+        val prompt = OpenUiTurnNative.SYSTEM_PROMPT
+        assertTrue(prompt.contains("Column([Markdown(正文), Buttons([...])])"))
+        assertTrue(prompt.contains("没有自然后续就保持裸 Markdown 干净收尾"))
+        // 后续选项黄金示例经 DSL_RULES 同源内嵌进系统提示词，且自身过终结校验
+        assertTrue(prompt.contains(OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM))
+        assertNull(RenderOpenUiValidator.validateProgramToError(OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM))
+    }
+
     @Test
     fun `system prompt embeds full component allowlist`() {
         val prompt = OpenUiTurnNative.SYSTEM_PROMPT

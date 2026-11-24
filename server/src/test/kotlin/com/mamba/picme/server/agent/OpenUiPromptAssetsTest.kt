@@ -1,5 +1,10 @@
 package com.mamba.picme.server.agent
 
+import com.mamba.picme.domain.chat.openui.OpenUiResult
+import com.mamba.picme.domain.chat.openui.OpenUiSession
+import com.mamba.picme.domain.chat.openui.OpenUiValue
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -71,10 +76,52 @@ class OpenUiPromptAssetsTest {
         listOf(
             OpenUiPromptAssets.GOLDEN_COMPARE_PROGRAM,
             OpenUiPromptAssets.GOLDEN_TIMELINE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM,
         ).forEach { golden ->
             assertNull("协议校验应过：$golden", RenderOpenUiValidator.validateToError(golden))
             assertTrue("布局门禁应过：$golden", OpenUiLayoutValidator.validate(golden).isEmpty())
             assertTrue("黄金程序不应被矫正改写", OpenUiLayoutNormalizer.normalize(golden) == golden)
+        }
+    }
+
+    @Test
+    fun `dsl rules pin follow-up options section`() {
+        // 2026-11-24 follow-up 批次：后续选项段是 LLM 唯一可见的 follow-up 规则文档
+        assertTrue(OpenUiPromptAssets.DSL_RULES.contains("后续选项"))
+        assertTrue(OpenUiPromptAssets.DSL_RULES.contains("回复干净结束"))
+        assertTrue(OpenUiPromptAssets.DSL_RULES.contains("选项标签 ≤8 字"))
+        // 对话形态 root 升级约定（Column([Markdown, Buttons])）必须写进规则
+        assertTrue(OpenUiPromptAssets.DSL_RULES.contains("Column([Markdown(正文), Buttons([...])])"))
+        // 数量口径与 lint 阈值同源（一卡 Button ≤3 个）
+        assertTrue(OpenUiPromptAssets.DSL_RULES.contains("合计 ≤3"))
+        // 黄金示例内嵌进规则正文（同源钉住）
+        assertTrue(OpenUiPromptAssets.DSL_RULES.contains(OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM))
+    }
+
+    @Test
+    fun `follow-up golden program evaluates in shared engine`() {
+        // 端上真实渲染走 shared OpenUiSession 求值——黄金示例除服务端结构校验外，
+        // 必须被引擎解析成 Column([Markdown, Buttons(3×Button)]) 组件树（防 DSL 写法
+        // 过得了正则级校验、过不了真解析器的脱节；管理后台组件树预览同路径）
+        val result = runBlocking {
+            OpenUiSession(
+                OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM,
+                tools = { _, _ -> OpenUiValue.Null },
+            ).prepare()
+        }
+        assertTrue("引擎求值应成功：$result", result is OpenUiResult.Rendered)
+        val root = (result as OpenUiResult.Rendered).root
+        assertEquals("Column", root.type)
+        val children = (root.props["children"] as? OpenUiValue.Arr)?.v.orEmpty()
+        assertEquals(2, children.size)
+        val buttons = children[1] as? OpenUiValue.ComponentVal
+        assertEquals("Buttons", buttons?.type)
+        val items = (buttons?.props?.get("buttons") as? OpenUiValue.Arr)?.v.orEmpty()
+        assertEquals(3, items.size)
+        items.forEach { item ->
+            val button = item as? OpenUiValue.ComponentVal
+            assertEquals("Button", button?.type)
+            assertTrue("每个选项必须挂 @ToAssistant 动作", button?.props?.containsKey("action") == true)
         }
     }
 }

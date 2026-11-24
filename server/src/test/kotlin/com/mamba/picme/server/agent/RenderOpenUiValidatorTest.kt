@@ -792,6 +792,20 @@ root = Card([Image(photos[0].id, 1.5, "http://insecure.example.com/a.png")])""",
         )
     }
 
+    // ── 后续选项批次（2026-11-24）：follow-up 选项排黄金示例 ──────────────
+
+    @Test
+    fun `follow-up golden example passes validation and lint`() {
+        // 对话形态收尾选项排：Column([Markdown, Buttons(3×tertiary@ToAssistant)])——
+        // 恰 3 个 Button 在「一卡 ≤3」lint 阈值上（不警告），同源钉住防规则与校验器脱节
+        assertNull(RenderOpenUiValidator.validateToError(OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM))
+        assertTrue(
+            RenderOpenUiValidator.lintComposition(OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM).isEmpty(),
+        )
+        // 回合原生入口（ProgramGuard/ensureValidProgram 消费）同样放行
+        assertNull(RenderOpenUiValidator.validateProgramToError(OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM))
+    }
+
     @Test
     fun `photo pattern components pass whitelist`() {
         val program =

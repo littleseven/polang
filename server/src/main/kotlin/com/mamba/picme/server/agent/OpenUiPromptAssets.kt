@@ -134,6 +134,21 @@ object OpenUiPromptAssets {
             "{title: \"返程\", time: \"2026-07-20\"}])])"
 
     /**
+     * 后续选项黄金示例（2026-11-24 follow-up 批次）：对话形态收尾追加选项排——
+     * root 由裸 Markdown 升级为 Column([Markdown(正文), Buttons([...])])，
+     * ≤3 个 tertiary Button 横排（标签 ≤8 字横排不溢出版心），action 一律
+     * @ToAssistant(用户视角完整一句话)（点击即作为用户消息发进新一轮对话）。
+     */
+    const val GOLDEN_FOLLOWUP_PROGRAM =
+        "// summary: 上周照片整理建议与后续选项\n" +
+            "root = Column([Markdown(\"上周你拍了 86 张，大头是周末奥森那场球。" +
+            "整理可以从最乱的开始。\\n\\n要我动手的话，挑一个方向就行。\"), " +
+            "Buttons([Button(\"挑最佳镜头\", @ToAssistant(\"从上周的照片里挑出最佳镜头\"), variant = \"tertiary\"), " +
+            "Button(\"按场景分组\", @ToAssistant(\"把上周的照片按场景分组\"), variant = \"tertiary\"), " +
+            "Button(\"找出废片\", @ToAssistant(\"找出上周照片里可以删掉的废片\"), variant = \"tertiary\")], " +
+            "direction = \"row\")])"
+
+    /**
      * Icon 预定义图标名清单（描述内嵌用）——真引用 shared [OpenUiLibrary.iconNames]
      * （分层 runtime M1.5，原字面量副本已收口，与 [RenderOpenUiValidator.ICON_NAMES]
      * 同源；非 const 因运行期派生，无 annotation 消费方）。
@@ -467,6 +482,23 @@ object OpenUiPromptAssets {
    选择经验：纯跳页/搜索直达用 @Navigate（零回合零延迟）；明确业务写动作用
    Mutation+@Run（结果可绑定、失败中断链）；需要模型再思考才用 @ToAssistant
    （@OpenUrl 仍只管打开网页）。
+   后续选项（2026-11-24 follow-up 批次：回复收尾的后续动作排——用户点选即把
+   选项全文作为用户消息发进新一轮对话，动作三通道第 3 条的场景化应用）：
+   - 何时加：正文收尾后，若存在与本轮上下文强相关的自然后续动作，在 root 树
+     末尾追加一排 Buttons([...], direction = "row")，≤3 个
+     Button(选项标签, @ToAssistant(选项全文), variant = "tertiary")；
+   - 何时不加：任务已收尾/话题自然结束/没有有意义的后续 → 不加，回复干净结束，
+     不为凑数编造弱相关选项；
+   - 写法约束：选项标签 ≤8 字（横排不溢出版心；选项较长时改
+     Buttons(direction = "column") 竖排）；@ToAssistant 的选项全文是用户视角的
+     完整一句话（可比标签长，语境写全）；选项之间不重复、与刚给出的内容连贯；
+   - 形态兼容：裸 Markdown 对话回复加选项时 root 升级为
+     Column([Markdown(正文), Buttons([...])])（仍是对话形态，不算表单卡包装）；
+     数据卡则在收尾 Markdown 讲解之后、Card 内末尾追加同一排；
+   - 数量口径：后续选项与卡内既有动作 Button 合计 ≤3（「一卡 Button ≤3 个」
+     口径不变）；
+   后续选项黄金示例（对话形态：Markdown 正文 + 末尾选项排）：
+""" + GOLDEN_FOLLOWUP_PROGRAM + """
    前后对比黄金示例：
 """ + GOLDEN_COMPARE_PROGRAM + """
    时间轴黄金示例：

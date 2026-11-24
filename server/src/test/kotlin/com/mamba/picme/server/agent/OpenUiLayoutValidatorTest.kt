@@ -24,6 +24,7 @@ class OpenUiLayoutValidatorTest {
             OpenUiPromptAssets.GOLDEN_PHOTO_PROGRAM,
             OpenUiPromptAssets.GOLDEN_COMPARE_PROGRAM,
             OpenUiPromptAssets.GOLDEN_TIMELINE_PROGRAM,
+            OpenUiPromptAssets.GOLDEN_FOLLOWUP_PROGRAM,
         ).forEach { golden ->
             assertEquals(golden, emptyList<String>(), OpenUiLayoutValidator.validate(golden))
         }

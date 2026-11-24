@@ -1200,6 +1200,18 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
   逃生舱拼 media:// 臆造 id（云端拿不到真实媒体 id）即「内嵌 H5 相册空内容」事故形态，
   现与路径禁令同规拒掉（校验文案指明走句柄投影）；DSL_RULES 规则 4 句柄来源补
   get_gallery_summary + Html 条目补本地媒体禁令。
+- **后续选项批次（2026-11-24，纯 prompt 资产改动，零端侧/协议变更）**：chat 回复
+  末尾 follow-up 选项排（用户需求「回复末尾追加 ≤3 个上下文相关选项，点击进下一轮；
+  任务完成不显示」）——实现 = DSL_RULES 新增「后续选项」规则段（收尾有自然后续时
+  root 树末尾追加 Buttons(direction = "row") 横排 ≤3 个
+  `Button(标签, @ToAssistant(用户视角完整一句话), variant = "tertiary")`，标签 ≤8 字，
+  较长改 direction = "column"；任务收尾/无有意义的后续不加；数量与「一卡 Button ≤3」
+  lint 同口径）+ 黄金示例 `GOLDEN_FOLLOWUP_PROGRAM`（对话形态 root 由裸 Markdown
+  升级为 `Column([Markdown(正文), Buttons([...])])`）+ `OpenUiTurnNative.SYSTEM_PROMPT`
+  形态定位段同步放宽（对话类回复允许该升级形态，仍禁表单卡包装）。回话通道零新增
+  （@ToAssistant 双端已实路由为用户消息上行）；iOS 零改动（OpenUI 双端同源渲染）。
+  测试钉住：规则段字面量 + 系统提示词引导 + 黄金示例过结构校验/布局门禁/lint 三闸 +
+  shared OpenUiSession 真实求值出 Column(Markdown + 3×Button) 组件树。
 - **端到端例子（turn-native 时序，2026-11-01 起）**：「统计我今年的照片」→ 云端回合
   search_media 取数（display=false）命中注册 handle → LLM 终结回复直接输出整颗
   BarChart 程序（buckets = Query("local_handle", {handle: "local://scan/<id>"})；流式
