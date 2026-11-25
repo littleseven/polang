@@ -367,7 +367,7 @@ ADR-016 对齐的「主流协议」中，OpenAI 是传输层实际采用的家�
 | 编辑结果卡 | `tool_image_edit` | isEditResult 分支 | 原生 | — | ✅ |
 | 浏览器直播卡 | `tool_browser` | `BrowserLiveCard` + `BrowserFramePreviewOverlay`（M2 全屏接管） | 原生（帧位图：M2 WS binary 推流 / HTTP base64） | —（视觉契约固化 chat.yaml §18） | ✅（Android 首发，iOS 跟随） |
 | ~~A2UI GenUI 卡~~（已退役 2026-11-05） | `data_ui`（已退役） | ~~`A2uiCardHost`~~（androidx.a2ui 官方渲染器，polang catalog = material + BarChart；已随退役拆除） | 原生（Compose，云端下发骨架 + 端上 HandleResolver 填槽） | —（GenUI 生成物无固定帧） | ❌ 已退役（2026-11-05 OpenUI 唯一化；v28 重置后运行时零存量行，v5 备份恢复落 Tombstone，详见 data_ui 节） |
-| OpenUI GenUI 卡 | `data_genui_program` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生；2026-11-05 起唯一 GenUI 线；2026-11-08 值语义化改名 `data_genui_program`）；iOS ✅ 2026-11-12（SwiftUI 原生渲染 + 云端回合接线，见 data_genui_program 节 iOS 渲染 bullet） |
+| OpenUI GenUI 卡 | `data_genui_program` | `OpenUiCardHost`（自研 Compose 渲染器，103 件组件库） | 原生（Compose，回合原生：终结回复即 OpenUI 程序，端上 OpenUiSession 求值 + local_handle 填槽 + 布局矫正/门禁；2026-11-24 起云端/本地回合双来源同渲染） | —（GenUI 生成物无固定帧；版式范式帧 `refs/ardot/pattern-*`） | ✅（2026-10-24 接入；2026-11-01 起回合原生；2026-11-05 起唯一 GenUI 线；2026-11-08 值语义化改名 `data_genui_program`；2026-11-24 起本地回合产出）；iOS ✅ 2026-11-12（SwiftUI 原生渲染 + 云端回合接线，见 data_genui_program 节 iOS 渲染 bullet） |
 | 思考过程折叠块 | `reasoning`（bare；永不作 type 投影源） | `ReasoningPartBlock`（Android）/ iOS `reasoningItem` | 原生 | —（跟随会话帧） | ✅（2026-11-08；默认折叠，生产开关默认关，§4.10） |
 | 引用 chips 行 | `source_url` / `source_document`（连续聚合单 item） | `SourceChipsRow`（Android）/ iOS `sourceChipsItem` | 原生 | —（跟随会话帧） | ✅（2026-11-08；web_search 结果 ≤5 条，§4.10） |
 | Claude 步骤附加区 | `text`（+ role=agent）+ metadata `claude_agent_state` | `AgentMessageExtras` / `ClaudeAgentSteps` | 原生 | — | ✅ |
@@ -916,7 +916,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 
 ---
 
-## data_genui_program · OpenUI GenUI 卡（2026-11-01 起为回合原生 turn-native 形态；2026-11-05 起为唯一 GenUI 线；2026-11-08 值语义化改名自 `data_ui_openui`）
+## data_genui_program · OpenUI GenUI 卡（2026-11-01 起为回合原生 turn-native 形态；2026-11-05 起为唯一 GenUI 线；2026-11-08 值语义化改名自 `data_ui_openui`；2026-11-24 起本地回合同产——云端/本地双来源）
 
 - **分流（已退役 2026-11-06，OpenUI 唯一化）**：原设置页「GenUI 协议」单选（DataStore `genui_format`，
   默认 openui）→ Chat 页云端回合请求头 `X-GenUI-Format` → server 侧分流（openui = 回合原生 /
@@ -928,12 +928,21 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **协议**：`ChatMessageEntity.type = "data_genui_program"`（投影），content 投影 = 整颗 `MessagePart.OpenUiCard`
 
 > 端侧合成消费者（2026-11-02）：工程师任务卡信息区（`tool_task` part）同走 OpenUI 运行时渲染（`EngineerTaskProgram` 端侧确定性合成程序文本 → `OpenUiSession` → 解包根 Card 原生渲染）——openui 渲染器的第二个消费者，程序不出端、非 turn-native 产物；详见「工程师任务卡」节。
-  part JSON。**来源（2026-11-01 起）= 云端回合终结 Message 事件**——响应即程序：assistant
+  part JSON。**来源（双通道）**——① **云端回合终结 Message 事件（2026-11-01 起）**：
+  响应即程序：assistant
   content 直接是 OpenUI Lang 1.0 程序文本，端上 `CloudAgentTurnRunner` message 分支经
   `OpenUiProgramSummary.looksLikeProgram` 嗅探（root 行首声明 / Card 调用，字符串字面量
   剥离后判定）→ 程序形态落 OpenUiCard 事件入库，非程序形态（理论上已被 server 双保险
   兜住）按纯文本 AssistantText 降级上屏；`extractFallbackSummary` 提取降级摘要
-  （`// summary:` 首行注释 > 首个 Markdown/Text 字符串字面量，截 80 字）。**流式预览（turn-native）**：服务端 `OpenUiContentStreamTracker` 跟踪 content
+  （`// summary:` 首行注释 > 首个 Markdown/Text 字符串字面量，截 80 字）。
+  ② **本地回合终结回复（2026-11-24 起，spec《2026-11-24-local-turn-openui-unification-design.md》）**：
+  端侧 Koog 回合同口径 turn-native——策略层流式 + `OpenUiProgramGuard` 纠正回环（每回合
+  reset，MAX_CORRECTIONS=1）、engine 层 `ensureValidProgram` 兜底（fullResponse 恒合法程序）、
+  prompt 尾部恒追加 `OpenUiTurnNativeContract` 契约段（shared 同一声明源，端侧变体槽）；
+  `ChatViewModel.insertAssistantFinalMessage` 嗅探落卡（parts = reasoning + source +
+  OpenUiCard，modelUsed = 本地模型标签，langVersion = 本地真值）、`TextSnapshot` 程序前缀
+  嗅探切 `OpenUiStreamingCard` 流式预览；DataStore 回滚闸（默认开）可整体退回文本气泡
+  （协议链路口径见 `CHAT_PROTOCOL_TECH_SPEC.md` §2.10）。**流式预览（turn-native）**：服务端 `OpenUiContentStreamTracker` 跟踪 content
   TextDelta 纯文本累计（响应即程序，无需 JSON 转义剥离——2026-10-26 P2 的
   ToolCallDelta 路径已随发卡工具退役物理删除，2026-11-06，server 0.9.20），节流同口径
   （≥48 字符增量且 ≥80ms，首发免时间窗）经 SSE `kind=openui_delta` 瞬态帧旁路下行
@@ -955,7 +964,9 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 - **parts 形态**：`MessagePart.OpenUiCard(partId, program, fallbackSummary, viewState, langVersion)`，
   category=DATA；持久轨 p0；viewState 同 part id 覆写（US-7 对偶）；`langVersion`（2026-11-11）
   = 服务端 OpenUI 语言协议版本（server done 帧 `lang_version` 真引用 shared
-  `OpenUiContract.LANG_VERSION`），旧 server 无字段/旧 partsJson 解码均落 null（默认值双向兼容）。
+  `OpenUiContract.LANG_VERSION`），旧 server 无字段/旧 partsJson 解码均落 null（默认值双向兼容）；
+  本地回合（2026-11-24 起）直接写 `OpenUiContract.LANG_VERSION` 本地真值（本地校验器与渲染器
+  同源，无服务器协商）。
 - **协议版本协商 + 未知组件可见降级（2026-11-11）**：服务端先部署新组件而 App 未发包时的
   前向兼容双保险（chat parts 层 Tombstone 口径在 OpenUI 程序层的对偶）——① done 帧
   `lang_version`（server `AgentRoutes` 真引用 shared 常量）→ 端侧 `CloudFrame.Done.langVersion`

@@ -17,7 +17,7 @@
 - DSL_RULES 等 prompt 资产逐字节搬运（含「服务端校验」等云端措辞，端侧不改写——字节钉住优先于措辞洁癖）；raw string 顶格禁 re-indent。
 - Koog 版本两端锁死 1.3.0；@Tool 参数禁 Kotlin 默认值（可选语义用空串）。
 - [I18N]：新增用户可见文案（回滚闸设置项）五语同步（EN/zh-CN/zh-TW/ES/FR）。
-- 测试命令约定：shared = `JITPACK=true ./gradlew :shared:jvmTest`；server = `./gradlew -p server build`；Android 编译 = `./gradlew :androidApp:compileDebugKotlinAndroid`，单测 = `./gradlew :androidApp:testDebugUnitTest`。
+- 测试命令约定：shared = `JITPACK=true ./gradlew :shared:jvmTest`；server = `./gradlew -p server build`；Android 编译 = `./gradlew :androidApp:compileDebugKotlin`，单测 = `./gradlew :androidApp:testDebugUnitTest`。
 - commonMain 禁用 JVM API（`java.util.concurrent.atomic.*` 用 `kotlin.concurrent.atomics`，slf4j 用 shared `Logger`）。
 
 ## Review Focus
@@ -45,7 +45,7 @@
 - [ ] **Step 1:** 搬运五件到 shared，package 声明改 `com.mamba.picme.domain.chat.openui`；文件内相互引用同包免 import；`OpenUiContract`/`OpenUiLibrary` 同包免改。
 - [ ] **Step 2:** server 建 `OpenUiSharedAliases.kt`（五件 typealias），删五件本体；server 消费方（OpenUiTurnNative/ProgramGuard/AgentRunner/AgentRoutes/AdminViews/AdminRoutes）零改动。
 - [ ] **Step 3:** 跑 `./gradlew -p server build`——全绿（校验器四测试件 + AgentRunnerTest/AgentRoutesTest 全量）。
-- [ ] **Step 4:** 跑 `JITPACK=true ./gradlew :shared:jvmTest` 与 `./gradlew :androidApp:compileDebugKotlinAndroid`——绿（shared 纯增量）。
+- [ ] **Step 4:** 跑 `JITPACK=true ./gradlew :shared:jvmTest` 与 `./gradlew :androidApp:compileDebugKotlin`——绿（shared 纯增量）。
 - [ ] **Step 5:** Commit：`refactor(shared): hoist OpenUI validators to shared SSOT (U1-1)`
 
 ### Task 2: U1 — prompt 资产 + 回合契约上提（参数化两变体槽）
@@ -158,7 +158,7 @@
 
 - [ ] **Step 1:** 写 failing test（ViewModel 层既有测试范式）：程序文本落库后消息 parts 含 OpenUiCard 且 reasoning 在前；非程序文本落文本 part；开关 off 时程序文本也落文本 part。
 - [ ] **Step 2:** 实现 + 三调用点改道。
-- [ ] **Step 3:** 跑 `./gradlew :androidApp:testDebugUnitTest --tests "*ChatViewModel*"`——绿；再跑 `:androidApp:compileDebugKotlinAndroid`。
+- [ ] **Step 3:** 跑 `./gradlew :androidApp:testDebugUnitTest --tests "*ChatViewModel*"`——绿；再跑 `:androidApp:compileDebugKotlin`。
 - [ ] **Step 4:** Commit：`feat(android): unified sniff-and-persist OpenUI card for local turns (U2-4)`
 
 ### Task 8: U2 — 流式预览接线（程序前缀 → OpenUiStreamingCard）
@@ -194,7 +194,7 @@
 ### Task 10: U2 — 端侧工具 handle 回执 + mediaType（选项 A）
 
 **Files:**
-- Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/ChatToolService.kt`（search_media 增第 6 参 `mediaType`（空串=photo/video/all）；三工具 @LLMDescription 增句柄双轨措辞：「结果尾部附数据句柄 local://scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供 render_html 与写工具」）
+- Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/inference/remote/tool/ChatToolService.kt`（search_media 增第 6 参 `mediaType`（空串=photo/video/all）；三工具 @LLMDescription 增句柄双轨措辞：「结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供 render_html 与写工具」）
 - Modify: `shared/src/commonMain/kotlin/com/mamba/picme/agent/core/model/command/AgentCommands.kt`（`SearchMedia` 增 `mediaType: String = "photo"` 字段）
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/capability/ChatSearchCapability.kt`（search/refine 回执注册句柄 + 类型过滤）
 - Modify: `androidApp/src/main/java/com/mamba/picme/features/chat/capability/` 摘要能力件（get_gallery_summary 注册全库句柄，对齐 `CloudAgentGalleryTools.getGallerySummary`）
@@ -203,9 +203,9 @@
 
 **Interfaces:**
 - Consumes: `LocalHandleStore.put(domain, payloadJson)`（androidApp data.local）、`OpenUiContract.DOMAIN_SCAN`/`formatHandleToken`、`ScanPhotoEntry(id, captureDate, mediaType)`。
-- Produces: 回执尾缀格式与云端工具桥逐字一致：`（数据句柄 local://scan/<12hex>）`；注册失败静默降级纯前缀（catch Exception 记日志，不走 error: 协议）。refine 的 mediaType 跟随产生基数的 search（CloudAgentGalleryTools `refineMediaType` 先例）。
+- Produces: 回执尾缀格式与云端工具桥逐字一致：`（数据句柄 handle: scan/<12hex>）`；注册失败静默降级纯前缀（catch Exception 记日志，不走 error: 协议）。refine 的 mediaType 跟随产生基数的 search（CloudAgentGalleryTools `refineMediaType` 先例）。
 
-- [ ] **Step 1:** 写 failing test：search 命中后回执含 `（数据句柄 local://scan/` 且 store 可按 id 取回 entries（fake store）；mediaType="video" 只注册 VIDEO entries；store 抛异常时回执为纯前缀。
+- [ ] **Step 1:** 写 failing test：search 命中后回执含 `（数据句柄 handle: scan/` 且 store 可按 id 取回 entries（fake store）；mediaType="video" 只注册 VIDEO entries；store 抛异常时回执为纯前缀。
 - [ ] **Step 2:** 实现（SearchOutcome 组装处挂句柄尾缀；注册逻辑抽私有函数镜像 `registerScanHandle`/`appendHandleSuffix`）。
 - [ ] **Step 3:** 三工具描述更新 + SearchIntent/命令/能力件 mediaType 贯通；iOS `IosCloudAgentToolBridge` 的 search/refine 已注册句柄（2026-11-12 批次），本任务不动 iOS。
 - [ ] **Step 4:** 跑 `./gradlew :androidApp:testDebugUnitTest --tests "*ChatSearch*" --tests "*ChatGallerySummary*"` + `:shared:jvmTest` + 编译——绿。
