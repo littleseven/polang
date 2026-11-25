@@ -1108,6 +1108,15 @@ class ChatViewModel(
      */
     private var openUiPreviewRound = false
 
+    /**
+     * 本地程序预览写入节流器（Task 13，U2 跟进）：镜像 server OpenUiContentStreamTracker
+     * 48 字符/80ms 粒度压低 TextSnapshot 帧直写预览轨的频率（低端机流式预览 OOM 修复）；
+     * 收尾 flushTail 保尾帧（判定/清空针对最新完整文本）。
+     * 冻结违反登记：本批次第 3 个字段（同 openUiPreviewRound 批次，任务卡指令优先），
+     * 遗留 streaming delegate 拆分时收编。
+     */
+    private val openUiPreviewThrottle = OpenUiPreviewStreamThrottle()
+
     private val pacingController = StreamingPacingController(
         scope = viewModelScope,
         onPaced = { text, cursor ->
@@ -1947,8 +1956,12 @@ class ChatViewModel(
                                     (openUiPreviewRound || OpenUiProgramSummary.looksLikeProgramPrefix(event.text))
                                 ) {
                                     openUiPreviewRound = true
-                                    _openUiStreamProgram.value = event.text
                                     programPreviewPath = true
+                                    // Task 13：命中帧经节流器写入（48 字符/80ms 粒度压帧，
+                                    // 首帧/非连续帧直通保改道可观测）；不发射 → 不写
+                                    openUiPreviewThrottle.onTextSnapshot(event.text)?.let { throttled ->
+                                        _openUiStreamProgram.value = throttled
+                                    }
                                     // 非卡片工具 chip 让位（原路径文本快照同款语义，U2-6
                                     // 顺车修 T8 评审 Important：否则工具轮的 chip 与占位
                                     // 气泡状态文案悬挂至回合收尾）
@@ -1966,6 +1979,7 @@ class ChatViewModel(
                                 // U2-5：工具轮打断程序轮——latch 复位 + 预览清空让位工具状态
                                 openUiPreviewRound = false
                                 _openUiStreamProgram.value = null
+                                openUiPreviewThrottle.reset()
                                 pacingController.reset()
                                 _streamingMessage.value = _streamingMessage.value?.copy(
                                     content = stringContext().getString(R.string.chat_calling_tool),
@@ -1987,6 +2001,7 @@ class ChatViewModel(
                             is ChatStreamEvent.RoundStarted -> {
                                 openUiPreviewRound = false
                                 _openUiStreamProgram.value = null
+                                openUiPreviewThrottle.reset()
                             }
                             // 值域终态 §6.1：思考链快照不进气泡 content 轨（正文仍由
                             // TextSnapshot 驱动），parts 轨经 feedTurn 装配 reasoning 折叠块；
@@ -2020,8 +2035,13 @@ class ChatViewModel(
                     onSuccess = { streamResult ->
                         // 清除流式占位
                         _streamingMessage.value = null
+                        // Task 13 保尾帧：清空动作针对最新完整文本（节流滞后不丢尾）
+                        openUiPreviewThrottle.flushTail()?.let { tail ->
+                            _openUiStreamProgram.value = tail
+                        }
                         // U2-5：终稿已落卡（insertAssistantFinalMessage），流式预览让位
                         _openUiStreamProgram.value = null
+                        openUiPreviewThrottle.reset()
 
                         // 性能数据统一在此计算并透传给所有回复路径（文本/命令），
                         // 让 remote(DeepSeek) 响应气泡也展示 prompt/decode tokens、延迟、速度。
@@ -2082,8 +2102,13 @@ class ChatViewModel(
                     onFailure = { error ->
                         // 清除流式占位
                         _streamingMessage.value = null
+                        // Task 13 保尾帧：清空动作针对最新完整文本（节流滞后不丢尾）
+                        openUiPreviewThrottle.flushTail()?.let { tail ->
+                            _openUiStreamProgram.value = tail
+                        }
                         // U2-5：回合失败收尾清流式预览（半截程序不上屏）
                         _openUiStreamProgram.value = null
+                        openUiPreviewThrottle.reset()
                         // langchain4j 异常 message = HTTP 响应体（OkHttpClient→HttpException→AuthenticationException 全程透传，状态码不进 message）。
                         // guest 配额耗尽时 server 返回 403 body={"error":"quota_exceeded",...}（见 LlmRoute），据此识别。
                         val errorBody = error.message.orEmpty()
@@ -2130,6 +2155,11 @@ class ChatViewModel(
                 // U2-6：程序预览在场（本轮已改道 OpenUI 预览轨）→ 半截不是合法产出，
                 // 整体丢弃不落库；判定先于下方清预览取样。
                 // 判定须在 finish() 之前取样：finish 会把 showCursor 归 false。
+                // Task 13 保尾帧：判定前 flush 尾帧——判定读到的预览反映最新流进度
+                // （预览非空=半截），节流滞后不得使判定误走无预览分支。
+                openUiPreviewThrottle.flushTail()?.let { tail ->
+                    _openUiStreamProgram.value = tail
+                }
                 val partial = _streamingMessage.value
                 val keepPartial = partial != null && !partial.isThinking && partial.showCursor &&
                     _openUiStreamProgram.value == null
@@ -2138,6 +2168,7 @@ class ChatViewModel(
                 _streamingMessage.value = null
                 // U2-5：取消收尾清流式预览（U2-6 半截丢弃口径已在 keepPartial 判定）
                 _openUiStreamProgram.value = null
+                openUiPreviewThrottle.reset()
                 if (keepPartial && finalText.isNotBlank()) {
                     withContext(NonCancellable) {
                         insertAgentMessage(sessionId, finalText, currentModelLabel())

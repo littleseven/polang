@@ -5,6 +5,8 @@ import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.agent.exception.AIAgentMaxNumberOfIterationsReachedException
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.features.eventHandler.feature.EventHandler
+import ai.koog.prompt.llm.LLModel
+import ai.koog.prompt.message.ResponseMetaInfo
 import ai.koog.prompt.streaming.StreamFrame
 import com.mamba.picme.agent.core.inference.remote.log.LlmCallRecord
 import com.mamba.picme.agent.core.inference.remote.log.TraceIdAware
@@ -349,10 +351,20 @@ class KoogChatAgent(
                         // onLLMStreaming* 事件、不触发 onLLMCallCompleted（后者仅非流式
                         // execute 路径发射，server 0.9.17 实证），流式 usage 只能从 End 帧
                         // metaInfo 拿（OpenAI 客户端自上游 usage chunk 构建）。
-                        is StreamFrame.End -> usageAccumulator.onStreamingEnd(
-                            frame.metaInfo?.inputTokensCount,
-                            frame.metaInfo?.outputTokensCount,
-                        )
+                        // Task 13：同点位补录 llm_call_log（流式回合调用流水审计，
+                        // 口径与非流式录制对齐，见 recordStreamingLlmCall）。
+                        is StreamFrame.End -> {
+                            usageAccumulator.onStreamingEnd(
+                                frame.metaInfo?.inputTokensCount,
+                                frame.metaInfo?.outputTokensCount,
+                            )
+                            recordStreamingLlmCall(
+                                model = ctx.model,
+                                meta = frame.metaInfo,
+                                roundText = snapshotBuffer.toString(),
+                                traceId = traceIdHolder.value,
+                            )
+                        }
                         else -> Unit
                     }
                 }
@@ -434,14 +446,58 @@ class KoogChatAgent(
     }
 
     private companion object {
-        const val RECORD_SOURCE = "chat-koog"
-
         /** Koog 一轮工具调用消耗的步数估计（nodeLLMRequest + nodeExecuteTool 等）。 */
         const val KOOG_STEPS_PER_LLM_ROUND = 3
 
         /** 端侧身份行（与 RemoteChatEngine.buildChatSystemPrompt 首句同源措辞；句式对齐契约身份行）。 */
         const val OPENUI_IDENTITY_LINE = "你是 PoLang 相册 AI 助手。"
     }
+}
+
+/** llm_call_log 的 chat 调用来源标签（非流式/流式两路录制共用）。 */
+private const val RECORD_SOURCE = "chat-koog"
+
+/**
+ * 流式轮 llm_call_log 补录（Task 13，U2 跟进）：Koog 1.3.0 流式路径
+ * （`ContextualPromptExecutor.executeStreaming`）只发 onLLMStreaming* 事件、不触发
+ * onLLMCallCompleted（后者仅 `execute` 非流式路径发射，字节码实证）——T5 切流式后
+ * 原录制点在流式回合整段缺失（llm_call_log 零记录）。本函数以 End 帧 metaInfo 补录，
+ * 字段口径与非流式录制（onLLMCallCompleted handler）对齐；responseJson 记本轮累计
+ * 快照正文（流式无完整 Message 可摘要，正文口径对齐 summarizeResponseForLog 的
+ * text 部分）。两路互斥由 Koog 事件语义保证（流式失败回退一次性请求时 End 帧不达、
+ * 仅 onLLMCallCompleted 录制），无双重记录。
+ *
+ * internal（非 private）：commonTest 钉字段口径与 release 纯指标模式。
+ */
+internal fun recordStreamingLlmCall(
+    model: LLModel?,
+    meta: ResponseMetaInfo?,
+    roundText: String,
+    traceId: String?,
+) {
+    val rec = RemoteModelFactory.recorder ?: return
+    val tap = RemoteModelFactory.wireTap
+    rec.record(
+        LlmCallRecord(
+            createdAt = Clock.System.now().toEpochMilliseconds(),
+            source = RECORD_SOURCE,
+            model = model?.id,
+            success = true,
+            latencyMs = null,
+            promptTokens = meta?.inputTokensCount,
+            completionTokens = meta?.outputTokensCount,
+            totalTokens = meta?.totalTokensCount,
+            requestJson = RemoteModelFactory.capturedRequestBody(tap),
+            responseJson = if (RemoteModelFactory.captureContent) {
+                LlmCallRecord.cap(roundText.takeIf { it.isNotBlank() })
+            } else {
+                null
+            },
+            errorMessage = null,
+            traceId = traceId,
+            cachedTokens = tap?.latestCachedTokens(),
+        )
+    )
 }
 
 /**

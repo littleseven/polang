@@ -430,6 +430,86 @@ class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
     }
 
     /**
+     * Task 13 节流接线：程序快照连续增长帧的预览写入被压缩——镜像 server
+     * OpenUiContentStreamTracker 48 字符/80ms 粒度（首帧直通保改道可观测性）。
+     * 增量条件（≥48 字符/发射档）是确定性上界：100 帧 × 每帧 +2 字符下，
+     * 即使间隔条件全放行，发射档数 ≤ 首帧 1 + floor(200/48) = 5。
+     */
+    @Test
+    fun `rapid program frames are throttled into few preview writes`() = runTest {
+        stubToggle(true)
+        val longProgram = program + "\n" + "// " + "x".repeat(200)
+        val frames = (1..100).map { index ->
+            // 从完整前缀形态起（首帧即命中改道判定），每帧 +2 字符单调增长
+            longProgram.substring(0, program.length + index * 2)
+        }
+        val distinctPreviews = mutableSetOf<String>()
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(events = frames.map { text -> ChatStreamEvent.TextSnapshot(text) }) {
+            vm.openUiStreamProgram.value?.let { preview -> distinctPreviews.add(preview) }
+        }
+        vm.sendMessage("帮我整理照片")
+        advanceUntilIdle()
+
+        // 写入被压缩：远小于帧数（增量档确定性上界 5）；每个观测值都是某一帧的文本
+        assertTrue("expected at least first-frame emission", distinctPreviews.isNotEmpty())
+        assertTrue(
+            "expected <= 5 distinct preview values, got ${distinctPreviews.size}",
+            distinctPreviews.size <= 5,
+        )
+        assertTrue(distinctPreviews.all { preview -> frames.contains(preview) })
+        // 回合收尾清预览 + 落卡照常（节流不破 T8 收尾语义）
+        assertNull(vm.openUiStreamProgram.value)
+    }
+
+    /**
+     * Task 13 节流 + 保尾帧：节流使流中预览滞后于真实流进度（采样点预览 ≠ 最新帧），
+     * 用户停止时收尾 flushTail 保证判定读到「预览在场」的忠实信号 → 半截丢弃不落库
+     * （T9 keepPartial 语义不被节流破坏）；预览与占位气泡照常清空。
+     */
+    @Test
+    fun `user stop during throttled program stream discards partial`() = runTest {
+        stubToggle(true)
+        val longProgram = program + "\n" + "// " + "x".repeat(200)
+        val frames = (1..100).map { index ->
+            longProgram.substring(0, program.length + index * 2)
+        }
+        // 采样点取非发射档帧（program.length + 120 ≈ 第 60 帧，非 48 字符档位）：
+        // 预览值若等于该帧文本说明节流失效（未接线或直通）
+        val sampleIndex = 59
+        val sampleFrame = frames[sampleIndex]
+        var previewAtSample: String? = null
+        var sawProgramPreview = false
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        coEvery { chatMessageDao.insertMessage(capture(inserted)) } answers { }
+        coEvery { chatSessionDao.getSession("default") } returns
+            ChatSessionEntity(sessionId = "default", title = "New Chat")
+        coEvery { chatMessageDao.getMessageCount("default") } returns 1
+        val onEventSlot = slot<(ChatStreamEvent) -> Unit>()
+        coEvery { orchestrator.remoteChatEngine.streamChat(any(), any(), capture(onEventSlot)) } coAnswers {
+            frames.forEachIndexed { index, event ->
+                onEventSlot.captured(ChatStreamEvent.TextSnapshot(event))
+                if (vm.openUiStreamProgram.value != null) sawProgramPreview = true
+                if (index == sampleIndex) previewAtSample = vm.openUiStreamProgram.value
+            }
+            throw CancellationException("user stop")
+        }
+        vm.sendMessage("帮我整理照片")
+        advanceUntilIdle()
+
+        // 节流在场：程序预览出现过，且采样点预览滞后于最新帧文本（节流压制了中间帧）
+        assertTrue("expected program preview to appear during stream", sawProgramPreview)
+        assertTrue("expected throttled (lagging) preview at sample frame", previewAtSample != sampleFrame)
+        // 取消收尾：预览在场 → 半截丢弃；预览清空；T9 语义保持
+        assertTrue(inserted.none { it.role == "agent" })
+        assertNull(vm.openUiStreamProgram.value)
+        assertNull(vm.streamingMessage.value)
+    }
+
+    /**
      * 顺车钉 T7 落卡主产线（调用点①）：带 commands 的回合经 capability dispatch 返回
      * TextReply 程序文本 → `handleAgentAction` TextReply 分支统一嗅探落 OpenUiCard。
      */
