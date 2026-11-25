@@ -25,6 +25,7 @@ import com.mamba.picme.agent.core.platform.logging.Logger
 import com.mamba.picme.agent.core.remote.config.RemoteModelConfig
 import com.mamba.picme.agent.core.skill.AgentSkillContract
 import com.mamba.picme.agent.core.skill.SkillRepository
+import com.mamba.picme.domain.chat.openui.OpenUiTurnNativeContract
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -153,19 +154,34 @@ class RemoteChatEngine internal constructor(
             val key: String,
             val missing: Set<String>,
         )
+
+        /**
+         * OpenUI 回合原生终结输出兜底（U2-3）：开关 on 时 summary 经
+         * [OpenUiTurnNativeContract.ensureValidProgram] 兜底——非程序文本包成
+         * `root = Markdown("…")` 程序（IM/飞书等无 onEvent 消费方同拿到兜底文本，
+         * 与云端口径一致）；off 时原样返回（现行路径逐字节不变）。
+         * internal 纯函数供 commonTest 直测（processChatReAct 有 agent 依赖不可直跑）。
+         */
+        internal fun wrapFinalOutput(summary: String, enabled: Boolean, language: ReplyLanguage): String =
+            if (enabled) OpenUiTurnNativeContract.ensureValidProgram(summary, language) else summary
     }
 
     // ── chat ReAct Agent（懒创建）────────────────────────────────────
 
-    /** chat agent 缓存条目（四元组原子替换，避免 agent 与重建条件错配）。 */
+    /** chat agent 缓存条目（五元组原子替换，避免 agent 与重建条件错配）。 */
     private class ChatAgentCache(
         val agent: KoogChatAgent,
         val config: RemoteModelConfig,
         val persona: AssistantPersona,
-        val replyLanguage: ReplyLanguage
+        val replyLanguage: ReplyLanguage,
+        val openUiTurnNative: Boolean,
     )
 
     private var cachedChatAgent: ChatAgentCache? = null
+
+    /** OpenUI 回合原生开关现值（U2-3）：provider 未注入 = off。 */
+    private fun currentOpenUiTurnNative(): Boolean =
+        configurator.getOpenUiTurnNativeProvider()?.invoke() ?: false
 
     /** chat system prompt（由组合根注入的工具描述元数据经注入的 prompt 组装器确定性组装，agent 构建期拼接当前日期）。 */
     private val chatSystemPrompt = chatPromptBuilder(chatToolDescriptors)
@@ -304,7 +320,10 @@ class RemoteChatEngine internal constructor(
     ): Result<Pair<String, AgentExecutionMetrics?>> = withContext(configurator.dispatcherProvider.orchestratorDispatcher) {
         Logger.d(tag, "processChatReAct: input='$input', sessionId='$sessionId', timeout=${timeoutMs}ms")
 
-        val agent = getChatAgent(persona, replyLanguage) ?: return@withContext Result.failure(
+        // U2-3：本轮开关单点采样——getChatAgent 与终结兜底用同一值，
+        // 兜底口径与 agent 实际跑的契约段/守卫配置同源（跑轮中途翻转不分裂）。
+        val openUiTurnNative = currentOpenUiTurnNative()
+        val agent = getChatAgent(persona, replyLanguage, openUiTurnNative) ?: return@withContext Result.failure(
             IllegalStateException("Chat ReAct Agent 初始化失败")
         )
 
@@ -351,7 +370,9 @@ class RemoteChatEngine internal constructor(
                     toolSetOverride = toolSetOverride,
                 )
             }
-            Result.success(summary to metrics)
+            // U2-3：开关 on 时终结 summary 经契约兜底（非程序文本包成 Markdown 程序，
+            // IM/飞书等无 onEvent 消费方同拿到兜底文本，云端口径）；off 原样（逐字节不变）。
+            Result.success(wrapFinalOutput(summary, openUiTurnNative, replyLanguage) to metrics)
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             Logger.e(tag, "processChatReAct timeout after ${timeoutMs}ms")
             Result.failure(RuntimeException("处理超时（${timeoutMs / 1000}秒），请稍后重试"))
@@ -419,13 +440,23 @@ class RemoteChatEngine internal constructor(
 
     /**
      * 获取或创建 chat Koog Agent（ChatToolService，chat 场域能力工具，不含 UI/相机）。
-     * 配置或 persona/回复语言变更时自动重建。共享配置经 [configurator] 只读访问。
+     * 配置、persona/回复语言或 OpenUI 回合原生开关变更时自动重建。共享配置经
+     * [configurator] 只读访问。
      *
      * KoogChatAgent 无 langchain4j 期的 initialize/shutdown 生命周期（AIAgent 在 [KoogChatAgent.agent]
      * 内按记忆快照新鲜度懒建/重建），故重建仅替换缓存条目；executor/memoryStore/historyProvider 复用，
      * 历史经 DataStore（chat_memory）跨重建留存。
+     *
+     * [openUiTurnNative]（U2-3）：本回合采样的开关现值，入缓存重建键并透传 config
+     *（契约段/流式策略/终结守卫由 KoogChatAgent 按 config 自选，T5）。显式传参供
+     * [processChatReAct] 单点采样（一轮一个开关值：兜底与 agent 实际跑的配置同源）；
+     * 其余调用点用缺省现值。
      */
-    private fun getChatAgent(persona: AssistantPersona, replyLanguage: ReplyLanguage): KoogChatAgent? {
+    internal fun getChatAgent(
+        persona: AssistantPersona,
+        replyLanguage: ReplyLanguage,
+        openUiTurnNative: Boolean = currentOpenUiTurnNative(),
+    ): KoogChatAgent? {
         val cache = cachedChatAgent
         val currentConfig = configurator.getUserRemoteConfig() ?: RemoteModelConfig.PICME_SERVER_DEFAULT
         if (cache != null) {
@@ -437,8 +468,9 @@ class RemoteChatEngine internal constructor(
                 || cache.config.providerId != currentConfig.providerId
                 || cache.persona != persona
                 || cache.replyLanguage != replyLanguage
+                || cache.openUiTurnNative != openUiTurnNative
             if (configChanged) {
-                Logger.i(tag, "Remote config or persona/language changed (model=${currentConfig.modelId}, persona=$persona, language=$replyLanguage), rebuilding Chat Agent")
+                Logger.i(tag, "Remote config or persona/language/openUiTurnNative changed (model=${currentConfig.modelId}, persona=$persona, language=$replyLanguage, openUiTurnNative=$openUiTurnNative), rebuilding Chat Agent")
             } else {
                 return cache.agent
             }
@@ -468,6 +500,11 @@ class RemoteChatEngine internal constructor(
                     // 技能清单段注入（非挂起读内存缓存；同步在 processChatReAct 跑轮前完成）
                     skillRepository?.let { repo -> skillPromptProvider { repo.cachedPromptSection() } }
                 }
+                // OpenUI 回合原生（U2-3）：开关现值 + 回复语言透传——契约段/流式策略/
+                // 终结守卫由 KoogChatAgent 按 config 自选（T5）。streaming 不在此设：
+                // chat 链路流式由策略配置决定（RPA 路径字段）。
+                .openUiTurnNative(openUiTurnNative)
+                .replyLanguage(replyLanguage)
                 .build()
         } catch (e: Exception) {
             Logger.w(tag, "Failed to build ChatAgent config", e)
@@ -487,7 +524,8 @@ class RemoteChatEngine internal constructor(
             agent = agent,
             config = currentConfig,
             persona = persona,
-            replyLanguage = replyLanguage
+            replyLanguage = replyLanguage,
+            openUiTurnNative = openUiTurnNative,
         )
         Logger.i(tag, "Chat Koog Agent created: model=${cfg.modelName}, baseUrl=${currentConfig.baseUrl.take(40)}")
         return agent

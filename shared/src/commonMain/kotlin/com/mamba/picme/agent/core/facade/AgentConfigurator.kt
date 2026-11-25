@@ -64,6 +64,22 @@ class AgentConfigurator(
     /** 渲染环境供给者；供 RemoteChatEngine 只读访问（null = 未注入，prompt 不含渲染环境段）。 */
     fun getRenderEnvironmentProvider(): (() -> RenderEnvironment)? = renderEnvironmentProvider
 
+    /**
+     * OpenUI 回合原生开关供给者（U2-3，spec《本地回合 OpenUI 统一》）；由组合根注入，
+     * null = 未注入（恒 off，非 Android 平台零行为变化）。每轮 getChatAgent 求值现值：
+     * 翻转即入 agent 重建键；processChatReAct 成功路径据此对终结 summary 兜底。
+     */
+    @Volatile
+    private var openUiTurnNativeProvider: (() -> Boolean)? = null
+
+    /** 注入 OpenUI 回合原生开关供给者；null 清除（回退恒 off）。 */
+    fun setOpenUiTurnNativeProvider(provider: (() -> Boolean)?) {
+        openUiTurnNativeProvider = provider
+    }
+
+    /** OpenUI 回合原生开关供给者；供 RemoteChatEngine 只读访问（null = 未注入，恒 off）。 */
+    fun getOpenUiTurnNativeProvider(): (() -> Boolean)? = openUiTurnNativeProvider
+
     // 核心组件
     /** 端侧 VLM 引擎（TAG 打标 / 图像理解专用；文本指令链路已移除）。组合根注入，全进程单实例。 */
     val imageEngine: ImageInferenceEngine = imageEngineProvider()
