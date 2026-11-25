@@ -1,4 +1,4 @@
-package com.mamba.picme.server.agent
+package com.mamba.picme.domain.chat.openui
 
 /**
  * OpenUI 布局结构门禁（2026-10-31 布局可控性批次，spec §2.2）——只判结构合法性，

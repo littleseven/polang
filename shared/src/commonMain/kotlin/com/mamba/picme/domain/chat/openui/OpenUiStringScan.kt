@@ -1,4 +1,4 @@
-package com.mamba.picme.server.agent
+package com.mamba.picme.domain.chat.openui
 
 /**
  * OpenUI 程序文本的字符串字面量字符级扫描器（2026-11-04 StackOverflowError 修复）。
@@ -14,7 +14,7 @@ package com.mamba.picme.server.agent
  * O(n) 零递归。语义与旧正则逐字对齐（回归测试钉住）：只配对**完整**字面量，
  * 未闭合尾段原样保留不剥离。
  */
-internal object OpenUiStringScan {
+object OpenUiStringScan {
 
     /** 一个字面量的扫描结果：content = 去引号原文（不反转义）；endExclusive = 闭合引号后一位。 */
     data class Literal(val content: String, val endExclusive: Int)
