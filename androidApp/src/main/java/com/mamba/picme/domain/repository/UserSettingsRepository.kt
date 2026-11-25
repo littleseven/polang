@@ -215,6 +215,11 @@ interface UserSettingsRepository {
     val cloudAgentEnabledFlow: Flow<Boolean>
     suspend fun updateCloudAgentEnabled(enabled: Boolean)
 
+    // ── 本地回合 OpenUI 统一回滚闸（spec《本地回合 OpenUI 统一》U2-8） ──
+    /** Chat 本地回合 OpenUI turn-native 开关（默认 true；false = 回退文本气泡回滚位）。 */
+    val localTurnOpenUiEnabledFlow: Flow<Boolean>
+    suspend fun updateLocalTurnOpenUiEnabled(enabled: Boolean)
+
     // ── 服务端邮箱认证 ──────────────────────────────────────────
     val serverAuthTokenFlow: Flow<String>
     val serverAuthEmailFlow: Flow<String>

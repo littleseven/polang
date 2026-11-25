@@ -497,6 +497,15 @@ interface AppContainer {
      * 幂等：由 Application.onCreate 单点调用；实现侧守卫兜底，重复调用直接返回（防双订阅）。
      */
     fun startUserTaskAdapters()
+
+    /**
+     * 注入本地回合 OpenUI 回滚闸（spec《本地回合 OpenUI 统一》U2-8）：DataStore
+     * `local_turn_openui_enabled`（默认 true）经 @Volatile 缓存桥接为同步 provider 注入
+     * AgentOrchestrator（engine 每轮采样，翻转触发 chat agent 重建）。
+     * 幂等：由 Application.onCreate 在 AndroidAgentComposition.initialize 之后单点调用；
+     * 实现侧守卫兜底，重复调用直接返回。
+     */
+    fun injectLocalTurnOpenUiGate()
 }
 
 class AppContainerImpl(
@@ -930,6 +939,35 @@ class AppContainerImpl(
                 scope = userTaskScope,
             )
         )
+    }
+
+    // ── 本地回合 OpenUI 回滚闸（spec《本地回合 OpenUI 统一》U2-8） ──
+
+    /** 回滚闸 DataStore 值的同步快照（默认 true 对齐持久化缺省）；engine provider 经它读取。 */
+    @Volatile
+    private var localTurnOpenUiEnabled = true
+
+    private var localTurnOpenUiGateInjected = false
+
+    /**
+     * 注入本地回合 OpenUI 回滚闸：applicationScope 常驻收集 DataStore flow 刷新同步快照，
+     * 快照读取 provider 注入 AgentOrchestrator（恒不抛异常——engine 在守卫外调用）。
+     */
+    override fun injectLocalTurnOpenUiGate() {
+        if (localTurnOpenUiGateInjected) return
+        localTurnOpenUiGateInjected = true
+        val app = context.applicationContext as com.mamba.picme.PoLangApplication
+        app.applicationScope.launch {
+            runCatching {
+                userPreferencesRepository.localTurnOpenUiEnabledFlow.collect { value ->
+                    localTurnOpenUiEnabled = value
+                }
+            }.onFailure { err ->
+                Logger.w("PoLang:DI", "Local-turn OpenUI gate collect failed, gate stays at cached value", err)
+            }
+        }
+        AgentOrchestrator.getInstance().setOpenUiTurnNativeProvider { localTurnOpenUiEnabled }
+        Logger.i("PoLang:DI", "Local-turn OpenUI rollback gate injected (cached=$localTurnOpenUiEnabled)")
     }
 
     /**

@@ -665,6 +665,8 @@
     <string name="ai_agent_privacy_permissive">Permissif (distant autorisé)</string>
     <string name="tag_gen_use_opencl_title">Accélération GPU de la génération d\'étiquettes</string>
     <string name="tag_gen_use_opencl_subtitle">Accélère l\'étiquetage ; désactivez en cas de blocage</string>
+    <string name="local_turn_openui_title">Rendu OpenUI local</string>
+    <string name="local_turn_openui_subtitle">Désactivé, les réponses du chat reviennent en texte brut</string>
     <string name="remote_models">Modèles distants</string>
     <string name="model_in_use">En cours d\'utilisation</string>
     <string name="remote_model_configured">Configuré</string>

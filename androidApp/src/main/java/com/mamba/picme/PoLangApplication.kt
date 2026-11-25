@@ -319,6 +319,10 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         // 注册应用级 Capability（只注册一次，永不注销）
         initializeCapabilities()
 
+        // 本地回合 OpenUI 回滚闸（U2-8）：DataStore 开关 → engine 同步 provider
+        // （须在 AndroidAgentComposition.initialize 之后——provider 挂在 orchestrator 上）
+        container.injectLocalTurnOpenUiGate()
+
         // 轻量位置索引 pass：读 EXIF GPS + 离线逆地理，替代废弃 MediaIndexingWorker 的位置职责。
         // 增量幂等（仅处理 locationName 为空），首启跑完后后续启动 no-op；不跑 OCR，不发热。
         applicationScope.launch {
