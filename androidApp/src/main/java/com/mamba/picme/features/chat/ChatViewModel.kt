@@ -1949,6 +1949,10 @@ class ChatViewModel(
                                     openUiPreviewRound = true
                                     _openUiStreamProgram.value = event.text
                                     programPreviewPath = true
+                                    // 非卡片工具 chip 让位（原路径文本快照同款语义，U2-6
+                                    // 顺车修 T8 评审 Important：否则工具轮的 chip 与占位
+                                    // 气泡状态文案悬挂至回合收尾）
+                                    _pendingNonCardTool.value = null
                                 } else {
                                     pacingController.onTextSnapshot(event.text)
                                     // 新一轮文本到达：非卡片工具状态让位（对齐 legacy 状态文案被快照覆盖）
@@ -2123,13 +2127,16 @@ class ChatViewModel(
                 // 用户主动停止（stopGeneration 取消本回合）：节奏器追平已缓冲全文，
                 // 有真实生成内容（非思考中/工具状态文案）则保留半截回复落库，
                 // 静默收场不产「推理失败」气泡（对齐 sendClaudeMessage 停止语义）。
+                // U2-6：程序预览在场（本轮已改道 OpenUI 预览轨）→ 半截不是合法产出，
+                // 整体丢弃不落库；判定先于下方清预览取样。
                 // 判定须在 finish() 之前取样：finish 会把 showCursor 归 false。
                 val partial = _streamingMessage.value
-                val keepPartial = partial != null && !partial.isThinking && partial.showCursor
+                val keepPartial = partial != null && !partial.isThinking && partial.showCursor &&
+                    _openUiStreamProgram.value == null
                 pacingController.finish()
                 val finalText = _streamingMessage.value?.content.orEmpty()
                 _streamingMessage.value = null
-                // U2-5：取消收尾清流式预览（keepPartial 半截口径属 T9，此处只加清预览）
+                // U2-5：取消收尾清流式预览（U2-6 半截丢弃口径已在 keepPartial 判定）
                 _openUiStreamProgram.value = null
                 if (keepPartial && finalText.isNotBlank()) {
                     withContext(NonCancellable) {

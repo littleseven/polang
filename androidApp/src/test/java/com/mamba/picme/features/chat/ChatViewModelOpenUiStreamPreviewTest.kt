@@ -16,9 +16,14 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -47,6 +52,11 @@ class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
     """.trimIndent()
 
     private val registry: CapabilityRegistry = mockk(relaxed = true)
+
+    private companion object {
+        /** 取消口径测试的虚拟时间推进量：足以让节奏器追平短文本缓冲（BASE_CHAR_MS=50/字 + 标点停顿）。 */
+        const val PACING_ADVANCE_MS = 10_000L
+    }
 
     @Before
     override fun setUp() {
@@ -216,6 +226,36 @@ class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
         assertNull(vm.openUiStreamProgram.value)
     }
 
+    /**
+     * T8 评审 Important（U2-6 顺车修）：工具轮后的程序快照命中预览轨时，非卡片工具
+     * chip（`_pendingNonCardTool`）须让位——原路径文本快照有该语义（新一轮文本到达
+     * 覆盖工具状态文案），预览轨漏了会让 search_media 的工具 chip 与占位气泡文案
+     * 悬挂至回合收尾。
+     */
+    @Test
+    fun `program snapshot after tool round yields pending non-card tool`() = runTest {
+        stubToggle(true)
+        var pendingAfterProgramSnapshot: String? = "unset"
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(
+            events = listOf(
+                ChatStreamEvent.ToolCallStarted(toolName = "search_media"),
+                ChatStreamEvent.TextSnapshot(program),
+            ),
+        ) { event ->
+            if (event is ChatStreamEvent.TextSnapshot) {
+                pendingAfterProgramSnapshot = vm.pendingNonCardTool.value
+            }
+        }
+        vm.sendMessage("查一下照片")
+        advanceUntilIdle()
+
+        // 程序快照命中即让位：chip 不悬挂至回合收尾（finally 才清）
+        assertNull(pendingAfterProgramSnapshot)
+        assertNull(vm.pendingNonCardTool.value)
+    }
+
     @Test
     fun `non-prefix snapshot keeps original path when toggle on`() = runTest {
         stubToggle(true)
@@ -303,8 +343,90 @@ class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
         assertEquals(program, previewAtCancel)
         assertNull(vm.openUiStreamProgram.value)
         assertNull(vm.streamingMessage.value)
-        // 预览轨无气泡正文 → keepPartial 不成立，半截不落库（keepPartial 口径属 T9，此处不动）
+        // 预览轨无气泡正文（纯程序轮占位停在思考态）→ keepPartial 不成立，半截不落库
         assertTrue(inserted.none { it.role == "agent" })
+    }
+
+    /**
+     * T9（U2-6）：用户停止半截口径——停止时程序预览在场（本轮已改道预览轨）→
+     * 半截程序不是合法产出，整体丢弃不落库；预览为空且文本半截非空 → 保留现行落库。
+     *
+     * 前提态构造：文本轨须先吐出真实内容（showCursor=true）现行 keepPartial 才成立——
+     * 节奏器吐字依赖 delay 虚拟时间，Main 须重挂到 runTest 的 testScheduler（TestBase
+     * 独立 UnconfinedTestDispatcher 的私有调度器不随 advanceTimeBy 推进，光标态进不了
+     * 测试视野）。轮内普通文本先到、程序中段起笔后快照改道预览轨——文本轨与预览轨
+     * 同时在场的混合轮，即现行实现唯一会落库半截的形态。
+     *
+     * 门闩手法：streamChat 回放桩吐出首个文本快照后挂起在 gate 上让位测试体——测试体
+     * 在非重入位置推进虚拟时间令节奏器吐字，再 complete 放行 tail 与用户停止（调度器
+     * 任务运行中重入 advanceTimeBy 推不动已挂起的节奏循环）。
+     */
+    private fun TestScope.stubPacedStopRound(
+        inserted: MutableList<ChatMessageEntity>,
+        pacedText: String,
+        tail: (dispatch: (ChatStreamEvent) -> Unit) -> Unit = {},
+    ): CompletableDeferred<Unit> {
+        coEvery { chatSessionDao.getSession("default") } returns
+            ChatSessionEntity(sessionId = "default", title = "New Chat")
+        coEvery { chatMessageDao.getMessageCount("default") } returns 1
+        coEvery { chatMessageDao.insertMessage(capture(inserted)) } answers { }
+        val onEventSlot = slot<(ChatStreamEvent) -> Unit>()
+        val gate = CompletableDeferred<Unit>()
+        coEvery { orchestrator.remoteChatEngine.streamChat(any(), any(), capture(onEventSlot)) } coAnswers {
+            onEventSlot.captured(ChatStreamEvent.TextSnapshot(pacedText))
+            gate.await()
+            tail(onEventSlot.captured)
+            throw CancellationException("user stop")
+        }
+        return gate
+    }
+
+    @Test
+    fun `user stop discards partial program when preview is present`() = runTest {
+        // 虚拟时间推进前提：Main 重挂 runTest 调度器（见 stubPacedStopRound KDoc）
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        stubToggle(true)
+        val prose = "你好，先说结论"
+        val proseThenProgram = prose + "\n// summary: 半截程序\nroot = Markdown(\"回复还没写完"
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        val gate = stubPacedStopRound(inserted, pacedText = prose) { dispatch ->
+            dispatch(ChatStreamEvent.TextSnapshot(proseThenProgram))
+        }
+        vm.sendMessage("帮我整理照片")
+        // 推进虚拟时间：节奏器吐出已缓冲文本（showCursor=true，keepPartial 成立前提）
+        testScheduler.advanceTimeBy(PACING_ADVANCE_MS)
+        val cursorAfterPacing = vm.streamingMessage.value?.showCursor
+        // 放行：程序快照改道预览轨（预览在场）→ 抛用户停止
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        // 前置自证：文本轨确已吐字（光标可见）——排除「预览在场但 keepPartial 本就不成立」的空真
+        assertEquals(true, cursorAfterPacing)
+        // 预览在场：半截非合法产出 → 不落库任何 agent 消息；预览与占位气泡均清空
+        assertNull(vm.openUiStreamProgram.value)
+        assertNull(vm.streamingMessage.value)
+        assertTrue(inserted.none { it.role == "agent" })
+    }
+
+    @Test
+    fun `user stop keeps partial text persisting when preview is empty`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        // 开关 on 但全程普通文本（预览从未置值）：现行半截落库口径不受丢弃分支影响
+        stubToggle(true)
+        val prose = "你好，这是半截文本"
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        val gate = stubPacedStopRound(inserted, pacedText = prose)
+        vm.sendMessage("帮我整理照片")
+        testScheduler.advanceTimeBy(PACING_ADVANCE_MS)
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertNull(vm.openUiStreamProgram.value)
+        assertEquals(prose, inserted.single { it.role == "agent" }.content)
     }
 
     /**
