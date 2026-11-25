@@ -152,25 +152,32 @@ class ChatToolService private constructor() : TraceIdAware {
     // ── 相册 ──────────────────────────────────────────────────────
 
     @Tool(customName = "get_gallery_summary")
-    @LLMDescription("获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。")
+    @LLMDescription("获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用（句柄为全库媒体集，月度分布/相册概况卡绑定它）；media id 保留供 render_html 与写工具。")
     suspend fun getGallerySummary(): String =
         dispatchCommand(AgentCommand.GetGallerySummary(includeDetails = false))
 
     @Tool(customName = "search_media")
-    @LLMDescription("搜索本地相册，返回命中总数与前 24 个媒体 id（命中 ≤24 时全量返回；需要更多 id 用 run_gallery_script 的 gallery.query 获取）。结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。")
+    @LLMDescription("搜索本地相册，返回命中总数与前 24 个媒体 id（命中 ≤24 时全量返回；需要更多 id 用 run_gallery_script 的 gallery.query 获取）。结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供 render_html 与写工具。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。找视频时 mediaType 传 'video'，照片+视频传 'all'。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") person: String,
         @LLMDescription("时间起点（毫秒，据当前日期算）；query 含时间词（如'去年夏天''3月'）时**必须**换算填入；空串=不限") fromMs: String,
         @LLMDescription("时间终点（毫秒）；query 含时间词时**必须**换算填入；空串=不限") toMs: String,
-        @LLMDescription("true=只要含人脸的照片；空串=不限") hasFace: String
+        @LLMDescription("true=只要含人脸的照片；空串=不限") hasFace: String,
+        @LLMDescription("媒体类型：'photo'=只搜照片（默认）；'video'=只搜视频（用户提到视频/录像/vlog 时必传）；'all'=照片+视频；空串=photo") mediaType: String
     ): String {
         val intent = structuredSearchIntent(query, person, fromMs, toMs, hasFace)
-        return dispatchCommand(AgentCommand.SearchMedia(query = query, intent = intent))
+        return dispatchCommand(
+            AgentCommand.SearchMedia(
+                query = query,
+                intent = intent,
+                mediaType = mediaType.ifBlank { "photo" },
+            )
+        )
     }
 
     @Tool(customName = "refine_media_search")
-    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数；展示用 render_html 重出图集卡）。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
+    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数；展示用 render_html 重出图集卡）。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供 render_html 与写工具。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
     suspend fun refineMediaSearch(
         @LLMDescription("细化条件") constraint: String,
         @LLMDescription("时间起点（毫秒），如某月起始；空串=不限") fromMs: String,

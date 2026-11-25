@@ -168,11 +168,14 @@ sealed class AgentCommand {
      * @property query 原始查询文本，必填；用于展示与语义召回兜底。
      * @property intent 可选的标准化搜索意图。当 LLM 能可靠拆出时间/关键词/地点/人物时填充，
      *                  下游可直接用结构化过滤执行精确 Room 查询；为 null 时退回到字符串解析。
+     * @property mediaType 媒体类型过滤（"photo"/"video"/"all"；空串与未知值按 photo 口径）。
+     *                     回执句柄注册的类型过滤与 refine 跟随语义见 ChatSearchCapability（U2-7）。
      */
     data class SearchMedia(
         override val commandId: Int = AgentIdGenerator.nextId(),
         val query: String,
-        val intent: SearchIntent? = null
+        val intent: SearchIntent? = null,
+        val mediaType: String = "photo"
     ) : AgentCommand()
 
     /**

@@ -323,6 +323,10 @@ class PoLangApplication : Application(), ImageLoaderFactory {
         // （须在 AndroidAgentComposition.initialize 之后——provider 挂在 orchestrator 上）
         container.injectLocalTurnOpenUiGate()
 
+        // chat 相册工具句柄回执接线（U2-7）：search/refine/summary 回执注册 local://scan
+        // 句柄（须在 initializeCapabilities 之后——能力件已注册进注册表）
+        container.attachChatGalleryScanHandles()
+
         // 轻量位置索引 pass：读 EXIF GPS + 离线逆地理，替代废弃 MediaIndexingWorker 的位置职责。
         // 增量幂等（仅处理 locationName 为空），首启跑完后后续启动 no-op；不跑 OCR，不发热。
         applicationScope.launch {

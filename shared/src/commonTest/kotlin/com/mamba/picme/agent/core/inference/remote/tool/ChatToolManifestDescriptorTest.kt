@@ -35,10 +35,15 @@ class ChatToolManifestDescriptorTest {
     fun `param descriptions survive schema generation on this platform`() {
         val search = descriptors.single { it.name == "search_media" }
         assertEquals(
-            listOf("query", "person", "fromMs", "toMs", "hasFace"),
+            listOf("query", "person", "fromMs", "toMs", "hasFace", "mediaType"),
             search.requiredParameters.map { it.name },
         )
         assertEquals("自然语言搜索词", search.requiredParameters[0].description)
+        // mediaType（U2-7 2026-11-26）：media id → handle 双轨的第 6 参，空串=photo
+        assertEquals(
+            "媒体类型：'photo'=只搜照片（默认）；'video'=只搜视频（用户提到视频/录像/vlog 时必传）；'all'=照片+视频；空串=photo",
+            search.requiredParameters.single { it.name == "mediaType" }.description,
+        )
 
         val refine = descriptors.single { it.name == "refine_media_search" }
         assertEquals(
@@ -60,7 +65,7 @@ class ChatToolManifestDescriptorTest {
     fun `tool descriptions are non blank and match android byte source`() {
         val summary = descriptors.single { it.name == "get_gallery_summary" }
         assertEquals(
-            "获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。",
+            "获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用（句柄为全库媒体集，月度分布/相册概况卡绑定它）；media id 保留供 render_html 与写工具。",
             summary.description,
         )
 

@@ -110,7 +110,9 @@ import com.mamba.picme.features.chat.ChatOptimizeGachaController
 import com.mamba.picme.features.chat.ChatViewModelDependencies
 import com.mamba.picme.features.chat.PrefsClaudeSidStore
 import com.mamba.picme.features.chat.buildAppToolExecutor
+import com.mamba.picme.features.chat.capability.ChatGallerySummaryCapability
 import com.mamba.picme.features.chat.capability.ChatHistoryRecallCapability
+import com.mamba.picme.features.chat.capability.ChatSearchCapability
 import com.mamba.picme.features.chat.capability.MemoryCapability
 import com.mamba.picme.features.chat.capability.PersonRelationCapability
 import com.mamba.picme.features.chat.js.QuickJsEngine
@@ -359,6 +361,7 @@ class TaskCenterViewModelFactory(
     }
 }
 
+@Suppress("TooManyFunctions") // 组合根门面：VM/工厂方法 + 单点接线成员为同一职责族（组合根装配），不按数量拆分
 interface AppContainer {
     val repository: AndroidMediaRepository
     val userPreferencesRepository: UserSettingsRepository
@@ -506,6 +509,16 @@ interface AppContainer {
      * 实现侧守卫兜底，重复调用直接返回。
      */
     fun injectLocalTurnOpenUiGate()
+
+    /**
+     * 接线 chat 相册工具句柄回执（spec《本地回合 OpenUI 统一》U2-7）：向
+     * ChatSearchCapability / ChatGallerySummaryCapability 注入 LocalHandleStore 与
+     * id→MediaAsset 解析/全库快照——search_media/refine_media_search/get_gallery_summary
+     * 回执尾部注册 local://scan 句柄供 OpenUI 程序绑定（镜像 CloudAgentGalleryTools 接线
+     * 先例，同一 LocalHandleStore 实例）。幂等：由 Application.onCreate 单点调用；
+     * 实现侧守卫兜底，重复调用直接返回。
+     */
+    fun attachChatGalleryScanHandles()
 }
 
 class AppContainerImpl(
@@ -968,6 +981,33 @@ class AppContainerImpl(
         }
         AgentOrchestrator.getInstance().setOpenUiTurnNativeProvider { localTurnOpenUiEnabled }
         Logger.i("PoLang:DI", "Local-turn OpenUI rollback gate injected (cached=$localTurnOpenUiEnabled)")
+    }
+
+    private var chatGalleryScanHandlesAttached = false
+
+    /**
+     * 接线 chat 相册工具句柄回执（U2-7）：能力件为进程级单例，依赖经 attach 注入
+     * （CloudAgentGalleryTools 为容器构造注入，能力件无构造缝——组合根单点等价接线）。
+     */
+    override fun attachChatGalleryScanHandles() {
+        if (chatGalleryScanHandlesAttached) return
+        chatGalleryScanHandlesAttached = true
+        ChatSearchCapability.getInstance().attachScanHandles(
+            localHandleStore = localHandleStore,
+            // id 序 = 搜索相关度序（outcome.mediaIds 由 ChatViewModel 基数投影）；
+            // allMedia 冷缓存是全库查询（万级 200-500ms），必须离开主线程
+            lookupMedia = { ids ->
+                withContext(Dispatchers.IO) {
+                    val byId = repository.allMedia.first().associateBy { asset -> asset.id }
+                    ids.mapNotNull { id -> byId[id] }
+                }
+            },
+        )
+        ChatGallerySummaryCapability.getInstance().attachScanHandles(
+            localHandleStore = localHandleStore,
+            allMedia = { withContext(Dispatchers.IO) { repository.allMedia.first() } },
+        )
+        Logger.i("PoLang:DI", "Chat gallery scan handles attached (local://scan tool receipts)")
     }
 
     /**
