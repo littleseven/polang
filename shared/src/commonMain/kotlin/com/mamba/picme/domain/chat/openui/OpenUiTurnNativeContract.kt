@@ -1,0 +1,174 @@
+package com.mamba.picme.domain.chat.openui
+
+import com.mamba.picme.agent.core.model.context.ReplyLanguage
+import com.mamba.picme.agent.core.model.context.openUiHardFallbackMessage
+import com.mamba.picme.agent.core.model.context.openUiHardFallbackSummaryLabel
+import com.mamba.picme.agent.core.model.context.openUiWrappedSummaryLabel
+import com.mamba.picme.agent.core.platform.logging.Logger
+
+/**
+ * OpenUI 回合原生契约（turn-native，spec《2026-11-01-openui-turn-native-design》；
+ * U1-2 自 server OpenUiTurnNative 上提为端云单一事实源）：系统提示词契约 +
+ * 终结消息兜底变换。
+ *
+ * [buildSystemPrompt]：响应即程序契约——DSL 规则与 [OpenUiPromptAssets.DSL_RULES]
+ * 同源复用（零漂移），工具语境改写为响应语境（无工具可回调、// summary 首行、
+ * 渲染顺序约定 §3.4、纯文本也必须是程序）。契约后紧跟「回复形态先定位」
+ * （2026-11-01 回复活感批次：对话类回复 = 裸 Markdown 程序、禁表单卡包装；数据卡
+ * 首子级 Markdown 导语——真机实证模型被卡片示例带偏，一切回复皆表单，活人感尽失）。
+ * 尾部附组件全量清单（引用 [RenderOpenUiValidator.ALLOWED_COMPONENTS] 生成而非手抄
+ * ——清单文本与计数（size 插值）都随白名单自动同步，与 shared
+ * `OpenUiLibrary.components` 同源字面量副本）——白名单违规文案「组件全量清单见系统
+ * 提示词」由此兑现。
+ *
+ * 两变体槽（U1 参数化，端云差异最小面；server 缺省参数组装输出与现网
+ * SYSTEM_PROMPT 逐字节一致，server OpenUiTurnNativeTest 与本包
+ * OpenUiTurnNativeContractTest 双钉）：
+ * - [identityLine]：身份行——server 缺省「你是 PoLang 云端 Agent。」，端侧传端侧措辞；
+ * - [toolNote]：结构约定段工具句——server 缺省「需要服务器时间时调用 server_time
+ *   工具；」（端侧 registry 无 server_time 时传空串剔除该句）。
+ * 契约其余字节端云逐字相同；组装顺序逐字节钉住（分段常量 raw string 顶格，
+ * 禁 re-indent——前导空白是字符串值的一部分）。
+ */
+object OpenUiTurnNativeContract {
+
+    /** 服务器日志 tag（原 server slf4j logger 名，语义保留）。 */
+    private const val LOG_TAG = "picme-agent"
+
+    /**
+     * 对话形态黄金示例（2026-11-01 回复活感批次）：问答/闲聊类回复的正确形态是裸
+     * Markdown 程序——自然语气、多段落（\n 转义写法即教学）、诚实交代能力边界
+     * （查不到的就直说再给替代）。反例（真机实证）：把「明天穿什么」也包成
+     * Card + 标题 + Callout + Timeline 表单卡。内嵌进 [buildSystemPrompt]（测试同源
+     * 钉住），自身须过结构校验 + 布局门禁。
+     */
+    const val GOLDEN_CHAT_PROGRAM =
+        "// summary: 明天故宫穿搭建议\n" +
+            "root = Markdown(\"明天降温，建议洋葱式穿法。\\n\\n**白天逛中轴线**走路多、" +
+            "日晒足，薄长袖加防晒衣最舒服；早晚广场风大，再带件防风外套。\\n\\n" +
+            "我查不到实时天气，出发前看一眼逐小时预报——有雨就带伞，宫里全程室外。\")"
+
+    /** 身份行变体槽缺省（server 云端 Agent）。 */
+    const val DEFAULT_IDENTITY_LINE = "你是 PoLang 云端 Agent。"
+
+    /** 工具句变体槽缺省（server：server_time 工具指引）。 */
+    const val DEFAULT_TOOL_NOTE = "需要服务器时间时调用 server_time 工具；"
+
+    /**
+     * 契约主体（身份行后、对话黄金示例前）：响应即程序契约 + 回复形态先定位。
+     */
+    private val CONTRACT_BODY: String =
+        """你的整个回复就是一颗 OpenUI Lang 1.0 程序——它就是
+用户看到的界面：不允许程序之外的任何文字，不要包 markdown 代码围栏；
+纯文本回复也必须写成程序（root = Markdown("…")）；闲聊一句话同样如此。
+回复形态先定位（动笔前先选形态——形态选错，排版再对也不是好回复；语气像人聊天：
+先回应人、先给结论，再展开细节；做不到的事直说，并给替代路径）：
+- 对话/问答/解释/建议/闲聊（没有照片、图表、交互件可放）→ 整个回复就是
+  root = Markdown("自然正文") 一条组件语句（// summary 首行照写）：像聊天一样写——
+  可以分多段、加粗关键词、用列表；
+  禁止包装成 Card + 标题 + Callout + Timeline 的表单卡（那是一份报告，不是一次对话）；
+  收尾若存在自然后续动作，root 升级为 Column([Markdown(正文), Buttons([...])])
+  在正文后补一排 ≤3 个后续选项（写法约束与黄金示例见 DSL 规则 8 后续选项段）；
+  没有自然后续就保持裸 Markdown 干净收尾，不硬凑；
+  黄金示例（用户问「明天去故宫穿什么合适」）：
+"""
+
+    /** 数据卡形态段（对话黄金示例后、程序结构约定前）。 */
+    private val DATA_CARD_GUIDE: String =
+        """
+- 数据/照片/图表/交互 → Card + 组件（版式范式见规则 8），但卡不做冷报表：Card 首子级
+  先放一段 Markdown 自然导语（先说结论或先回应，如「今年拍了 138 张，八成在下半年」）
+  再放组件，收尾补一句 Markdown 讲解或下一步建议——像在跟用户说话，不是只摆数据；
+  收尾讲解之后同样可按 DSL 规则 8 后续选项段补 Buttons 选项排。
+"""
+
+    /** 程序结构约定段（[DEFAULT_TOOL_NOTE] 槽嵌在本段与取数收尾段之间）。 */
+    private val STRUCTURE_CONVENTIONS: String =
+        """程序结构约定（边生成边渲染，骨架必须先立）：
+1. 首行写 `// summary: <投影级一句话摘要>`（端上降级与历史折叠的数据源，
+   摘要只含计数/结论，不含 handle id 与用户隐私细节）；
+2. 第二行起 `root = ...` 声明独占一行行首（root 是组件树入口）；
+3. 布局骨架组件（Column/Row/Card/Grid）先于数据组件书写；
+4. Query 取数语句殿后（程序末尾），组件参数引用其变量名。
+"""
+
+    /** 工具句后的取数/绑定收尾段。 */
+    private val TOOL_QUERY_TAIL: String =
+        """相册数据查询照旧调用搜索工具，
+结果尾部的 handle 按数据禁令绑定进程序。
+"""
+
+    /** 组件全量清单引言（清单本体验 [RenderOpenUiValidator.ALLOWED_COMPONENTS]）。 */
+    private val COMPONENT_LIST_INTRO: String =
+        """
+
+可用组件全量清单（${RenderOpenUiValidator.ALLOWED_COMPONENTS.size} 个，与校验器白名单同源，逐字使用、禁臆造组件名；另有
+Query 取数语句）：
+"""
+
+    /**
+     * 组装系统提示词（组装顺序逐字节钉住：身份行 + 契约主体 + 对话黄金示例 +
+     * 数据卡形态段 + 结构约定段 + 工具句 + 取数收尾 + DSL 规则 + 组件全量清单）。
+     * server 侧缺省参数输出与现网 SYSTEM_PROMPT 逐字节一致。
+     */
+    fun buildSystemPrompt(
+        identityLine: String = DEFAULT_IDENTITY_LINE,
+        toolNote: String = DEFAULT_TOOL_NOTE,
+    ): String =
+        identityLine + CONTRACT_BODY + GOLDEN_CHAT_PROGRAM + DATA_CARD_GUIDE +
+            STRUCTURE_CONVENTIONS + toolNote + TOOL_QUERY_TAIL + OpenUiPromptAssets.DSL_RULES +
+            COMPONENT_LIST_INTRO + RenderOpenUiValidator.ALLOWED_COMPONENTS.joinToString(", ")
+
+    /**
+     * 终结消息兜底变换（AgentRunner 终结落流前无条件内联调用，spec§3.2 双保险）：
+     * 合法 → normalize 后原样放行；非法（ProgramGuard 纠正用尽）→ 兜底包成
+     * Markdown 程序，端上永远收到合法树。
+     *
+     * [language]：兜底文案语言（2026-11-22 OpenUI 多语言批次）——Markdown 包装 summary
+     * 标签与硬降级错误卡随用户界面语言五语化（shared `ReplyLanguage.kt` SSOT），
+     * 缺省简中兼容管理后台 skill 调试等无语言头路径。
+     */
+    fun ensureValidProgram(text: String, language: ReplyLanguage = ReplyLanguage.SIMPLIFIED_CHINESE): String {
+        val normalized = OpenUiLayoutNormalizer.normalize(text)
+        if (RenderOpenUiValidator.validate(normalized).isEmpty() &&
+            OpenUiLayoutValidator.validate(normalized).isEmpty()
+        ) {
+            return normalized
+        }
+        val wrapped = "// summary: ${openUiWrappedSummaryLabel(language)}\n" +
+            "root = Markdown(\"${escapeOpenUiString(text)}\")"
+        // 防御分支：兜底包装自身复验（整程序扫描的违规——媒体路径/非法 handle/quoted
+        // action 等——在字符串包装后仍存活时命中），仍失败则硬编码保底。
+        // 2026-11-08 真机事故：该分支曾静默吞掉 ECharts 卡回复，无从定位——
+        // 必须留可观测性（违规清单 + 原文长度 + 预览，对齐 errorText 回显口径无隐私面）。
+        val wrapError = RenderOpenUiValidator.validateProgramToError(wrapped)
+        if (wrapError != null) {
+            Logger.w(
+                LOG_TAG,
+                "终结兜底硬降级：原始输出含 Markdown 包装后仍存活的违规，整回复被硬编码替换。" +
+                    "rawLen=${text.length}, wrapError=$wrapError, rawPreview=${text.replace("\n", "\\n").take(500)}",
+            )
+            return "// summary: ${openUiHardFallbackSummaryLabel(language)}\n" +
+                "root = Markdown(\"${openUiHardFallbackMessage(language)}\")"
+        }
+        Logger.i(
+            LOG_TAG,
+            "终结兜底：原始输出非合法程序，Markdown 包装放行。rawLen=${text.length}, rawPreview=${text.replace("\n", "\\n").take(200)}",
+        )
+        return wrapped
+    }
+
+    /** OpenUI 双引号字符串转义（JSON 转义子集，对齐 OpenUiLexer 双引规则）。 */
+    fun escapeOpenUiString(raw: String): String = buildString(raw.length + 8) {
+        for (c in raw) {
+            when (c) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(c)
+            }
+        }
+    }
+}

@@ -12,4 +12,5 @@ typealias RenderOpenUiValidator = com.mamba.picme.domain.chat.openui.RenderOpenU
 typealias OpenUiCallTree = com.mamba.picme.domain.chat.openui.OpenUiCallTree
 typealias OpenUiLayoutValidator = com.mamba.picme.domain.chat.openui.OpenUiLayoutValidator
 typealias OpenUiLayoutNormalizer = com.mamba.picme.domain.chat.openui.OpenUiLayoutNormalizer
+typealias OpenUiPromptAssets = com.mamba.picme.domain.chat.openui.OpenUiPromptAssets
 internal typealias OpenUiStringScan = com.mamba.picme.domain.chat.openui.OpenUiStringScan
