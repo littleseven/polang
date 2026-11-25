@@ -18,6 +18,8 @@ import com.mamba.picme.domain.chat.primaryPartOf
 import com.mamba.picme.domain.chat.projectChatRow
 import com.mamba.picme.domain.chat.roleOf
 import com.mamba.picme.domain.chat.toToolPartState
+import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.OpenUiProgramSummary
 
 import android.content.Context
 import android.content.res.Configuration
@@ -2017,7 +2019,7 @@ class ChatViewModel(
                             if (actionValue is AgentAction.Error) {
                                 // 聊天页命令分发失败时，优先展示模型原始回复，避免把"暂不支持此操作"抛给用户
                                 Logger.w(TAG, "Capability dispatch failed in chat, falling back to full response. error=${actionValue.message}, detail=${actionValue.detail}")
-                                insertAgentMessage(
+                                insertAssistantFinalMessage(
                                     sessionId, streamResult.fullResponse.ifBlank { actionValue.message },
                                     currentModelLabel(), performance, turnReasoning, turnSources,
                                 )
@@ -2025,10 +2027,11 @@ class ChatViewModel(
                                 handleAgentAction(actionValue, sessionId, currentModelLabel(), performance, turnReasoning, turnSources)
                             }
                         } else {
-                            // 纯文本回复：保存到 Room（REMOTE 场景或 LOCAL 的 text_reply）
-                            insertAgentMessage(
+                            // 纯文本回复：保存到 Room（REMOTE 场景或 LOCAL 的 text_reply）——
+                            // 统一嗅探落卡（开关 on 且程序文本 → OpenUiCard；否则原文本路径）
+                            insertAssistantFinalMessage(
                                 sessionId = sessionId,
-                                content = streamResult.fullResponse,
+                                text = streamResult.fullResponse,
                                 modelUsed = currentModelLabel(),
                                 performance = performance,
                                 reasoningParts = turnReasoning,
@@ -2489,8 +2492,9 @@ class ChatViewModel(
     ) {
         when (action) {
             is AgentAction.TextReply -> {
-                // 流式 turn 终稿（remote ReAct 恒走此分支）：reasoning/source 随行落库
-                insertAgentMessage(sessionId, action.message, modelLabel, performance, reasoningParts, sourceParts)
+                // 流式 turn 终稿（remote ReAct 恒走此分支）：reasoning/source 随行落库——
+                // 统一嗅探落卡（开关 on 且程序文本 → OpenUiCard；否则原文本路径）
+                insertAssistantFinalMessage(sessionId, action.message, modelLabel, performance, reasoningParts, sourceParts)
             }
             is AgentAction.Success -> {
                 when (val cmd = action.command) {
@@ -3073,6 +3077,43 @@ class ChatViewModel(
             extraMetadataJson = performanceMetadataJson(performance),
         )
         chatSessionDao.touchSession(sessionId)
+    }
+
+    /**
+     * 本地回合终稿统一落库（spec《本地回合 OpenUI 统一》U2-4）：回滚闸 on 且终稿嗅探为
+     * OpenUI 程序 → 落 `data_genui_program` part（与云端 [insertOpenUiCardMessage] 同款
+     * part 构造，端侧语言版本恒为 [OpenUiContract.LANG_VERSION]）；reasoning/source
+     * parts 随行在卡前（排序立法同 [insertAgentMessage]）。
+     * 开关 off（回滚位）或非程序文本（防御不可达——engine 层 ensureValidProgram 已兜底
+     * 包程序，T6）→ 原 [insertAgentMessage] 文本路径，行为逐字节不变。
+     */
+    private suspend fun insertAssistantFinalMessage(
+        sessionId: String,
+        text: String,
+        modelUsed: String,
+        performance: LlmPerformance?,
+        reasoningParts: List<MessagePart.Reasoning>,
+        sourceParts: List<MessagePart.SourceUrl>,
+    ) {
+        if (userSettingsRepository.localTurnOpenUiEnabledFlow.first() &&
+            OpenUiProgramSummary.looksLikeProgram(text)
+        ) {
+            chatMessageDao.insertPartsMessage(
+                sessionId = sessionId,
+                role = ModelInputRole.ASSISTANT,
+                parts = reasoningParts + sourceParts + MessagePart.OpenUiCard(
+                    partId = "p0",
+                    program = text,
+                    fallbackSummary = OpenUiProgramSummary.extractFallbackSummary(text),
+                    langVersion = OpenUiContract.LANG_VERSION,
+                ),
+                modelUsed = modelUsed,
+                extraMetadataJson = performanceMetadataJson(performance),
+            )
+            chatSessionDao.touchSession(sessionId)
+        } else {
+            insertAgentMessage(sessionId, text, modelUsed, performance, reasoningParts, sourceParts)
+        }
     }
 
     /** OpenUI 卡交互态持久化（US-7 对偶，openui P2）：同 part id 覆写，重建时作初始 state。 */
