@@ -1,6 +1,7 @@
 package com.mamba.picme.agent.core.inference.remote.react
 
 import com.mamba.picme.agent.core.inference.remote.tool.MemoryContextProvider
+import com.mamba.picme.agent.core.model.context.ReplyLanguage
 import com.mamba.picme.agent.core.remote.config.RemoteProtocol
 
 data class RemoteReActAgentConfig(
@@ -24,6 +25,14 @@ data class RemoteReActAgentConfig(
      *（SkillRepository.cachedPromptSection），资产同步由引擎层在跑轮前完成。
      */
     val skillPromptProvider: (() -> String)? = null,
+    /**
+     * OpenUI 回合原生模式（U2-2，spec《本地回合 OpenUI 统一》）：true 时 chat 链路
+     * KoogChatAgent 切流式策略 + 终结程序守卫纠正，system prompt 末尾追加
+     * OpenUiTurnNativeContract 契约段 + 语言规则段。默认 false——现行路径逐字节不变。
+     */
+    val openUiTurnNative: Boolean = false,
+    /** OpenUI 契约段语言规则段的回复语言（flag on 才消费；默认简中）。 */
+    val replyLanguage: ReplyLanguage = ReplyLanguage.SIMPLIFIED_CHINESE,
 ) {
     companion object {
         const val DEFAULT_SYSTEM_PROMPT = """
@@ -184,6 +193,8 @@ data class RemoteReActAgentConfig(
         private var protocol: RemoteProtocol = RemoteProtocol.OPENAI
         private var providerId: String = ""
         private var skillPromptProvider: (() -> String)? = null
+        private var openUiTurnNative: Boolean = false
+        private var replyLanguage: ReplyLanguage = ReplyLanguage.SIMPLIFIED_CHINESE
 
         fun apiKey(apiKey: String) = apply {
             this.apiKey = apiKey
@@ -200,10 +211,12 @@ data class RemoteReActAgentConfig(
         fun protocol(protocol: RemoteProtocol) = apply { this.protocol = protocol }
         fun providerId(providerId: String) = apply { this.providerId = providerId }
         fun skillPromptProvider(provider: (() -> String)?) = apply { this.skillPromptProvider = provider }
+        fun openUiTurnNative(enabled: Boolean) = apply { this.openUiTurnNative = enabled }
+        fun replyLanguage(lang: ReplyLanguage) = apply { this.replyLanguage = lang }
 
         fun build(): RemoteReActAgentConfig {
             require(apiKey.isNotEmpty() || gatewayToken != null) { "API key or gateway token is required" }
-            return RemoteReActAgentConfig(apiKey, baseUrl, modelName, systemPrompt, maxIterations, temperature, streaming, gatewayToken, deviceId, memoryContextProvider, protocol, providerId, skillPromptProvider)
+            return RemoteReActAgentConfig(apiKey, baseUrl, modelName, systemPrompt, maxIterations, temperature, streaming, gatewayToken, deviceId, memoryContextProvider, protocol, providerId, skillPromptProvider, openUiTurnNative, replyLanguage)
         }
     }
 }
