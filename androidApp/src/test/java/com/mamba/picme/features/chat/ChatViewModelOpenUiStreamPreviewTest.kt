@@ -1,0 +1,342 @@
+package com.mamba.picme.features.chat
+
+import com.mamba.picme.R
+import com.mamba.picme.agent.core.inference.remote.ChatStreamEvent
+import com.mamba.picme.agent.core.inference.remote.StreamChatResult
+import com.mamba.picme.agent.core.model.command.AgentCommand
+import com.mamba.picme.agent.core.model.context.AgentAction
+import com.mamba.picme.agent.core.runtime.capability.CapabilityRegistry
+import com.mamba.picme.data.local.ChatMessageEntity
+import com.mamba.picme.data.local.ChatSessionEntity
+import com.mamba.picme.data.local.decodeParts
+import com.mamba.picme.domain.chat.MessagePart
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+/**
+ * 本地回合 OpenUI 流式预览接线（Task 8 / spec《本地回合 OpenUI 统一》U2-5）：
+ * 开关 on 且 TextSnapshot 命中程序前缀（[com.mamba.picme.domain.chat.openui.OpenUiProgramSummary]
+ * 的 `looksLikeProgramPrefix`）→ 快照改道 `_openUiStreamProgram` 预览轨（渲染层既有
+ * OPENUI_STREAM_PREVIEW_ID 合成管线零改动），不喂 pacingController/turnAdapter
+ * （本轮无文本气泡）；轮内 latch 防抖动；RoundStarted / ToolCallStarted 复位清空；
+ * 回合收尾（onSuccess / onFailure / CancellationException）清预览；开关 off 快照
+ * 走原路径逐字节不变。
+ *
+ * 观测手法：ChatStreamEvent 的 StateFlow 副作用同步置值——事件回放桩在每个事件
+ * 分发返回后即刻采样（[stubStreamRound] 的 afterEvent），不依赖 pacing 虚拟时间。
+ */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
+
+    private val program = """
+        // summary: 已为你整理好照片
+        root = Markdown("这是回复正文")
+    """.trimIndent()
+
+    private val registry: CapabilityRegistry = mockk(relaxed = true)
+
+    @Before
+    override fun setUp() {
+        super.setUp()
+        every { context.getString(R.string.new_chat) } returns "New Chat"
+        every { context.getString(R.string.chat_title_image_first) } returns "Image Chat"
+        every { context.getString(R.string.chat_calling_tool) } returns "正在调用工具"
+        every { context.getString(R.string.chat_thinking) } returns "思考中"
+        every { orchestrator.getCapabilityRegistry() } returns registry
+    }
+
+    private fun stubToggle(enabled: Boolean) {
+        every { userSettingsRepository.localTurnOpenUiEnabledFlow } returns flowOf(enabled)
+    }
+
+    /**
+     * 事件回放桩：按序发射事件后返回指定终稿；afterEvent 在每个事件同步分发完成后
+     * 即刻回调采样中流态（预览轨 StateFlow 同步置值）。yield 对齐生产主线程 FIFO
+     * 时序（T7 先例：feedTurn 漏斗先出队，fold 读取时 parts 已装配）。
+     */
+    private fun stubStreamRound(
+        events: List<ChatStreamEvent>,
+        result: Result<StreamChatResult> = Result.success(StreamChatResult(fullResponse = program)),
+        afterEvent: (ChatStreamEvent) -> Unit = {},
+    ) {
+        coEvery { chatSessionDao.getSession("default") } returns
+            ChatSessionEntity(sessionId = "default", title = "New Chat")
+        coEvery { chatMessageDao.getMessageCount("default") } returns 1
+        val onEventSlot = slot<(ChatStreamEvent) -> Unit>()
+        coEvery { orchestrator.remoteChatEngine.streamChat(any(), any(), capture(onEventSlot)) } coAnswers {
+            events.forEach { event ->
+                onEventSlot.captured(event)
+                afterEvent(event)
+            }
+            yield()
+            result
+        }
+    }
+
+    @Test
+    fun `program prefix snapshot routes to OpenUI preview and skips text bubble`() = runTest {
+        stubToggle(true)
+        var previewAtSnapshot: String? = null
+        var thinkingAtSnapshot: Boolean? = null
+        var contentAtSnapshot: String? = null
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(listOf(ChatStreamEvent.TextSnapshot(program))) {
+            previewAtSnapshot = vm.openUiStreamProgram.value
+            thinkingAtSnapshot = vm.streamingMessage.value?.isThinking
+            contentAtSnapshot = vm.streamingMessage.value?.content
+        }
+        vm.sendMessage("帮我看看照片")
+        advanceUntilIdle()
+
+        // 快照命中程序前缀 → 预览轨置值；文本气泡轨不动（仍思考态）
+        assertEquals(program, previewAtSnapshot)
+        assertEquals(true, thinkingAtSnapshot)
+        assertEquals("思考中", contentAtSnapshot)
+        // 回合收尾（onSuccess 点位）清预览 + 清流式占位
+        assertNull(vm.openUiStreamProgram.value)
+        assertNull(vm.streamingMessage.value)
+    }
+
+    @Test
+    fun `in-round latch keeps subsequent snapshots on preview path`() = runTest {
+        stubToggle(true)
+        val followUp = "后续普通文本（无程序前缀）"
+        var previewAfterFollowUp: String? = null
+        var thinkingAfterFollowUp: Boolean? = null
+        val vm = newViewModel()
+        advanceUntilIdle()
+        var sawPrefixSnapshot = false
+        stubStreamRound(
+            events = listOf(
+                ChatStreamEvent.TextSnapshot(program),
+                ChatStreamEvent.TextSnapshot(followUp),
+            ),
+            result = Result.success(StreamChatResult(fullResponse = followUp)),
+        ) { event ->
+            if (event is ChatStreamEvent.TextSnapshot && !sawPrefixSnapshot) {
+                sawPrefixSnapshot = true
+            } else if (event is ChatStreamEvent.TextSnapshot) {
+                previewAfterFollowUp = vm.openUiStreamProgram.value
+                thinkingAfterFollowUp = vm.streamingMessage.value?.isThinking
+            }
+        }
+        vm.sendMessage("继续说")
+        advanceUntilIdle()
+
+        // 命中后本轮后续快照同路（latch 防抖动来回切）：非前缀快照仍走预览轨
+        assertEquals(followUp, previewAfterFollowUp)
+        assertEquals(true, thinkingAfterFollowUp)
+        assertNull(vm.openUiStreamProgram.value)
+    }
+
+    @Test
+    fun `RoundStarted clears preview and resets latch for new round`() = runTest {
+        stubToggle(true)
+        val plainFollowUp = "你好，这是新一轮普通文本"
+        var previewAfterRoundStart: String? = "unset"
+        var previewAfterFollowUp: String? = "unset"
+        var thinkingAfterFollowUp: Boolean? = null
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(
+            events = listOf(
+                ChatStreamEvent.TextSnapshot(program),
+                ChatStreamEvent.RoundStarted,
+                ChatStreamEvent.TextSnapshot(plainFollowUp),
+            ),
+            result = Result.success(StreamChatResult(fullResponse = plainFollowUp)),
+        ) { event ->
+            if (event is ChatStreamEvent.RoundStarted) {
+                previewAfterRoundStart = vm.openUiStreamProgram.value
+            }
+            if (event is ChatStreamEvent.TextSnapshot && event.text == plainFollowUp) {
+                previewAfterFollowUp = vm.openUiStreamProgram.value
+                thinkingAfterFollowUp = vm.streamingMessage.value?.isThinking
+            }
+        }
+        vm.sendMessage("再来一轮")
+        advanceUntilIdle()
+
+        // 轮边界即清预览（对齐云端 onRoundStart）+ latch 复位：非前缀快照回原路径
+        assertNull(previewAfterRoundStart)
+        assertNull(previewAfterFollowUp)
+        assertEquals(false, thinkingAfterFollowUp)
+        assertNull(vm.openUiStreamProgram.value)
+    }
+
+    @Test
+    fun `ToolCallStarted interrupts program round and clears preview`() = runTest {
+        stubToggle(true)
+        val plainFollowUp = "工具结果后的普通回复"
+        var previewAfterTool: String? = "unset"
+        var contentAfterTool: String? = null
+        var previewAfterFollowUp: String? = "unset"
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(
+            events = listOf(
+                ChatStreamEvent.TextSnapshot(program),
+                ChatStreamEvent.ToolCallStarted(toolName = "search_media"),
+                ChatStreamEvent.TextSnapshot(plainFollowUp),
+            ),
+            result = Result.success(StreamChatResult(fullResponse = plainFollowUp)),
+        ) { event ->
+            when (event) {
+                is ChatStreamEvent.ToolCallStarted -> {
+                    previewAfterTool = vm.openUiStreamProgram.value
+                    contentAfterTool = vm.streamingMessage.value?.content
+                }
+                is ChatStreamEvent.TextSnapshot -> if (event.text == plainFollowUp) {
+                    previewAfterFollowUp = vm.openUiStreamProgram.value
+                }
+                else -> Unit
+            }
+        }
+        vm.sendMessage("查一下照片")
+        advanceUntilIdle()
+
+        // 工具轮打断程序轮：预览清空 + 气泡切工具状态文案；latch 复位
+        assertNull(previewAfterTool)
+        assertEquals("正在调用工具", contentAfterTool)
+        assertNull(previewAfterFollowUp)
+        assertNull(vm.openUiStreamProgram.value)
+    }
+
+    @Test
+    fun `non-prefix snapshot keeps original path when toggle on`() = runTest {
+        stubToggle(true)
+        val plain = "你好，这是一段普通回复"
+        var previewAtSnapshot: String? = "unset"
+        var thinkingAtSnapshot: Boolean? = null
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(
+            events = listOf(ChatStreamEvent.TextSnapshot(plain)),
+            result = Result.success(StreamChatResult(fullResponse = plain)),
+        ) {
+            previewAtSnapshot = vm.openUiStreamProgram.value
+            thinkingAtSnapshot = vm.streamingMessage.value?.isThinking
+        }
+        vm.sendMessage("打个招呼")
+        advanceUntilIdle()
+
+        assertNull(previewAtSnapshot)
+        assertEquals(false, thinkingAtSnapshot)
+        assertNull(vm.openUiStreamProgram.value)
+    }
+
+    @Test
+    fun `program snapshot keeps original path when toggle off`() = runTest {
+        stubToggle(false)
+        var previewAtSnapshot: String? = "unset"
+        var thinkingAtSnapshot: Boolean? = null
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        coEvery { chatMessageDao.insertMessage(capture(inserted)) } answers { }
+        stubStreamRound(listOf(ChatStreamEvent.TextSnapshot(program))) {
+            previewAtSnapshot = vm.openUiStreamProgram.value
+            thinkingAtSnapshot = vm.streamingMessage.value?.isThinking
+        }
+        vm.sendMessage("帮我看看照片")
+        advanceUntilIdle()
+
+        // 回滚位：快照走原路径（预览轨不启用、思考态按原逻辑解除）
+        assertNull(previewAtSnapshot)
+        assertEquals(false, thinkingAtSnapshot)
+        assertNull(vm.openUiStreamProgram.value)
+        val parts = inserted.single { it.role == "agent" }.decodeParts()
+        assertTrue(parts.none { it is MessagePart.OpenUiCard })
+        assertEquals(program, parts.filterIsInstance<MessagePart.Text>().single().markdown)
+    }
+
+    @Test
+    fun `turn failure clears preview`() = runTest {
+        stubToggle(true)
+        val vm = newViewModel()
+        advanceUntilIdle()
+        stubStreamRound(
+            events = listOf(ChatStreamEvent.TextSnapshot(program)),
+            result = Result.failure(IllegalStateException("boom")),
+        )
+        vm.sendMessage("帮我看看照片")
+        advanceUntilIdle()
+
+        assertNull(vm.openUiStreamProgram.value)
+    }
+
+    @Test
+    fun `cancellation clears preview without persisting assistant message`() = runTest {
+        stubToggle(true)
+        var previewAtCancel: String? = null
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        coEvery { chatMessageDao.insertMessage(capture(inserted)) } answers { }
+        coEvery { chatSessionDao.getSession("default") } returns
+            ChatSessionEntity(sessionId = "default", title = "New Chat")
+        coEvery { chatMessageDao.getMessageCount("default") } returns 1
+        val onEventSlot = slot<(ChatStreamEvent) -> Unit>()
+        coEvery { orchestrator.remoteChatEngine.streamChat(any(), any(), capture(onEventSlot)) } coAnswers {
+            onEventSlot.captured(ChatStreamEvent.TextSnapshot(program))
+            previewAtCancel = vm.openUiStreamProgram.value
+            throw CancellationException("user stop")
+        }
+        vm.sendMessage("帮我看看照片")
+        advanceUntilIdle()
+
+        // 流中预览在场（前缀命中）；取消分支清预览
+        assertEquals(program, previewAtCancel)
+        assertNull(vm.openUiStreamProgram.value)
+        assertNull(vm.streamingMessage.value)
+        // 预览轨无气泡正文 → keepPartial 不成立，半截不落库（keepPartial 口径属 T9，此处不动）
+        assertTrue(inserted.none { it.role == "agent" })
+    }
+
+    /**
+     * 顺车钉 T7 落卡主产线（调用点①）：带 commands 的回合经 capability dispatch 返回
+     * TextReply 程序文本 → `handleAgentAction` TextReply 分支统一嗅探落 OpenUiCard。
+     */
+    @Test
+    fun `commands turn lands OpenUiCard via TextReply branch`() = runTest {
+        stubToggle(true)
+        coEvery { registry.dispatch(any(), any()) } returns Result.success(
+            AgentAction.TextReply(commandId = 1, message = program)
+        )
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        coEvery { chatMessageDao.insertMessage(capture(inserted)) } answers { }
+        stubStreamRound(
+            events = emptyList(),
+            result = Result.success(
+                StreamChatResult(
+                    fullResponse = program,
+                    commands = listOf(AgentCommand.SearchMedia(query = "猫")),
+                )
+            ),
+        )
+        vm.sendMessage("看看猫的照片")
+        advanceUntilIdle()
+
+        coVerify { registry.dispatch(any(), any()) }
+        val parts = inserted.single { it.role == "agent" }.decodeParts()
+        val card = parts.filterIsInstance<MessagePart.OpenUiCard>().single()
+        assertEquals(program, card.program)
+        assertEquals("p0", card.partId)
+    }
+}

@@ -1100,6 +1100,14 @@ class ChatViewModel(
     private val _openUiStreamProgram = MutableStateFlow<String?>(null)
     val openUiStreamProgram: StateFlow<String?> = _openUiStreamProgram.asStateFlow()
 
+    /**
+     * U2-5（本地回合 OpenUI 统一）：轮内预览轨 latch——本轮 TextSnapshot 已改道程序
+     * 预览后，后续快照同路（防前缀误判/中段抖动来回切）；RoundStarted / ToolCallStarted
+     * 复位。快照仅随 RoundStarted 之后到达（Koog onLLMStreamingStarting 每轮先发），
+     * 上一轮残留 latch 必先经复位消费，无需回合级防御清零。
+     */
+    private var openUiPreviewRound = false
+
     private val pacingController = StreamingPacingController(
         scope = viewModelScope,
         onPaced = { text, cursor ->
@@ -1876,6 +1884,9 @@ class ChatViewModel(
                 val assistantPersona = userSettingsRepository.assistantPersonaFlow.first()
                 val replyLanguage = userSettingsRepository.appLanguageFlow.first()
                     .toReplyLanguage(Locale.getDefault().toLanguageTag())
+                // U2-5 回滚闸：本地回合 OpenUI 流式预览开关（一次性读取，设置变更下条消息
+                // 即生效——insertAssistantFinalMessage 落卡开关同一范式）
+                val localTurnOpenUiEnabled = userSettingsRepository.localTurnOpenUiEnabledFlow.first()
                 val agentContext = AgentContext(
                     scene = AgentScene.CHAT,
                     memorySessionId = sessionId,
@@ -1926,16 +1937,31 @@ class ChatViewModel(
                     input = effectiveInput,
                     agentContext = agentContext,
                     onEvent = { event ->
+                        // U2-5：程序前缀快照改道 OpenUI 流式预览轨（渲染层既有合成管线零改动），
+                        // 不喂 pacingController/turnAdapter（本轮无文本气泡）；轮内 latch
+                        // 命中后后续快照同路，防抖动来回切
+                        var programPreviewPath = false
                         when (event) {
                             is ChatStreamEvent.TextSnapshot -> {
-                                pacingController.onTextSnapshot(event.text)
-                                // 新一轮文本到达：非卡片工具状态让位（对齐 legacy 状态文案被快照覆盖）
-                                _pendingNonCardTool.value = null
-                                if (_streamingMessage.value?.isThinking == true) {
-                                    _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
+                                if (localTurnOpenUiEnabled &&
+                                    (openUiPreviewRound || OpenUiProgramSummary.looksLikeProgramPrefix(event.text))
+                                ) {
+                                    openUiPreviewRound = true
+                                    _openUiStreamProgram.value = event.text
+                                    programPreviewPath = true
+                                } else {
+                                    pacingController.onTextSnapshot(event.text)
+                                    // 新一轮文本到达：非卡片工具状态让位（对齐 legacy 状态文案被快照覆盖）
+                                    _pendingNonCardTool.value = null
+                                    if (_streamingMessage.value?.isThinking == true) {
+                                        _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
+                                    }
                                 }
                             }
                             is ChatStreamEvent.ToolCallStarted -> {
+                                // U2-5：工具轮打断程序轮——latch 复位 + 预览清空让位工具状态
+                                openUiPreviewRound = false
+                                _openUiStreamProgram.value = null
                                 pacingController.reset()
                                 _streamingMessage.value = _streamingMessage.value?.copy(
                                     content = stringContext().getString(R.string.chat_calling_tool),
@@ -1952,15 +1978,23 @@ class ChatViewModel(
                                 }
                             }
                             // M4 显式轮边界：气泡态无需响应（文本快照/工具事件已驱动），
-                            // 仅经 feedTurn 喂装配器闭合上一轮文本块
-                            is ChatStreamEvent.RoundStarted -> Unit
+                            // 仅经 feedTurn 喂装配器闭合上一轮文本块；
+                            // U2-5：新一轮预览从空累计（对齐云端 onRoundStart）
+                            is ChatStreamEvent.RoundStarted -> {
+                                openUiPreviewRound = false
+                                _openUiStreamProgram.value = null
+                            }
                             // 值域终态 §6.1：思考链快照不进气泡 content 轨（正文仍由
                             // TextSnapshot 驱动），parts 轨经 feedTurn 装配 reasoning 折叠块；
-                            // 生产开关默认关（thinking=disabled，事件不产出）
+                            // 生产开关默认关（thinking=disabled，事件不产出）；
+                            // U2-5：程序轮 reasoning 照喂不误（turnReasoning 收集不能破）
                             is ChatStreamEvent.ReasoningSnapshot -> Unit
                         }
-                        // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）
-                        feedTurn(event)
+                        // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）；
+                        // U2-5：改道预览轨的快照不喂（本轮无文本气泡）
+                        if (!programPreviewPath) {
+                            feedTurn(event)
+                        }
                     }
                 )
 
@@ -1982,6 +2016,8 @@ class ChatViewModel(
                     onSuccess = { streamResult ->
                         // 清除流式占位
                         _streamingMessage.value = null
+                        // U2-5：终稿已落卡（insertAssistantFinalMessage），流式预览让位
+                        _openUiStreamProgram.value = null
 
                         // 性能数据统一在此计算并透传给所有回复路径（文本/命令），
                         // 让 remote(DeepSeek) 响应气泡也展示 prompt/decode tokens、延迟、速度。
@@ -2042,6 +2078,8 @@ class ChatViewModel(
                     onFailure = { error ->
                         // 清除流式占位
                         _streamingMessage.value = null
+                        // U2-5：回合失败收尾清流式预览（半截程序不上屏）
+                        _openUiStreamProgram.value = null
                         // langchain4j 异常 message = HTTP 响应体（OkHttpClient→HttpException→AuthenticationException 全程透传，状态码不进 message）。
                         // guest 配额耗尽时 server 返回 403 body={"error":"quota_exceeded",...}（见 LlmRoute），据此识别。
                         val errorBody = error.message.orEmpty()
@@ -2091,6 +2129,8 @@ class ChatViewModel(
                 pacingController.finish()
                 val finalText = _streamingMessage.value?.content.orEmpty()
                 _streamingMessage.value = null
+                // U2-5：取消收尾清流式预览（keepPartial 半截口径属 T9，此处只加清预览）
+                _openUiStreamProgram.value = null
                 if (keepPartial && finalText.isNotBlank()) {
                     withContext(NonCancellable) {
                         insertAgentMessage(sessionId, finalText, currentModelLabel())
