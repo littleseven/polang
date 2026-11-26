@@ -61,11 +61,15 @@ class KoogChatAgent(
     private val toolRegistry: ToolRegistry,
     memoryStore: ChatMemoryStore,
     summaryGenerator: SummaryGenerator? = null,
+    executorBundleOverride: RemoteModelFactory.KoogExecutorBundle? = null,
 ) {
     private val tag = "KoogChatAgent"
 
-    // internal（非 private）：commonTest 契约测试需断言 protocol/providerId 透传到工厂产物
-    internal val executorBundle = RemoteModelFactory.createKoogExecutor(
+    // internal（非 private）：commonTest 契约测试需断言 protocol/providerId 透传到工厂产物。
+    // [executorBundleOverride]：测试注入缝（与 summaryGenerator 同模式，生产恒 null）——
+    // 端到端接线测试用假 PromptExecutor 录制出站 prompt.messages，钉 buildAgent 把
+    // 组装成品 system prompt（而非 config.systemPrompt 基座）传给 historyProvider。
+    internal val executorBundle = executorBundleOverride ?: RemoteModelFactory.createKoogExecutor(
         config = RemoteModelConfig(
             modelId = config.modelName,
             providerId = config.providerId,
@@ -169,14 +173,16 @@ class KoogChatAgent(
             ""
         }
 
-    // 记忆快照 + 摘要版本 + 工具子集 + 技能清单段 + OpenUI 契约段驱动的懒重建（五者任一变更才
+    // 记忆快照 + 摘要文本 + 工具子集 + 技能清单段 + OpenUI 契约段驱动的懒重建（五者任一变更才
     // 重建 AIAgent；executor/store/provider 复用）。
-    // 摘要每轮新鲜渲染（US-2.4），但其变化经 version 反映——压缩后 version 变 → 重建 → 新摘要烘焙。
+    // 摘要每轮新鲜渲染（US-2.4），变化经文本比对反映（2026-11-27 起——不再仅比 version，
+    // 防跨会话同版本号串摘要，见 agent() 注释）——压缩后文本变 → 重建 → 新摘要烘焙。
     // 技能清单段（2026-11-08）：内容随 SkillRepository 同步变化，段文本比对入键——
     // 技能新增/删除/描述变更即重建烘焙新清单，正文更新（version 变、name/description 不变）
     // 不触发重建（清单段无变化，load_skill 拉的是最新缓存正文，无需重建）。
     // OpenUI 契约段（U2-2）：与技能清单段同槽文本比对入键；flag off 时空串入键零扰动。
     private var builtSnapshot: String? = null
+    private var builtSummaryText: String? = null
     private var builtSummaryVersion: Int = -1
     private var builtToolSetKey: String? = null
     private var builtSkillSection: String? = null
@@ -266,8 +272,9 @@ class KoogChatAgent(
     }
 
     /**
-     * 取或按「记忆快照 + 摘要版本 + 工具子集 + 技能清单段 + OpenUI 契约段」新鲜度重建
-     * AIAgent（M2：摘要变更同样触发重建，使新压缩的摘要即时烘焙进 system prompt；
+     * 取或按「记忆快照 + 摘要文本 + 工具子集 + 技能清单段 + OpenUI 契约段」新鲜度重建
+     * AIAgent（M2：摘要变更同样触发重建，使新压缩的摘要即时烘焙进 system prompt——
+     * 2026-11-27 起比对摘要文本本体而非版本号，防跨会话同版本号串摘要；
      * M3：意图子集切换同级触发，覆写 registry/prompt 即时生效；U2-2：契约段文本
      * 变更同级触发——config 不可变故当前恒稳定，为动态化留位）。
      */
@@ -275,7 +282,11 @@ class KoogChatAgent(
         val snapshot = config.memoryContextProvider?.snapshot()?.trim()?.ifEmpty { null }
         val skillSection = config.skillPromptProvider?.invoke()?.trim()?.ifEmpty { null }
         val cached = builtAgent
-        if (cached != null && snapshot == builtSnapshot && summaryVersion == builtSummaryVersion &&
+        // 摘要比对用文本本体而非版本号（2026-11-27 跨会话串摘要缺口修复）：version 是
+        // 会话内单调序号，两会话同版本号不同内容时仅比 version 会复用旧 agent——
+        // 烘焙的摘要段是别的会话的（会话切换经 setSessionId，单实例服务多会话）。
+        // version 仍记录仅用于日志。文本比对 O(摘要长)，仅 runChat 入口一次，可忽略。
+        if (cached != null && snapshot == builtSnapshot && summaryText == builtSummaryText &&
             toolSet?.key == builtToolSetKey && skillSection == builtSkillSection &&
             openUiContractSection == builtOpenUiSection
         ) {
@@ -287,6 +298,7 @@ class KoogChatAgent(
         )
         builtAgent = agent
         builtSnapshot = snapshot
+        builtSummaryText = summaryText
         builtSummaryVersion = summaryVersion
         builtToolSetKey = toolSet?.key
         builtSkillSection = skillSection
