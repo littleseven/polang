@@ -183,7 +183,6 @@ class KoogChatAgent(
     // OpenUI 契约段（U2-2）：与技能清单段同槽文本比对入键；flag off 时空串入键零扰动。
     private var builtSnapshot: String? = null
     private var builtSummaryText: String? = null
-    private var builtSummaryVersion: Int = -1
     private var builtToolSetKey: String? = null
     private var builtSkillSection: String? = null
     private var builtOpenUiSection: String = ""
@@ -299,7 +298,6 @@ class KoogChatAgent(
         builtAgent = agent
         builtSnapshot = snapshot
         builtSummaryText = summaryText
-        builtSummaryVersion = summaryVersion
         builtToolSetKey = toolSet?.key
         builtSkillSection = skillSection
         builtOpenUiSection = openUiContractSection

@@ -99,7 +99,8 @@ class KoogChatAgentHistoryWiringE2ETest {
             }
             .skillPromptProvider(skillSection?.let { section -> { section } })
             .build()
-        // model/baseParams 取真实工厂产物（构造无网络），仅 executor 换录制假件
+        // model/baseParams 取真实工厂产物（构造无网络），仅 executor 换录制假件；
+        // 被丢弃的真实 executor 显式 close（持 Ktor client，测试结束即释放）
         val realBundle = RemoteModelFactory.createKoogExecutor(
             config = RemoteModelConfig(
                 modelId = config.modelName,
@@ -112,6 +113,7 @@ class KoogChatAgentHistoryWiringE2ETest {
             ),
             extraHeaders = emptyMap(),
         )
+        realBundle.executor.close()
         return KoogChatAgent(
             config = config,
             toolRegistry = ToolRegistry {},
@@ -135,7 +137,7 @@ class KoogChatAgentHistoryWiringE2ETest {
         assertEquals(1, systems.size, "出站消息必须有且仅有一条 System")
         assertEquals(messages.first(), systems.single(), "System 必须在首位")
         assertEquals(
-            agent.composeSystemPrompt("快照X", null, null, "SKILLS段"),
+            agent.composeSystemPrompt("快照X", null, null, "SKILLS段").trim(),
             systems.single().textContent(),
             "传给 historyProvider 的必须是组装成品 prompt（变异成 config.systemPrompt 基座时此断言变红）",
         )
