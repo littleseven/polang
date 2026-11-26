@@ -78,4 +78,45 @@ class OpenUiProgramSummaryTest {
         // 无后续引号 = 真未闭合：与旧正则「未闭合不匹配」同口径，落到空串
         assertEquals("", OpenUiProgramSummary.extractFallbackSummary("root = Markdown(\"未闭合正文"))
     }
+
+    // ── U2-1：流式前缀嗅探（turn-native 预览分派启发式，looksLikeProgram 前缀版） ──
+
+    @Test
+    fun prefixSniffAcceptsSummaryCommentFirstLine() {
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("// summary: x"))
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("// summary: 周报\nroot = Card([Mark"))
+    }
+
+    @Test
+    fun prefixSniffAcceptsRootStatementLineStart() {
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("root = Markdown("))
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("root=Markdown(1)"))
+    }
+
+    @Test
+    fun prefixSniffRejectsPlainChineseTextAndEmpty() {
+        assertFalse(OpenUiProgramSummary.looksLikeProgramPrefix("今天天气不错"))
+        assertFalse(OpenUiProgramSummary.looksLikeProgramPrefix(""))
+    }
+
+    @Test
+    fun prefixSniffToleratesUpToTwoLeadingNoiseChars() {
+        // 噪声 = 空白/BOM，前 2 字符容忍（流式 chunk 可能带 BOM 或散落空白）
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("  // summary: x"))
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("\uFEFF\uFEFFroot = Card([Mark"))
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix(" \uFEFF\nroot=Markdown(1)"))
+        // 3 字符噪声起不再容忍（首行判定失效；root 行由 looksLikeProgram 的 ^\s* 兜底仍可命中）
+        assertFalse(OpenUiProgramSummary.looksLikeProgramPrefix("   // summary: 只有注释"))
+        // 纯噪声 / 只有空白 = 无内容，false
+        assertFalse(OpenUiProgramSummary.looksLikeProgramPrefix(" "))
+        assertFalse(OpenUiProgramSummary.looksLikeProgramPrefix("\uFEFF"))
+    }
+
+    @Test
+    fun prefixSniffMiddleRootLineAndFullProgramBothHit() {
+        // 任一非空行以 root= 起首即命中（不止首行）
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("// summary: x\n\nroot = Card([Mark"))
+        // 完整程序：looksLikeProgram 为 true 的必然命中（口径包含关系）
+        assertTrue(OpenUiProgramSummary.looksLikeProgramPrefix("card = Card([Text(1)])"))
+    }
 }

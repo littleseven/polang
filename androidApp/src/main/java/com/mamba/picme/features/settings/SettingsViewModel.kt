@@ -316,6 +316,14 @@ class SettingsViewModel(
             initialValue = false
         )
 
+    /** 本地回合 OpenUI turn-native 回滚闸（默认开；关=Chat 本地回合回退文本气泡） */
+    val localTurnOpenUiEnabled: StateFlow<Boolean> = repository.localTurnOpenUiEnabledFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = true
+        )
+
     val localAsrModel: StateFlow<String> = repository.localAsrModelFlow
         .stateIn(
             scope = viewModelScope,
@@ -1123,6 +1131,13 @@ class SettingsViewModel(
         viewModelScope.launch {
             Logger.d("UX", "Cloud agent orchestration changed: $enabled")
             repository.updateCloudAgentEnabled(enabled)
+        }
+    }
+
+    fun setLocalTurnOpenUiEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            Logger.d("UX", "Local-turn OpenUI toggle changed: $enabled")
+            repository.updateLocalTurnOpenUiEnabled(enabled)
         }
     }
 

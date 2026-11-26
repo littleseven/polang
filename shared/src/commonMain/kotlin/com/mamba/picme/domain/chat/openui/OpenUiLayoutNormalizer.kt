@@ -1,6 +1,6 @@
-package com.mamba.picme.server.agent
+package com.mamba.picme.domain.chat.openui
 
-import org.slf4j.LoggerFactory
+import com.mamba.picme.agent.core.platform.logging.Logger
 
 /**
  * OpenUI 布局无声矫正器（2026-10-31 布局可控性批次，spec §2.1）——只做「有唯一
@@ -26,8 +26,6 @@ object OpenUiLayoutNormalizer {
 
     /** 规则开关（spec §2.3：误伤止血——把规则名（"N1"~"N5"）加进集合即关该条，不改代码）。 */
     internal val DISABLED_RULES: Set<String> = emptySet()
-
-    private val logger = LoggerFactory.getLogger("picme-agent")
 
     private val UNWRAP_CONTAINERS = setOf("Row", "Column", "Grid", "Box", "Stack")
     private val VERTICAL_FLOW_PARENTS = setOf("Column", "Card")
@@ -57,7 +55,7 @@ object OpenUiLayoutNormalizer {
             // warn 而非 debug：runCatching 只兜矫正器自身 bug（残缺程序走 parse null 不到此）——
             // 稀有 + 高信号；生产 INFO 级下 debug 会让安全网成黑洞（Task 12+13 质量 I-1）
             .onFailure { e ->
-                logger.warn("normalize 静默放行：{} | program 开头：{}", e.toString(), program.take(120))
+                Logger.w("picme-agent", "normalize 静默放行：$e | program 开头：${program.take(120)}")
             }
             .getOrDefault(stripped)
     }

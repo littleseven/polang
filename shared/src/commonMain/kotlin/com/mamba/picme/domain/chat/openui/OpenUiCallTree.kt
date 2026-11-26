@@ -1,11 +1,11 @@
-package com.mamba.picme.server.agent
+package com.mamba.picme.domain.chat.openui
 
 /**
  * OpenUI program 组件调用树扫描器（2026-10-31 布局可控性批次，spec
  * 《openui-layout-controllability》§1）。
  *
- * 字符级扫描（字符串字面量/行注释感知），不跑完整 parser（server 不依赖 :shared，
- * [RenderOpenUiValidator] 半信任口径先例）：每个 `Name(…)` 调用一个节点，span 锚定
+ * 字符级扫描（字符串字面量/行注释感知），不跑完整 parser（[RenderOpenUiValidator]
+ * 半信任口径先例）：每个 `Name(…)` 调用一个节点，span 锚定
  * **原文**区间（供 [OpenUiLayoutNormalizer] 无损改写）；children = 直接嵌套调用
  * （隔层数组/对象字面量不建节点，嵌套调用归属最近祖先调用）。
  *

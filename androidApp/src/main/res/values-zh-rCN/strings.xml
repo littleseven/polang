@@ -669,6 +669,8 @@
     <string name="ai_agent_privacy_permissive">宽松（允许远程）</string>
     <string name="tag_gen_use_opencl_title">TAG 生成 GPU 加速</string>
     <string name="tag_gen_use_opencl_subtitle">加速标签生成，卡顿时可关闭</string>
+    <string name="local_turn_openui_title">本地回合 OpenUI 渲染</string>
+    <string name="local_turn_openui_subtitle">关闭后聊天回复回退为纯文本</string>
     <string name="remote_models">远程模型</string>
     <string name="model_in_use">使用中</string>
     <string name="remote_model_configured">已配置</string>

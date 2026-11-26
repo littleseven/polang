@@ -682,6 +682,8 @@
     <string name="ai_agent_privacy_permissive">Permissive (Allow Remote)</string>
     <string name="tag_gen_use_opencl_title">TAG Generation GPU Accel</string>
     <string name="tag_gen_use_opencl_subtitle">Faster tagging; disable if it hangs</string>
+    <string name="local_turn_openui_title">Local-turn OpenUI rendering</string>
+    <string name="local_turn_openui_subtitle">Turn off to roll chat replies back to plain text</string>
     <string name="remote_models">Remote Models</string>
     <string name="model_in_use">In use</string>
     <string name="remote_model_configured">Configured</string>

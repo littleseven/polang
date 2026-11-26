@@ -3,6 +3,7 @@
 > **日期**：2026-11-07
 > **状态**：在途活跃 spec（M1/M1.5/M2 已合 main；M3~M6 未开始）
 > **分支**：M1 = `feat/layered-agent-runtime`（已合）；M1.5/M2 = `feat/layered-runtime-m2`（已合）
+> **修订（2026-11-24）**：§3 决策 1（L7 产出协议不合线）已被 spec《2026-11-24-local-turn-openui-unification-design.md》正式翻案——L7 合线为 turn-native 唯一产出协议，本文相关表述以修订后口径为准。
 > **起因**：用户要求统一本地 Agent 与远程（云端）Agent 的代码——「出于成本考虑仍在端上跑 Agent，但差异仅在一个开关；从原理上同构，仅仅是 runtime 在云上或端上的区别」。用户补充关键修正：**Agent 架构是分层的，开关控制各层跑在端上还是服务端**（不是整体两态）。
 
 ---
@@ -19,7 +20,7 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 | **L4 工具层** | 工具集 + locality 声明 + 执行桥 | `ChatToolService` / `CloudAgentToolCatalog`（LOCAL/CLOUD 已声明） | `DeviceToolService`（端工具云桥）+ `ServerTools` | **M2**：locality 泛化——同一目录声明工具跑在端/云，开关即「哪个 runtime 持有 executor」 |
 | **L5 记忆层** | 会话记忆组装/压缩/投影 | shared `KoogMessageMemory`（DataStore store） | server 事件溯源 `agent_event` + `AgentProjection` | **M3**：`MemoryStore` 接口两侧实现，组装/压缩算法已在 shared 共用 |
 | **L6 流式协议层** | 事件→parts 的流式下行 | `ChatStreamEvent`→`TurnStreamEvent`（端内 Flow） | SSE 事件帧（`AgentEvent`） | **M4**：事件模型合一，端内 Flow 与 SSE 只是同一事件的两种传输 |
-| **L7 产出协议层** | 卡片/GenUI 产出形态 | OpenUI 卡 + HTML 卡 + parts | OpenUI 回合原生（turn-native only） | 已拍板：**不合线为「一份形态」**，产出协议下沉为「产出 Profile」配置（见 §3 决策 1） |
+| **L7 产出协议层** | 卡片/GenUI 产出形态 | turn-native OpenUI（终结回复即程序；工具产物卡 Chart/HtmlCard/任务卡保留） | OpenUI 回合原生（turn-native only） | 原拍板「不合线为一份形态、下沉产出 Profile 配置」已于 **2026-11-24 翻案**：合线为 turn-native 唯一产出协议（见 §3 决策 1） |
 
 三个注入点（差异全部收敛于此）：
 
@@ -43,7 +44,7 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 
 ## 3. 已拍板决策（与用户对齐，勿重开）
 
-1. **产出协议（L7）不合为一份形态**：端侧本地 Agent 的产出形态（parts 卡）与云端 turn-native OpenUI 是两种产品形态，收敛为「产出 Profile」配置而非统一实现。M1 不触碰。
+1. **产出协议（L7）**（原拍板 2026-11-07「不合为一份形态、收敛为产出 Profile 配置」；**2026-11-24 正式翻案**，翻案 spec《2026-11-24-local-turn-openui-unification-design.md》）：**L7 合线为「turn-native OpenUI 唯一产出协议」**——本地回合终结回复与云端同一形态（整颗 OpenUI Lang 1.0 程序，纯对话也写 `root = Markdown("…")`），流式预览/策略层纠正回环/engine 层兜底/`data_genui_program` 落库全链路与云端同口径；契约/校验/守卫资产自 server 上提 shared 同一声明源。runtime 落点继续是部署差异（端侧 Koog 保留，见决策 2），产出协议不再是差异。「产出 Profile」配置机制随之退役——L7 不再是配置点；端侧灰度期经回滚闸（DataStore 开关，默认开）可整体退回纯文本路径，闸收编后移除。工具产物卡（Chart/HtmlCard/任务卡/直播卡）不属于终结回复通道，两端照旧保留。
 2. **开关硬两态、不漂移**：TurnRunner 只有 Local/Cloud 两档，不做运行时按请求动态分流（避免三态漂移）。
 3. **会话归属创建它的 runtime**：云端会话（`agent_session` 事件溯源）与端侧会话（Room）有意独立（ADR-018），状态层不统一。
 4. **Koog 版本两端锁死 1.3.0**：server 直接依赖与 shared `libs.versions.toml` 手工对齐（双构建不共享版本目录，注释互链）。
@@ -121,5 +122,5 @@ Agent 栈拆为七层。每一层有**端/云两个实现**（或天然同构一
 **排期原则**：
 - M3 先行的理由：接口抽取不动行为、随时可合，且为 M5 的「记忆层注入差异」准备好接缝。
 - M4 前置 iOS 云端回合批次的理由：合一事件模型需要两个真实消费端校验语义，只改造不新增消费面等于盲改。
-- L7 产出 Profile 维持决策 1（不合线），M5 落地时以组合根配置注入，不在 TurnRunner 内分支。
+- ~~L7 产出 Profile 维持决策 1（不合线），M5 落地时以组合根配置注入，不在 TurnRunner 内分支。~~ 已随 2026-11-24 翻案失效（见 §3 决策 1）：L7 合线为 turn-native 唯一产出协议，M5 TurnRunner 合一时无产出 Profile 配置点；灰度期回滚闸（DataStore 开关）承担退路，闸收编后移除。
 - 每期开工前重估：若 Koog 升级（如 reasoning 透出/usage 字段补全）改变 L3/L6 前提，M4 的事件族设计先吸收再动工。

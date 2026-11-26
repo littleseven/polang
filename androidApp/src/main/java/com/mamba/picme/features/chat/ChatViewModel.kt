@@ -18,6 +18,8 @@ import com.mamba.picme.domain.chat.primaryPartOf
 import com.mamba.picme.domain.chat.projectChatRow
 import com.mamba.picme.domain.chat.roleOf
 import com.mamba.picme.domain.chat.toToolPartState
+import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.OpenUiProgramSummary
 
 import android.content.Context
 import android.content.res.Configuration
@@ -1098,6 +1100,24 @@ class ChatViewModel(
     private val _openUiStreamProgram = MutableStateFlow<String?>(null)
     val openUiStreamProgram: StateFlow<String?> = _openUiStreamProgram.asStateFlow()
 
+    /**
+     * U2-5（本地回合 OpenUI 统一）：轮内预览轨 latch——本轮 TextSnapshot 已改道程序
+     * 预览后，后续快照同路（防前缀误判/中段抖动来回切）；RoundStarted / ToolCallStarted
+     * 复位。快照仅随 RoundStarted 之后到达（Koog onLLMStreamingStarting 每轮先发），
+     * 上一轮残留 latch 必先经复位消费，无需回合级防御清零。
+     */
+    private var openUiPreviewRound = false
+
+    /**
+     * 本地程序预览写入节流器（Task 13，U2 跟进）：镜像 server OpenUiContentStreamTracker
+     * 48 字符/80ms 粒度压低 TextSnapshot 帧直写预览轨的频率（低端机流式预览 OOM 修复）；
+     * 收尾 flushTail 保尾帧（判定/清空针对最新完整文本）。
+     * 冻结违反登记：本批次第 2 个字段（同 openUiPreviewRound 批次，任务卡指令优先；
+     * _pendingNonCardTool 为批次前存量，评审 git 考证不计入）。
+     * 遗留 streaming delegate 拆分时收编。
+     */
+    private val openUiPreviewThrottle = OpenUiPreviewStreamThrottle()
+
     private val pacingController = StreamingPacingController(
         scope = viewModelScope,
         onPaced = { text, cursor ->
@@ -1874,6 +1894,9 @@ class ChatViewModel(
                 val assistantPersona = userSettingsRepository.assistantPersonaFlow.first()
                 val replyLanguage = userSettingsRepository.appLanguageFlow.first()
                     .toReplyLanguage(Locale.getDefault().toLanguageTag())
+                // U2-5 回滚闸：本地回合 OpenUI 流式预览开关（一次性读取，设置变更下条消息
+                // 即生效——insertAssistantFinalMessage 落卡开关同一范式）
+                val localTurnOpenUiEnabled = userSettingsRepository.localTurnOpenUiEnabledFlow.first()
                 val agentContext = AgentContext(
                     scene = AgentScene.CHAT,
                     memorySessionId = sessionId,
@@ -1924,16 +1947,40 @@ class ChatViewModel(
                     input = effectiveInput,
                     agentContext = agentContext,
                     onEvent = { event ->
+                        // U2-5：程序前缀快照改道 OpenUI 流式预览轨（渲染层既有合成管线零改动），
+                        // 不喂 pacingController/turnAdapter（本轮无文本气泡）；轮内 latch
+                        // 命中后后续快照同路，防抖动来回切
+                        var programPreviewPath = false
                         when (event) {
                             is ChatStreamEvent.TextSnapshot -> {
-                                pacingController.onTextSnapshot(event.text)
-                                // 新一轮文本到达：非卡片工具状态让位（对齐 legacy 状态文案被快照覆盖）
-                                _pendingNonCardTool.value = null
-                                if (_streamingMessage.value?.isThinking == true) {
-                                    _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
+                                if (localTurnOpenUiEnabled &&
+                                    (openUiPreviewRound || OpenUiProgramSummary.looksLikeProgramPrefix(event.text))
+                                ) {
+                                    openUiPreviewRound = true
+                                    programPreviewPath = true
+                                    // Task 13：命中帧经节流器写入（48 字符/80ms 粒度压帧，
+                                    // 首帧/非连续帧直通保改道可观测）；不发射 → 不写
+                                    openUiPreviewThrottle.onTextSnapshot(event.text)?.let { throttled ->
+                                        _openUiStreamProgram.value = throttled
+                                    }
+                                    // 非卡片工具 chip 让位（原路径文本快照同款语义，U2-6
+                                    // 顺车修 T8 评审 Important：否则工具轮的 chip 与占位
+                                    // 气泡状态文案悬挂至回合收尾）
+                                    _pendingNonCardTool.value = null
+                                } else {
+                                    pacingController.onTextSnapshot(event.text)
+                                    // 新一轮文本到达：非卡片工具状态让位（对齐 legacy 状态文案被快照覆盖）
+                                    _pendingNonCardTool.value = null
+                                    if (_streamingMessage.value?.isThinking == true) {
+                                        _streamingMessage.value = _streamingMessage.value?.copy(isThinking = false)
+                                    }
                                 }
                             }
                             is ChatStreamEvent.ToolCallStarted -> {
+                                // U2-5：工具轮打断程序轮——latch 复位 + 预览清空让位工具状态
+                                openUiPreviewRound = false
+                                _openUiStreamProgram.value = null
+                                openUiPreviewThrottle.reset()
                                 pacingController.reset()
                                 _streamingMessage.value = _streamingMessage.value?.copy(
                                     content = stringContext().getString(R.string.chat_calling_tool),
@@ -1950,15 +1997,24 @@ class ChatViewModel(
                                 }
                             }
                             // M4 显式轮边界：气泡态无需响应（文本快照/工具事件已驱动），
-                            // 仅经 feedTurn 喂装配器闭合上一轮文本块
-                            is ChatStreamEvent.RoundStarted -> Unit
+                            // 仅经 feedTurn 喂装配器闭合上一轮文本块；
+                            // U2-5：新一轮预览从空累计（对齐云端 onRoundStart）
+                            is ChatStreamEvent.RoundStarted -> {
+                                openUiPreviewRound = false
+                                _openUiStreamProgram.value = null
+                                openUiPreviewThrottle.reset()
+                            }
                             // 值域终态 §6.1：思考链快照不进气泡 content 轨（正文仍由
                             // TextSnapshot 驱动），parts 轨经 feedTurn 装配 reasoning 折叠块；
-                            // 生产开关默认关（thinking=disabled，事件不产出）
+                            // 生产开关默认关（thinking=disabled，事件不产出）；
+                            // U2-5：程序轮 reasoning 照喂不误（turnReasoning 收集不能破）
                             is ChatStreamEvent.ReasoningSnapshot -> Unit
                         }
-                        // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）
-                        feedTurn(event)
+                        // ADR-016 M2：同一事件喂 turn 装配器（parts 快照挂流式消息，M4 渲染切换打底）；
+                        // U2-5：改道预览轨的快照不喂（本轮无文本气泡）
+                        if (!programPreviewPath) {
+                            feedTurn(event)
+                        }
                     }
                 )
 
@@ -1980,6 +2036,13 @@ class ChatViewModel(
                     onSuccess = { streamResult ->
                         // 清除流式占位
                         _streamingMessage.value = null
+                        // Task 13 保尾帧：清空动作针对最新完整文本（节流滞后不丢尾）
+                        openUiPreviewThrottle.flushTail()?.let { tail ->
+                            _openUiStreamProgram.value = tail
+                        }
+                        // U2-5：终稿已落卡（insertAssistantFinalMessage），流式预览让位
+                        _openUiStreamProgram.value = null
+                        openUiPreviewThrottle.reset()
 
                         // 性能数据统一在此计算并透传给所有回复路径（文本/命令），
                         // 让 remote(DeepSeek) 响应气泡也展示 prompt/decode tokens、延迟、速度。
@@ -2017,7 +2080,7 @@ class ChatViewModel(
                             if (actionValue is AgentAction.Error) {
                                 // 聊天页命令分发失败时，优先展示模型原始回复，避免把"暂不支持此操作"抛给用户
                                 Logger.w(TAG, "Capability dispatch failed in chat, falling back to full response. error=${actionValue.message}, detail=${actionValue.detail}")
-                                insertAgentMessage(
+                                insertAssistantFinalMessage(
                                     sessionId, streamResult.fullResponse.ifBlank { actionValue.message },
                                     currentModelLabel(), performance, turnReasoning, turnSources,
                                 )
@@ -2025,10 +2088,11 @@ class ChatViewModel(
                                 handleAgentAction(actionValue, sessionId, currentModelLabel(), performance, turnReasoning, turnSources)
                             }
                         } else {
-                            // 纯文本回复：保存到 Room（REMOTE 场景或 LOCAL 的 text_reply）
-                            insertAgentMessage(
+                            // 纯文本回复：保存到 Room（REMOTE 场景或 LOCAL 的 text_reply）——
+                            // 统一嗅探落卡（开关 on 且程序文本 → OpenUiCard；否则原文本路径）
+                            insertAssistantFinalMessage(
                                 sessionId = sessionId,
-                                content = streamResult.fullResponse,
+                                text = streamResult.fullResponse,
                                 modelUsed = currentModelLabel(),
                                 performance = performance,
                                 reasoningParts = turnReasoning,
@@ -2039,6 +2103,13 @@ class ChatViewModel(
                     onFailure = { error ->
                         // 清除流式占位
                         _streamingMessage.value = null
+                        // Task 13 保尾帧：清空动作针对最新完整文本（节流滞后不丢尾）
+                        openUiPreviewThrottle.flushTail()?.let { tail ->
+                            _openUiStreamProgram.value = tail
+                        }
+                        // U2-5：回合失败收尾清流式预览（半截程序不上屏）
+                        _openUiStreamProgram.value = null
+                        openUiPreviewThrottle.reset()
                         // langchain4j 异常 message = HTTP 响应体（OkHttpClient→HttpException→AuthenticationException 全程透传，状态码不进 message）。
                         // guest 配额耗尽时 server 返回 403 body={"error":"quota_exceeded",...}（见 LlmRoute），据此识别。
                         val errorBody = error.message.orEmpty()
@@ -2082,12 +2153,23 @@ class ChatViewModel(
                 // 用户主动停止（stopGeneration 取消本回合）：节奏器追平已缓冲全文，
                 // 有真实生成内容（非思考中/工具状态文案）则保留半截回复落库，
                 // 静默收场不产「推理失败」气泡（对齐 sendClaudeMessage 停止语义）。
+                // U2-6：程序预览在场（本轮已改道 OpenUI 预览轨）→ 半截不是合法产出，
+                // 整体丢弃不落库；判定先于下方清预览取样。
                 // 判定须在 finish() 之前取样：finish 会把 showCursor 归 false。
+                // Task 13 保尾帧：判定前 flush 尾帧——判定读到的预览反映最新流进度
+                // （预览非空=半截），节流滞后不得使判定误走无预览分支。
+                openUiPreviewThrottle.flushTail()?.let { tail ->
+                    _openUiStreamProgram.value = tail
+                }
                 val partial = _streamingMessage.value
-                val keepPartial = partial != null && !partial.isThinking && partial.showCursor
+                val keepPartial = partial != null && !partial.isThinking && partial.showCursor &&
+                    _openUiStreamProgram.value == null
                 pacingController.finish()
                 val finalText = _streamingMessage.value?.content.orEmpty()
                 _streamingMessage.value = null
+                // U2-5：取消收尾清流式预览（U2-6 半截丢弃口径已在 keepPartial 判定）
+                _openUiStreamProgram.value = null
+                openUiPreviewThrottle.reset()
                 if (keepPartial && finalText.isNotBlank()) {
                     withContext(NonCancellable) {
                         insertAgentMessage(sessionId, finalText, currentModelLabel())
@@ -2097,6 +2179,13 @@ class ChatViewModel(
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send message", e)
                 _streamingMessage.value = null
+                // Task 13 收尾补丁（评审 Important #2）：第四收尾点——异常自未预期路径
+                // 冒出（未经 onSuccess/onFailure/Cancel 清理）时收掉预览残留 + 节流器归零；
+                // 节奏器同点收尾（对齐 Cancellation 分支——此前漏 finish 使 paceLoop
+                // 空转至下回合，新测试覆盖此路径时实证暴露）
+                pacingController.finish()
+                _openUiStreamProgram.value = null
+                openUiPreviewThrottle.reset()
                 // 保存错误提示；工具循环熔断/迭代硬顶走本地化文案，不透传 Koog 英文原文
                 val errorContent = if (e.containsAgentLoopStuck()) {
                     stringContext().getString(R.string.chat_agent_loop_stuck)
@@ -2489,8 +2578,9 @@ class ChatViewModel(
     ) {
         when (action) {
             is AgentAction.TextReply -> {
-                // 流式 turn 终稿（remote ReAct 恒走此分支）：reasoning/source 随行落库
-                insertAgentMessage(sessionId, action.message, modelLabel, performance, reasoningParts, sourceParts)
+                // 流式 turn 终稿（remote ReAct 恒走此分支）：reasoning/source 随行落库——
+                // 统一嗅探落卡（开关 on 且程序文本 → OpenUiCard；否则原文本路径）
+                insertAssistantFinalMessage(sessionId, action.message, modelLabel, performance, reasoningParts, sourceParts)
             }
             is AgentAction.Success -> {
                 when (val cmd = action.command) {
@@ -3073,6 +3163,43 @@ class ChatViewModel(
             extraMetadataJson = performanceMetadataJson(performance),
         )
         chatSessionDao.touchSession(sessionId)
+    }
+
+    /**
+     * 本地回合终稿统一落库（spec《本地回合 OpenUI 统一》U2-4）：回滚闸 on 且终稿嗅探为
+     * OpenUI 程序 → 落 `data_genui_program` part（与云端 [insertOpenUiCardMessage] 同款
+     * part 构造，端侧语言版本恒为 [OpenUiContract.LANG_VERSION]）；reasoning/source
+     * parts 随行在卡前（排序立法同 [insertAgentMessage]）。
+     * 开关 off（回滚位）或非程序文本（防御不可达——engine 层 ensureValidProgram 已兜底
+     * 包程序，T6）→ 原 [insertAgentMessage] 文本路径，行为逐字节不变。
+     */
+    private suspend fun insertAssistantFinalMessage(
+        sessionId: String,
+        text: String,
+        modelUsed: String,
+        performance: LlmPerformance?,
+        reasoningParts: List<MessagePart.Reasoning>,
+        sourceParts: List<MessagePart.SourceUrl>,
+    ) {
+        if (userSettingsRepository.localTurnOpenUiEnabledFlow.first() &&
+            OpenUiProgramSummary.looksLikeProgram(text)
+        ) {
+            chatMessageDao.insertPartsMessage(
+                sessionId = sessionId,
+                role = ModelInputRole.ASSISTANT,
+                parts = reasoningParts + sourceParts + MessagePart.OpenUiCard(
+                    partId = "p0",
+                    program = text,
+                    fallbackSummary = OpenUiProgramSummary.extractFallbackSummary(text),
+                    langVersion = OpenUiContract.LANG_VERSION,
+                ),
+                modelUsed = modelUsed,
+                extraMetadataJson = performanceMetadataJson(performance),
+            )
+            chatSessionDao.touchSession(sessionId)
+        } else {
+            insertAgentMessage(sessionId, text, modelUsed, performance, reasoningParts, sourceParts)
+        }
     }
 
     /** OpenUI 卡交互态持久化（US-7 对偶，openui P2）：同 part id 覆写，重建时作初始 state。 */

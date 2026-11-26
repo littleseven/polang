@@ -63,6 +63,12 @@ abstract class ChatViewModelTestBase {
 
     protected open val initialToken: String = ""
 
+    /**
+     * 本地回合 OpenUI 统一开关初始值（Task 7）：默认 false = 既有派生测试全部
+     * 钉住回滚位（文本气泡）行为；覆盖 true 的测试走 turn-native 落卡路径。
+     */
+    protected open val initialLocalTurnOpenUiEnabled: Boolean = false
+
     protected val tokenFlow: MutableStateFlow<String> by lazy { MutableStateFlow(initialToken) }
 
     // ── Lifecycle ──────────────────────────────────────────────────
@@ -84,6 +90,8 @@ abstract class ChatViewModelTestBase {
 
         every { userSettingsRepository.serverAuthTokenFlow } returns tokenFlow
         every { userSettingsRepository.guestChatMessageCountFlow } returns flowOf(0)
+        every { userSettingsRepository.localTurnOpenUiEnabledFlow } returns
+            flowOf(initialLocalTurnOpenUiEnabled)
         every { userSettingsRepository.assistantPersonaFlow } returns flowOf(AssistantPersona.DEFAULT)
         every { userSettingsRepository.appLanguageFlow } returns flowOf(AppLanguage.SYSTEM)
         // relaxed mock 对枚举返回随机值：钉死 SYSTEM，使 ChatViewModel.stringContext() 直接返回

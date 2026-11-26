@@ -224,6 +224,7 @@ fun SettingsScreen(
     val mediaManageSilentTrashEnabled by viewModel.mediaManageSilentTrashEnabled.collectAsState()
     val cloudAgentByokConsent by viewModel.cloudAgentByokConsent.collectAsState()
     val cloudAgentEnabled by viewModel.cloudAgentEnabled.collectAsState()
+    val localTurnOpenUiEnabled by viewModel.localTurnOpenUiEnabled.collectAsState()
     val localAsrModel by viewModel.localAsrModel.collectAsState()
     val localKwsModel by viewModel.localKwsModel.collectAsState()
     val logModuleConfig by viewModel.logModuleConfig.collectAsState()
@@ -354,6 +355,8 @@ fun SettingsScreen(
             onCloudAgentByokConsentChange = { viewModel.setCloudAgentByokConsent(it) },
             cloudAgentEnabled = cloudAgentEnabled,
             onCloudAgentEnabledChange = { viewModel.setCloudAgentEnabled(it) },
+            localTurnOpenUiEnabled = localTurnOpenUiEnabled,
+            onLocalTurnOpenUiEnabledChange = { viewModel.setLocalTurnOpenUiEnabled(it) },
             localAsrModel = localAsrModel,
             onLocalAsrModelChange = { viewModel.setLocalAsrModel(it) },
             localKwsModel = localKwsModel,
@@ -436,6 +439,8 @@ private fun SettingsContent(
     onCloudAgentByokConsentChange: (Boolean) -> Unit = {},
     cloudAgentEnabled: Boolean = false,
     onCloudAgentEnabledChange: (Boolean) -> Unit = {},
+    localTurnOpenUiEnabled: Boolean = true,
+    onLocalTurnOpenUiEnabledChange: (Boolean) -> Unit = {},
     localAsrModel: String,
     onLocalAsrModelChange: (String) -> Unit,
     localKwsModel: String,
@@ -1127,6 +1132,19 @@ private fun SettingsContent(
                         onCheckedChange = onTagGenerationUseOpenclChange,
                         horizontalPadding = SettingsTokens.listRowPaddingH,
                         icon = Icons.Rounded.Speed,
+                        iconBlockColor = StatusColor.warningAmber
+                    )
+                }
+
+                // ── 组1.6 本地回合 OpenUI 回滚闸（U2-8；默认开，关=Chat 本地回合回退文本气泡）──
+                SettingsListSection {
+                    DebugOptionRow(
+                        title = stringResource(R.string.local_turn_openui_title),
+                        subtitle = stringResource(R.string.local_turn_openui_subtitle),
+                        checked = localTurnOpenUiEnabled,
+                        onCheckedChange = onLocalTurnOpenUiEnabledChange,
+                        horizontalPadding = SettingsTokens.listRowPaddingH,
+                        icon = Icons.Rounded.Code,
                         iconBlockColor = StatusColor.warningAmber
                     )
                 }

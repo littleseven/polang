@@ -1,11 +1,9 @@
-package com.mamba.picme.server.agent
-
-import com.mamba.picme.domain.chat.openui.OpenUiLibrary
+package com.mamba.picme.domain.chat.openui
 
 /**
  * OpenUI prompt 资产（原 render_ui_openui 工具描述常量，2026-11-05 A2UI 退役/
  * OpenUI 唯一化时迁入本对象）：DSL 规则 + Icon 词表 + 黄金示例，
- * [OpenUiTurnNative.SYSTEM_PROMPT] 与校验器/测试同源引用。
+ * [OpenUiTurnNativeContract.buildSystemPrompt] 与校验器/测试同源引用。
  */
 object OpenUiPromptAssets {
     // 字符串模板插值只许引用 const（编译期常量约束），$selected 的 $ 由此而来

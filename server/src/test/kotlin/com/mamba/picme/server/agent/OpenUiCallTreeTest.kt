@@ -1,5 +1,8 @@
 package com.mamba.picme.server.agent
 
+// U1 过渡：嵌套类型 CallNode 不穿透 typealias 限定解析（成员函数可以）——显式
+// import 直指 shared 对象使 `OpenUiCallTree.CallNode` 限定引用解析；断言零改动。
+import com.mamba.picme.domain.chat.openui.OpenUiCallTree
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

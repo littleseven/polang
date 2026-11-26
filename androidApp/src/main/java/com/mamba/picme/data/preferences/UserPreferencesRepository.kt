@@ -177,6 +177,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 云端 Agent 编排开关（默认关=本地编排；开=Chat 页回合走云端 SSE 链路，ADR-018 实验线）
         val CLOUD_AGENT_ENABLED = booleanPreferencesKey("cloud_agent_enabled")
 
+        // 本地回合 OpenUI 统一回滚闸（默认开=turn-native 程序卡；关=文本气泡回滚位）
+        val LOCAL_TURN_OPENUI_ENABLED = booleanPreferencesKey("local_turn_openui_enabled")
+
         // 服务端邮箱认证
         val SERVER_AUTH_TOKEN = stringPreferencesKey("server_auth_token")
         val SERVER_AUTH_EMAIL = stringPreferencesKey("server_auth_email")
@@ -1333,6 +1336,25 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     override suspend fun updateCloudAgentEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.CLOUD_AGENT_ENABLED] = enabled
+        }
+    }
+
+    // ── 本地回合 OpenUI 统一回滚闸 ─────────────────────────────
+    override val localTurnOpenUiEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.LOCAL_TURN_OPENUI_ENABLED] ?: true
+        }
+
+    override suspend fun updateLocalTurnOpenUiEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.LOCAL_TURN_OPENUI_ENABLED] = enabled
         }
     }
 

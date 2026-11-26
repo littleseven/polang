@@ -197,6 +197,15 @@ class AgentOrchestrator private constructor(
     }
 
     /**
+     * 注入 OpenUI 回合原生开关供给者（转发给内部 [AgentConfigurator]，U2-3/U2-8）。
+     * app 组合根注入 DataStore 回滚闸的同步桥；null = 未注入（恒 off，非注入平台零行为）。
+     * 开关值每轮采样（翻转触发 chat agent 重建）；供给者不得抛异常——engine 在守卫外调用。
+     */
+    fun setOpenUiTurnNativeProvider(provider: (() -> Boolean)?) {
+        configurator.setOpenUiTurnNativeProvider(provider)
+    }
+
+    /**
      * 获取 CapabilityRegistry
      */
     fun getCapabilityRegistry(): CapabilityRegistry {

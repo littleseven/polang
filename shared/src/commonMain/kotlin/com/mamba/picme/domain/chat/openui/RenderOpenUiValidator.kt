@@ -1,16 +1,14 @@
-package com.mamba.picme.server.agent
-
-import com.mamba.picme.domain.chat.openui.OpenUiContract
-import com.mamba.picme.domain.chat.openui.OpenUiLibrary
+package com.mamba.picme.domain.chat.openui
 
 /**
  * OpenUI 程序负载校验器——把「LLM 写错 OpenUI 线格式」从端侧静默降级提前为
  * 服务端同轮纠错。
  *
  * 消费点（GenUI 唯一化后收编为终结链路，同源规则零漂移）：
- * 1. [ProgramGuard] 策略层纠正回环（[validateProgramToError]：先 normalize 再
+ * 1. ProgramGuard 策略层纠正回环（server 侧，[validateProgramToError]：先 normalize 再
  *    结构校验 + 布局门禁，非法 → correctInvalidProgram 节点携带错误清单回环）；
- * 2. [OpenUiTurnNative.ensureValidProgram] 终结落流前兜底校验。
+ * 2. OpenUiTurnNative.ensureValidProgram 终结落流前兜底校验（server 侧薄壳 →
+ *    shared OpenUiTurnNativeContract）。
  *
  * 结构级轻量校验（OpenUI 白名单资产真引用 shared——分层 runtime M1.5 起
  * `OpenUiLibrary.componentNames`/`iconNames` 与 `OpenUiContract` 常量为唯一出处，
@@ -40,16 +38,17 @@ object RenderOpenUiValidator {
      * 独立出现的位置约束由端侧 schema/渲染层兜底（半信任口径：白名单 + 明显结构错误，
      * 不做 per-component prop schema 校验；ListItem 2026-10-31 起例外——经典 ListTile
      * 实渲染化，独立/列表内皆可）。
-     * internal 供测试钉住派生关系。
+     * public（U1 上提：server 经 typealias 跨模块消费）；测试钉住派生关系。
      */
-    internal val ALLOWED_COMPONENTS: Set<String> = OpenUiLibrary.componentNames
+    val ALLOWED_COMPONENTS: Set<String> = OpenUiLibrary.componentNames
 
     /**
-     * Icon.name 预定义图标名白名单（M2，禁 svgPath 同口径）——真引用 shared
-     * `OpenUiLibrary.iconNames`（分层 runtime M1.5，原三处字面量副本已收口：
+     * Icon.name 预定义图标名白名单（M2，禁 svgPath 同口径）——真引用 [OpenUiLibrary.iconNames]
+     * （分层 runtime M1.5，原三处字面量副本已收口：
      * 本清单 ↔ shared ENUM 域 ↔ `OpenUiPromptAssets.ICON_NAMES_TEXT`）。
+     * public（U1 上提：server 测试跨模块钉住派生关系）。
      */
-    internal val ICON_NAMES: Set<String> = OpenUiLibrary.iconNames.toSet()
+    val ICON_NAMES: Set<String> = OpenUiLibrary.iconNames.toSet()
 
     /** 组件外允许的大写调用：Query（宿主取数语句）/ Mutation（写工具语句，@Run 执行，
      *  2026-11-01 官方对齐）/ Action（官方多动作包装语法）。 */

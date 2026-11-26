@@ -136,8 +136,9 @@ private fun configurableStrategy(config: PoLangReActStrategyConfig): AIAgentGrap
 }
 
 /** 自定义节点无纠正版（streaming=true + corrector=null；当前无消费方，为配置闭集完整性保留）。 */
-private fun plainConfigurableStrategy(config: PoLangReActStrategyConfig): AIAgentGraphStrategy<String, String> =
-    strategy(config.name) {
+private fun plainConfigurableStrategy(config: PoLangReActStrategyConfig): AIAgentGraphStrategy<String, String> {
+    val loopGuard = config.toolLoopGuard
+    return strategy(config.name) {
         val nodeCallLLM by node<String, Message.Assistant>("callLLM") { message ->
             llm.writeSession {
                 appendPrompt {
@@ -161,18 +162,39 @@ private fun plainConfigurableStrategy(config: PoLangReActStrategyConfig): AIAgen
         edge(nodeStart forwardTo nodeCallLLM)
         edge(nodeCallLLM forwardTo nodeExecuteTool onToolCalls { true })
         edge(nodeCallLLM forwardTo nodeFinish onTextMessage { true })
+        // 循环熔断边（与 builtinOneShotStrategy 同构）：声明在回落边之前（先匹配者胜）。
+        // 命中时本轮工具结果不再回灌 LLM，直接携哨兵文本落终点。
+        if (loopGuard != null) {
+            edge(
+                nodeExecuteTool forwardTo nodeFinish
+                    onCondition { results ->
+                        loopGuard.checkAndRecord(
+                            results.toolResults.map {
+                                ToolLoopGuard.RoundSignal(
+                                    tool = it.tool,
+                                    output = it.output,
+                                    isError = it.resultKind !is ToolResultKind.Success,
+                                )
+                            },
+                        )
+                    }
+                    transformed { ToolLoopGuard.TRIPPED_SENTINEL },
+            )
+        }
         edge(nodeExecuteTool forwardTo nodeSendToolResult)
         // 与内建版相反：先匹配 tool_calls 再兜底文本
         edge(nodeSendToolResult forwardTo nodeExecuteTool onToolCalls { true })
         edge(nodeSendToolResult forwardTo nodeFinish onTextMessage { true })
     }
+}
 
 /** 自定义节点 + correctInvalidProgram 纠正节点（server `cloudAgentStrategy` 原图逐点对应）。 */
 private fun guardedStrategy(
     config: PoLangReActStrategyConfig,
     corrector: FinalOutputCorrector,
-): AIAgentGraphStrategy<String, String> =
-    strategy(config.name) {
+): AIAgentGraphStrategy<String, String> {
+    val loopGuard = config.toolLoopGuard
+    return strategy(config.name) {
         val nodeCallLLM by node<String, Message.Assistant>("callLLM") { message ->
             llm.writeSession {
                 appendPrompt {
@@ -212,6 +234,25 @@ private fun guardedStrategy(
                 onCondition { text -> corrector.correctionGateError(text) != null },
         )
         edge(nodeCallLLM forwardTo nodeFinish onTextMessage { true })
+        // 循环熔断边（与 builtinOneShotStrategy 同构）：声明在回落边之前（先匹配者胜）。
+        // 命中时本轮工具结果不再回灌 LLM，直接携哨兵文本落终点。
+        if (loopGuard != null) {
+            edge(
+                nodeExecuteTool forwardTo nodeFinish
+                    onCondition { results ->
+                        loopGuard.checkAndRecord(
+                            results.toolResults.map {
+                                ToolLoopGuard.RoundSignal(
+                                    tool = it.tool,
+                                    output = it.output,
+                                    isError = it.resultKind !is ToolResultKind.Success,
+                                )
+                            },
+                        )
+                    }
+                    transformed { ToolLoopGuard.TRIPPED_SENTINEL },
+            )
+        }
         edge(nodeExecuteTool forwardTo nodeSendToolResult)
         // 与内建版相反：先匹配 tool_calls 再兜底文本
         edge(nodeSendToolResult forwardTo nodeExecuteTool onToolCalls { true })
@@ -226,6 +267,7 @@ private fun guardedStrategy(
         // 纠正后再输出仍非法：放行落流（终结兜底变换包装）
         edge(nodeCorrectInvalidProgram forwardTo nodeFinish onTextMessage { true })
     }
+}
 
 /**
  * 流式请求并组装完整响应（云端路径）。逐帧收集触发 EventHandler 流式钩子；收齐后经

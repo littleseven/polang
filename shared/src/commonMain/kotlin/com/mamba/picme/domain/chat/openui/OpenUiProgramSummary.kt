@@ -25,11 +25,39 @@ object OpenUiProgramSummary {
         Regex("""(?<![@${'$'}A-Za-z0-9_])(?:Markdown|Text)\s*\(\s*"""")
 
     private const val MAX_SUMMARY_LEN = 80
+    private const val MAX_PREFIX_NOISE_CHARS = 2
+    private const val BOM = '\uFEFF'
+    private const val SUMMARY_LINE_PREFIX = "// summary:"
+    private val ROOT_LINE_PREFIXES = listOf("root =", "root=")
 
     /** assistant content 是否按程序解析（false → 按纯文本 AssistantText 降级上屏）。 */
     fun looksLikeProgram(content: String): Boolean {
         val stripped = stripLiterals(content)
         return ROOT_STATEMENT.containsMatchIn(stripped) || CARD_CALL.containsMatchIn(stripped)
+    }
+
+    /**
+     * 流式前缀嗅探（U2-1）：partial 文本是否「正在长成」一个程序——true 时上层把流式
+     * 预览切到程序通道。[looksLikeProgram] 的前缀版：首行 `// summary:` 注释开头 ‖
+     * 任一非空行以 `root =`/`root=` 起首 ‖ [looksLikeProgram] 为 true；文本前 2 字符
+     * 噪声（空白/BOM）容忍，空串 false。仍是消息分派启发式，不做完整校验。
+     */
+    fun looksLikeProgramPrefix(text: String): Boolean {
+        if (text.isEmpty()) return false
+        var start = 0
+        while (start < text.length &&
+            start < MAX_PREFIX_NOISE_CHARS &&
+            text[start].let { it == BOM || it.isWhitespace() }
+        ) {
+            start++
+        }
+        val stripped = text.substring(start)
+        if (stripped.isEmpty()) return false
+        if (stripped.substringBefore('\n').startsWith(SUMMARY_LINE_PREFIX)) return true
+        for (line in stripped.split('\n')) {
+            if (line.isNotEmpty() && ROOT_LINE_PREFIXES.any(line::startsWith)) return true
+        }
+        return looksLikeProgram(stripped)
     }
 
     /** 降级摘要：// summary 首行注释 > 首个 Markdown/Text 字符串字面量（截 80 字）> 空串。 */

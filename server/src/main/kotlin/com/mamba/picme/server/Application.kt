@@ -1,5 +1,6 @@
 package com.mamba.picme.server
 
+import com.mamba.picme.agent.core.platform.logging.Logger as AgentCoreLogger
 import com.mamba.picme.server.admin.adminRoute
 import com.mamba.picme.server.agent.AgentBridgeRegistry
 import com.mamba.picme.server.agent.AgentExecutorFactory
@@ -77,9 +78,31 @@ import org.slf4j.event.Level
 
 private val logger = LoggerFactory.getLogger("picme-server")
 
+/**
+ * shared [AgentCoreLogger] 的 slf4j delegate：U1 上提后 shared 侧 openui 校验栈
+ * （OpenUiLayoutNormalizer/OpenUiTurnNativeContract）日志走 companion 的 println
+ * 兜底，旁路 logback（无时间戳/级别路由）。logger 名 = tag，与上提前 server 侧
+ * `LoggerFactory.getLogger("picme-agent")` 形态对齐；级别过滤交 slf4j 各调用点，
+ * isLogEnabled 恒 true 不做前置门控。
+ */
+internal class Slf4jAgentCoreLogger : AgentCoreLogger {
+    override fun d(tag: String, message: String) = LoggerFactory.getLogger(tag).debug(message)
+    override fun i(tag: String, message: String) = LoggerFactory.getLogger(tag).info(message)
+    override fun w(tag: String, message: String) = LoggerFactory.getLogger(tag).warn(message)
+    override fun w(tag: String, message: String, throwable: Throwable) = LoggerFactory.getLogger(tag).warn(message, throwable)
+    override fun e(tag: String, message: String, throwable: Throwable?) = LoggerFactory.getLogger(tag).error(message, throwable)
+    override fun isLogEnabled(tag: String): Boolean = true
+}
+
+/** 组合根注入（main 最早执行，先于任何 agent 跑轮触发 shared 日志）。 */
+internal fun installSharedLoggerDelegate() {
+    AgentCoreLogger.setDelegate(Slf4jAgentCoreLogger())
+}
+
 val appJson = Json { prettyPrint = false; ignoreUnknownKeys = true; encodeDefaults = true }
 
 fun main() {
+    installSharedLoggerDelegate()
     val config = AppConfig.load()
     Db.init(config.dbPath)
     Migrations.run(config)

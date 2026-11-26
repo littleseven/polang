@@ -7,15 +7,29 @@ import com.mamba.picme.agent.core.model.context.AgentAction
 import com.mamba.picme.agent.core.model.context.AgentContext
 import com.mamba.picme.agent.core.model.context.AgentErrorCode
 import com.mamba.picme.agent.core.model.context.GallerySummary
+import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.agent.core.model.context.PageContext
 import com.mamba.picme.agent.core.runtime.state.SceneManager
 import com.mamba.picme.core.common.Logger
+import com.mamba.picme.data.local.LocalHandleStore
+import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.ScanPhotoEntry
 import java.lang.ref.WeakReference
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 /**
  * Chat 场景相册摘要 Capability。
  *
  * 职责：在 CHAT 场景暴露 `get_gallery_summary`，把命令回调给 [Delegate]（ChatViewModel）执行。
+ *
+ * 句柄回执（U2-7，2026-11-26）：摘要回执尾部附 `（数据句柄 handle: scan/<12hex>）` 并把
+ * **全库媒体**注册进 [LocalHandleStore]——逐字对齐云端工具桥
+ * `CloudAgentGalleryTools.getGallerySummary`（2026-11-13 placeholder 假句柄事故修复：
+ * 「我的个人相册」→ 月度分布卡流程有合法 handle，`#histogram`/`#photos`/`#videos`
+ * 均可绑定，模型不再臆造 handleId）。全库快照/注册失败静默降级纯文本（不走 error: 协议）。
+ * 依赖经 [attachScanHandles] 由组合根注入（未注入 = 纯文本，兼容无容器环境与旧测试）。
  */
 class ChatGallerySummaryCapability private constructor() : BaseCapability() {
 
@@ -39,6 +53,34 @@ class ChatGallerySummaryCapability private constructor() : BaseCapability() {
     }
 
     private var delegateRef: WeakReference<Delegate>? = null
+
+    // ── U2-7 句柄回执接缝（组合根注入）──────────────────────────────────────────
+
+    /** 全库媒体句柄注册入口；null = 未接线，回执纯文本。 */
+    @Volatile
+    private var scanHandleStore: LocalHandleStore? = null
+
+    /** 全库媒体快照（生产 = repository.allMedia）。 */
+    @Volatile
+    private var allMediaSnapshot: (suspend () -> List<MediaAsset>)? = null
+
+    private val handleJson = Json { encodeDefaults = true }
+
+    /** 组合根接线：注入句柄 store 与全库媒体快照（幂等，重调覆盖）。 */
+    fun attachScanHandles(
+        localHandleStore: LocalHandleStore,
+        allMedia: suspend () -> List<MediaAsset>,
+    ) {
+        scanHandleStore = localHandleStore
+        allMediaSnapshot = allMedia
+        Logger.i(tag, "Scan handle support attached")
+    }
+
+    /** 清空句柄接缝（测试隔离用）。 */
+    internal fun resetScanHandleSupport() {
+        scanHandleStore = null
+        allMediaSnapshot = null
+    }
 
     fun bindDelegate(delegate: Delegate) {
         delegateRef = WeakReference(delegate)
@@ -79,8 +121,9 @@ class ChatGallerySummaryCapability private constructor() : BaseCapability() {
         return try {
             if (command is AgentCommand.GetGallerySummary) {
                 val summary = d.onGetGallerySummary(command.includeDetails)
-                val message = summary?.let { formatGallerySummaryForReply(it) }
+                val text = summary?.let { formatGallerySummaryForReply(it) }
                     ?: GALLERY_SUMMARY_UNAVAILABLE_HINT
+                val message = appendScanHandleSuffix(text)
                 Result.success(
                     AgentAction.TextReply(
                         commandId = command.commandId,
@@ -105,6 +148,43 @@ class ChatGallerySummaryCapability private constructor() : BaseCapability() {
                     message = "获取相册摘要失败：${e.message ?: "未知错误"}"
                 )
             )
+        }
+    }
+
+    // ── U2-7 全库句柄（镜像 CloudAgentGalleryTools.getGallerySummary）─────────
+
+    /**
+     * 摘要文本 + 全库数据句柄尾缀；快照为空/查询失败/注册失败均静默降级纯文本
+     * （只记日志，不走 error: 协议——摘要本身已成功）。尾缀字面量与云端工具桥
+     * 逐字一致：`（数据句柄 handle: scan/<12hex>）`。
+     */
+    private suspend fun appendScanHandleSuffix(text: String): String {
+        val store = scanHandleStore ?: return text
+        val allMedia = allMediaSnapshot ?: return text
+        val media = try {
+            allMedia()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.w(tag, "gallery summary all-media snapshot failed, degrading to plain text", e)
+            return text
+        }
+        if (media.isEmpty()) return text
+        return try {
+            val entries = media.map { asset ->
+                ScanPhotoEntry(id = asset.id, captureDate = asset.captureDate, mediaType = asset.type.name)
+            }
+            val handleId = store.put(
+                OpenUiContract.DOMAIN_SCAN,
+                handleJson.encodeToString(entries),
+            )
+            val token = OpenUiContract.formatHandleToken(OpenUiContract.DOMAIN_SCAN, handleId)
+            "$text（数据句柄 $token）"
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.w(tag, "scan handle registration failed, degrading to plain text", e)
+            text
         }
     }
 }
@@ -144,3 +224,4 @@ internal fun formatGallerySummaryForReply(summary: GallerySummary): String {
         }
     }
 }
+
