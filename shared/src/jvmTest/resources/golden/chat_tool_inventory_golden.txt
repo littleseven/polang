@@ -29,7 +29,7 @@
 - query_tag_scan_status: 查询 TAG 扫描状态（人脸/标签/语义索引进度）。
 - recall_chat_history: 召回当前会话更早的聊天历史原文（对话长了之后早期内容会被压缩摘要，摘要没细节时用它找回原文）。
 - recall_memory: system prompt【关于用户】段已含常见记忆，优先直接引用；本工具仅在该段未列全（被截断）或需拿 factId 删除时调用。
-- refine_media_search: 在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数；展示用 render_html 重出图集卡）。
+- refine_media_search: 在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数与尾部数据句柄；出卡展示方式同 search_media 遵循系统提示词展示规则）。
 - remember_fact: 记住一条事实，如用户说「帮我记住小宝对花粉过敏」「记住我喜欢低饱和度滤镜」。
 - remember_person_relation: 记住人物与「我」的关系，如用户说「小宝是我女儿」「大宝是我发小」。
 - render_html: 渲染一个 HTML 组件卡片插入聊天（端侧 WebView 渲染，支持内联 CSS/JS 动画与交互）。

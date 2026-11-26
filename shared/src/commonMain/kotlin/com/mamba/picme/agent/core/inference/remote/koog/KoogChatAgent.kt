@@ -50,7 +50,8 @@ import kotlin.time.Clock
  * StreamChatResult / ChatStreamEvent；onPartialText / onToolCall 经 processChatReAct 透传到 UI。
  *
  * **记忆快照新鲜度**：system prompt（含【关于用户】记忆快照）在 build 期烘焙；记忆快照变更时重建 AIAgent
- * （executor / memoryStore / historyProvider 复用，历史经 DataStore 跨重建留存）。
+ * （executor / memoryStore 复用，历史经 DataStore 跨重建留存；historyProvider 随 build 新建——
+ * 轻量无状态，携带当次成品 system prompt，见 KoogSessionHistoryProvider KDoc）。
  *
  * **回调闭包**：EventHandler lambda 在 build 期捕获，引用 per-run 持有字段 [currentPartialText] / [currentToolCall]
  *（runChat 开头赋值、finally 清空），避免捕获过期回调；runs 串行（processChatReAct 的 isRunning 互斥）。
@@ -77,7 +78,6 @@ class KoogChatAgent(
         extraHeaders = buildGatewayHeaders(),
     )
 
-    private val historyProvider = KoogSessionHistoryProvider(memoryStore)
     private val memoryStoreRef = memoryStore
 
     /**
@@ -163,6 +163,7 @@ class KoogChatAgent(
             OpenUiTurnNativeContract.buildSystemPrompt(
                 identityLine = OPENUI_IDENTITY_LINE,
                 toolNote = "",
+                toolModeOverride = OPENUI_TOOL_MODE_OVERRIDE,
             ) + "\n\n" + openUiReplyLanguageRuleSegment(config.replyLanguage)
         } else {
             ""
@@ -192,8 +193,8 @@ class KoogChatAgent(
      * 意图级工具子集覆写（M3 分支化，2026-10-17）：引擎层按路由契约把 tool schema 裁到
      * 意图白名单时，单次 runChat 携带此覆写——[registry] 与 [systemPrompt]（子集清单段
      * 同源生成 + 动态尾段）替换构造期的全量默认值；[key] 进 AIAgent 重建键，子集切换
-     * 与记忆快照/摘要变更同级触发重建（executor/memoryStore/historyProvider 仍单份复用，
-     * 不为每个子集各建 executor）。
+     * 与记忆快照/摘要变更同级触发重建（executor/memoryStore 仍单份复用，
+     * 不为每个子集各建 executor；historyProvider 随 build 新建，轻量无状态）。
      */
     class ChatToolSetOverride(
         val key: String,
@@ -298,13 +299,16 @@ class KoogChatAgent(
         return agent
     }
 
-    private fun buildAgent(systemPrompt: String, registry: ToolRegistry): AIAgent<String, String> =
+    private fun buildAgent(systemPrompt: String, registry: ToolRegistry): AIAgent<String, String> {
+        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——provider 携带
+        // 当次成品 system prompt 在 load 时重新前置，详见 KoogSessionHistoryProvider KDoc。
+        val historyProvider = KoogSessionHistoryProvider(memoryStoreRef, systemPrompt)
         // 自定义策略：修复 Koog 1.1.1 内建 singleRunStrategy 丢「文本+tool_calls 同帧」
         // 工具调用的缺陷（chat 多轮工具任务同样受影响），详见 poLangSingleRunStrategy KDoc。
         //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
         // U2-2：策略配置经 [strategyConfig] flag 驱动——off = 现行内建节点路径
         // （streaming=false 无纠正），on = OpenUI turn-native（流式 + 终结程序守卫纠正）。
-        AIAgent.builder()
+        return AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
             // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。挂工具循环熔断边。
             .graphStrategy(poLangSingleRunStrategy(strategyConfig))
@@ -409,6 +413,7 @@ class KoogChatAgent(
                 }
             }
             .build()
+    }
 
     /**
      * base system prompt + 【关于用户】记忆快照 + 【会话摘要】段（M2，US-2.4）+ 技能清单段
@@ -451,6 +456,23 @@ class KoogChatAgent(
 
         /** 端侧身份行（与 RemoteChatEngine.buildChatSystemPrompt 首句同源措辞；句式对齐契约身份行）。 */
         const val OPENUI_IDENTITY_LINE = "你是 PoLang 相册 AI 助手。"
+
+        /**
+         * 端侧模式覆盖段（2026-11-26 照片图集引导修复）：基础规则段（ChatPromptRules
+         * 收敛规则）与工具描述里的「看照片 → render_html 出图集卡收尾」指引在
+         * turn-native 模式下与「响应即程序」直接冲突（1.0.96 真机实证模型服从
+         * 收敛规则，搜索照片出 HTML 卡而非 PhotoGrid 程序）——本段在契约段内、
+         * DSL 规则前显式作废该指引。工具描述已中性化（双模共用不能写死路径），
+         * 收敛规则段是 flag-off 文本气泡路径的活指引不能改，故覆盖只能落在这里。
+         */
+        const val OPENUI_TOOL_MODE_OVERRIDE =
+            "\n模式覆盖（优先级高于上文一切提及 render_html 图集卡 / media:// 出卡的指引——\n" +
+                "工具描述、收敛规则、窄化规则、脚本规则同此）：看照片/图集不调 render_html——\n" +
+                "数据类工具（search_media / refine_media_search / get_gallery_summary /\n" +
+                "run_gallery_script）结果到手后，直接按下方数据禁令在终结程序里用结果尾部句柄\n" +
+                "绑定出 PhotoGrid，终结程序即交付物；render_html 仅在用户明确要求独立 HTML\n" +
+                "沙箱卡（内容不含相册媒体）时才调用；draw_chart 不在此列——用户明确要求画图时\n" +
+                "照旧按画图规则调用。\n"
     }
 }
 

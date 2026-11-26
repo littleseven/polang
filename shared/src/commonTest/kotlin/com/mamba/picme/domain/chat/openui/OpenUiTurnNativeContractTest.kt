@@ -1,6 +1,7 @@
 package com.mamba.picme.domain.chat.openui
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -38,6 +39,24 @@ class OpenUiTurnNativeContractTest {
         // 契约主体字节（黄金示例前后衔接）
         assertTrue(prompt.contains("黄金示例（用户问「明天去故宫穿什么合适」）：\n" + OpenUiTurnNativeContract.GOLDEN_CHAT_PROGRAM))
         assertTrue(prompt.contains("相册数据查询照旧调用搜索工具，\n结果尾部的 handle 按数据禁令绑定进程序。"))
+        // 模式覆盖槽缺省 = 空串（server 现网逐字节不变：覆盖段缺席）
+        assertFalse(prompt.contains("模式覆盖"), "缺省不应含模式覆盖段")
+    }
+
+    @Test
+    fun toolModeOverrideSlotInjectsVerbatimBetweenQueryTailAndDslRules() {
+        val override = "\n模式覆盖（测试注入）。\n"
+        val prompt = OpenUiTurnNativeContract.buildSystemPrompt(toolModeOverride = override)
+        // 紧邻缝逐字钉住：取数收尾段 + 覆盖段 + DSL 规则首行（防 trim/漂移）
+        assertTrue(
+            prompt.contains("绑定进程序。\n\n模式覆盖（测试注入）。\n约束（必须全部满足"),
+            "覆盖段应紧邻取数收尾段与 DSL 规则之间，无 trim 无漂移",
+        )
+        // 缺省参数输出与显式传缺省常量的输出逐字节一致（槽零扰动）
+        assertEquals(
+            OpenUiTurnNativeContract.buildSystemPrompt(),
+            OpenUiTurnNativeContract.buildSystemPrompt(toolModeOverride = OpenUiTurnNativeContract.DEFAULT_TOOL_MODE_OVERRIDE),
+        )
     }
 
     @Test

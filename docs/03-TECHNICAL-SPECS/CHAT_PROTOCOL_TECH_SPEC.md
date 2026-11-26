@@ -105,7 +105,7 @@ Koog Agent Loop（poLangSingleRunStrategy 配置化工厂，ReAct 图循环）
 **【关于用户】**：`MemoryContextProviderImpl.snapshot()`（Room facts + 人物关系，@Volatile 缓存），字符预算 1500，截断后附 recall_memory 兜底提示。
 **【会话摘要】**：每轮 `memoryStore.loadSummary(sessionId)`，滚动压缩产物（见 §3.2）。
 
-**turn-native 契约段（2026-11-24 起，本地回合 OpenUI 统一）**：`KoogChatAgent.composeSystemPrompt` 末尾（技能清单段之后恒最末）追加 `OpenUiTurnNativeContract.buildSystemPrompt(端侧身份行, toolNote="")` + `openUiReplyLanguageRuleSegment`（五语规则段）——仅回滚闸开（`RemoteReActAgentConfig.openUiTurnNative`）时追加；契约段文本与技能清单段同槽进 AIAgent 重建键（flag off 时空串入键零扰动）。意图子集裁剪路径（toolSetOverride）的子集 prompt 缓存不含契约段——契约段在 KoogChatAgent 层恒追加，子集缓存键不受污染。
+**turn-native 契约段（2026-11-24 起，本地回合 OpenUI 统一）**：`KoogChatAgent.composeSystemPrompt` 末尾（技能清单段之后恒最末）追加 `OpenUiTurnNativeContract.buildSystemPrompt(端侧身份行, toolNote="", toolModeOverride=端侧模式覆盖段)` + `openUiReplyLanguageRuleSegment`（五语规则段）——仅回滚闸开（`RemoteReActAgentConfig.openUiTurnNative`）时追加；契约段文本与技能清单段同槽进 AIAgent 重建键（flag off 时空串入键零扰动）。模式覆盖段（2026-11-26 第三变体槽）：端侧基础规则段（ChatPromptRules 收敛规则/窄化规则）与工具描述里的 render_html 图集卡指引同「响应即程序」冲突（1.0.96 真机实证模型服从收敛规则出 HTML 卡），覆盖段显式作废之——数据工具结果直接进终结程序绑句柄出 PhotoGrid，draw_chart 豁免；server 缺省空槽零扰动。意图子集裁剪路径（toolSetOverride）的子集 prompt 缓存不含契约段——契约段在 KoogChatAgent 层恒追加，子集缓存键不受污染。
 
 **params 烘焙**：`polangSystemPrompt(...)`（koog/KoogPromptFactory.kt）——🔴 必须走 Koog prompt DSL 传 params，否则 temperature/maxTokens/thinking 丢失。AIAgent 按「记忆快照内容 + 摘要 version」新鲜度懒重建。
 
@@ -193,7 +193,7 @@ TurnPartsReducer 规则：
 成功后**双通道**：
 
 1. `uiActions.tryEmit(action)` → ChatViewModel 产卡落库（§2.4）；
-2. 按 action 类型生成**硬编码中文模板 observation**（"找到 N 张…，媒体 id：…"——search/refine 2026-11-14 起附前 24 个媒体 id，供 LLM render_html + media://{id} 出图集卡；2026-11-24 起三工具回执尾部另附 `（数据句柄 handle: scan/<12hex>）` 并注册 `LocalHandleStore`，供 OpenUI 程序绑定照片/视频投影，见 §2.10）作 @Tool 返回值 → Koog 自动包成 tool result 回喂下一轮 ReAct。⚠️ observation 只进模型/记忆，**绝不直达用户气泡**（I18N）；失败/超时统一 `"Error: ..."` 文本回传。
+2. 按 action 类型生成**硬编码中文模板 observation**（"找到 N 张…，媒体 id：…"——search/refine 2026-11-14 起附前 24 个媒体 id，供写工具与 render_html 非常规展示引用；2026-11-24 起三工具回执尾部另附 `（数据句柄 handle: scan/<12hex>）` 并注册 `LocalHandleStore`，供 OpenUI 程序绑定照片/视频投影，见 §2.10；2026-11-26 起 turn-native 模式看照片的展示通路收敛为句柄 + PhotoGrid 程序卡，render_html 图集卡指引作废）作 @Tool 返回值 → Koog 自动包成 tool result 回喂下一轮 ReAct。⚠️ observation 只进模型/记忆，**绝不直达用户气泡**（I18N）；失败/超时统一 `"Error: ..."` 文本回传。
 
 ### 2.4 产物落库路径（emit* 全清单）
 
@@ -326,7 +326,7 @@ data: [DONE]                                             ← 字面量哨兵
 > spec《2026-11-24-local-turn-openui-unification-design.md》（在册在途 spec）。本地回合终结回复与云端同形态：整颗 OpenUI Lang 1.0 程序（纯对话也写 `root = Markdown("…")`），runtime 落点不变（端侧 Koog + 端工具 + DataStore 记忆），产出协议统一。分层 runtime spec §3 决策 1 同日翻案。灰度期有回滚闸，关闸 = 现行纯文本路径逐字节回归。
 
 - **策略切换（开关 on）**：`KoogChatAgent.chatReActStrategyConfig` 选 `PoLangReActStrategyConfig(streaming=true, finalOutputCorrector=openUiGuard.asCorrector(), onStreamingFallback=shared Logger.w, toolLoopGuard)`；`OpenUiProgramGuard`（自 server 上提 shared）每回合 `runChat` 开头 reset（与 `toolLoopGuard.reset()` 同点位，跨回合不累积纠正计数）；`guardedStrategy` 补齐 loopGuard 熔断边（与 builtinOneShotStrategy 同构，命中携 `TRIPPED_SENTINEL` 直达 nodeFinish）。开关 off 时策略 config 逐字节保留现行（非流式 + 无纠正，只传 toolLoopGuard）。
-- **契约段**：见 §1.3——`OpenUiTurnNativeContract`（自 server 上提 shared，SYSTEM_PROMPT 参数化两变体槽：身份行端侧措辞 / toolNote 空串剔除 `server_time` 句；契约其余部分与云端逐字相同）+ 五语规则段，技能清单段之后恒最末。
+- **契约段**：见 §1.3——`OpenUiTurnNativeContract`（自 server 上提 shared，SYSTEM_PROMPT 参数化三变体槽：身份行端侧措辞 / toolNote 空串剔除 `server_time` 句 / toolModeOverride 端侧模式覆盖段（2026-11-26，作废 render_html 图集卡指引、豁免 draw_chart；server 缺省空槽零扰动）；契约其余部分与云端逐字相同）+ 五语规则段，技能清单段之后恒最末。工具描述侧配套（2026-11-26）：search_media/refine_media_search/get_gallery_summary/run_gallery_script 四件描述中性化（去 render_html 推送，ChatToolService + ChatToolManifest 双声明源同步）；DSL_RULES 数据禁令段补句柄拼法逐字教学（`scan/<id>` → `local://` 前缀 + `#photos` 后缀，位置参数反例禁令）。已知挂账：run_gallery_script 复合命中集（gallery.intersect 等）不产句柄，turn-native 下精确出图只能改走 search_media 近似集——后续评估脚本结果注册句柄。
 - **End 帧 metrics**：`TurnUsageAccumulator` 统一回合用量两路互斥累加（流式轮 `StreamFrame.End` metaInfo ‖ 非流式轮 `onLLMCallCompleted`——同 server 0.9.17 修法，Koog 1.3.0 流式路径不触发后者）；替代原直读 AtomicInt 的 metrics 装配。
 - **终结兜底（engine 层）**：`RemoteChatEngine.processChatReAct` 成功路径经 `wrapFinalOutput`（开关 on 时 `OpenUiTurnNativeContract.ensureValidProgram(summary, replyLanguage)`）——对一切消费方（UI/TextReply/IM）fullResponse 恒为合法程序，与云端「server 落流前已兜底」口径一致；开关 off 原样。
 - **落库（parts-first）**：`ChatViewModel.insertAssistantFinalMessage` 统一嗅探分流——开关 on 且 `looksLikeProgram(text)`（engine 已兜底，防御不可达）→ `insertPartsMessage`（role=ASSISTANT，parts = reasoning + source + `OpenUiCard(partId="p0", program=text, fallbackSummary, langVersion=OpenUiContract.LANG_VERSION)`，性能 metadata 走既有 `performanceMetadataJson`）+ `touchSession`；否则走原 `insertAgentMessage` 落文本气泡。三个调用点改道：`handleAgentAction` TextReply 分支、dispatch 失败 fallback、纯文本分支。modelUsed 用本地模型标签（非 `cloud_agent`）。IM/无 UI 通道零改动（TextReply 携带兜底后程序文本，与云端 IM 现状同口径）。

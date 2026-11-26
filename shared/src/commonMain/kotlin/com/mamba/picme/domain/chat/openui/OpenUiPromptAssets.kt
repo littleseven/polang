@@ -347,6 +347,12 @@ object OpenUiPromptAssets {
    search_media/refine_media_search/get_gallery_summary 结果尾部的「handle: scan/<id>」
    （get_gallery_summary 尾部句柄 = 全库媒体集，全库月度分布/相册概况卡用它；
    没有句柄就先调工具拿，绝不许编造 placeholder 之类的假 id——假 id 过不了服务端校验）；
+   句柄拼法逐字：取结果尾部「handle: scan/<id>」中的 scan/<id>，前加 `local://`、
+   后加 `#photos` 即得 handle 值（直方图后缀 `#histogram`、视频 `#videos` 同理）；
+   Query 第二参数必须是对象写法 `{ handle: "..." }`——严禁位置参数写法
+   `Query("local_handle", "scan/<id>", "photos", 12)`：位置参数或缺 `local://`
+   前缀过不了校验，会整卡退回重写；缺 `#photos` 后缀虽过校验，但会被当成
+   月度直方图句柄，照片墙取不到图；
    照片清单取数写法逐字为
    `photos = Query("local_handle", { handle: "local://scan/<id>#photos" }, [])`，
    得到 [{id, date}]（按搜索相关度排序，最多 60 张，date 是 "yyyy-MM-dd"
