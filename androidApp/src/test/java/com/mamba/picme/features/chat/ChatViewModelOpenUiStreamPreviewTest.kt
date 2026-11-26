@@ -531,7 +531,7 @@ class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
         coEvery { orchestrator.remoteChatEngine.streamChat(any(), any(), capture(onEventSlot)) } coAnswers {
             onEventSlot.captured(ChatStreamEvent.TextSnapshot(program))
             previewDuringStream = vm.openUiStreamProgram.value
-            throw RuntimeException("engine boom")
+            error("engine boom")
         }
         vm.sendMessage("帮我看看照片")
         advanceUntilIdle()

@@ -86,7 +86,7 @@ docs/superpowers/
 
 ## 6. 索引（在途/活跃 SSOT 白名单 = 活文档可引用本目录文档的唯一许可集）
 
-- **specs（21 篇，均为在途/活跃 SSOT）**：
+- **specs（22 篇，均为在途/活跃 SSOT）**：
   - `2026-08-08-face-restoration-ondevice-design.md` — 人脸修复方向（未实施，待排期）
   - `2026-08-10-ios-follow-command-design.md` — /ios-follow 六阶段管线设计 SSOT（AGENTS §7 引用）
   - `2026-08-13-ios-chat-rich-features-design.md` — iOS Chat 富交互（批次③沙盒写操作在途）
@@ -109,7 +109,8 @@ docs/superpowers/
   - `2026-11-01-agent-step-timeline-and-admin-trace-design.md` — Agent 步骤时间线（用户可见）+ 管理后台推理追溯（M1 Android 时间线 + M2 后台追溯已合 main；M3 iOS 条件跟随在途）
   - `2026-11-07-layered-agent-runtime-design.md` — 分层 Agent runtime（One Agent, Two Runtimes 七层模型；M1/M1.5/M2 已合 main（OpenUI 资产真引用化 + 工具目录化），M3~M6 路线见 spec §2）
   - `2026-11-08-chat-value-domain-ideal-design.md` — chat 消息值域一步到位终态（13 值 4+1 分类 + parts-first 持久化 + legacy 出清；已全量合 main，ADR-016 D1/D2a 实施 spec）
-- **plans（6 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）；`2026-11-07-layered-agent-runtime-m1.md`（分层 runtime M1 实施计划，与同名 spec 配套，已交付）；`2026-11-07-layered-agent-runtime-m15-m2.md`（分层 runtime M1.5+M2 实施计划，与同名 spec 配套，已交付）；`2026-11-08-chat-value-domain-ideal.md`（值域终态 9-Task 实施计划，与同名 spec 配套，已交付）
+  - `2026-11-24-local-turn-openui-unification-design.md` — 本地回合 OpenUI 统一（L7 合线为 turn-native 唯一产出协议，翻案分层 runtime spec §3 决策 1；回滚闸 `local_turn_openui_enabled`；U1/U2/U4 已交付待合 main，U3 iOS 镜像为后续交付条件）
+- **plans（7 篇）**：`2026-08-13-ios-chat-rich-features.md`（批次③在途，与同名 spec 配套）；`2026-10-06-browser-vnc-live-card.md`（browser-vnc 直播卡 M1 实施计划，与同名 spec 配套）；`2026-10-17-cloud-agent-tool-bridge.md`（云端 Agent M2 实施计划，与同名 spec 配套）；`2026-11-07-layered-agent-runtime-m1.md`（分层 runtime M1 实施计划，与同名 spec 配套，已交付）；`2026-11-07-layered-agent-runtime-m15-m2.md`（分层 runtime M1.5+M2 实施计划，与同名 spec 配套，已交付）；`2026-11-08-chat-value-domain-ideal.md`（值域终态 9-Task 实施计划，与同名 spec 配套，已交付）；`2026-11-24-local-turn-openui-unification.md`（本地回合 OpenUI 统一 12 任务实施计划，与同名 spec 配套，已交付）
 
 ---
 
@@ -139,3 +140,4 @@ docs/superpowers/
 | 2026-11-07 | 索引补录 `2026-11-07-layered-agent-runtime-design.md` + plan `2026-11-07-layered-agent-runtime-m1.md`（分层 Agent runtime：One Agent, Two Runtimes 七层模型，M1 契约/策略/执行器端云同源在途） |
 | 2026-11-07 | M1 已合 main（`40eafd36e`）；索引补录 plan `2026-11-07-layered-agent-runtime-m15-m2.md`（M1.5 OpenUI 白名单/prompt 资产真引用化 + M2 工具目录化，spec 状态行与里程碑表同步） |
 | 2026-11-08 | 索引补录 spec `2026-11-08-chat-value-domain-ideal-design.md` + plan `2026-11-08-chat-value-domain-ideal.md`（chat 消息值域一步到位终态：13 值 4+1 分类 + parts-first 持久化 + Room v28 重置 + legacy 机器全删；9-Task 全量交付，结论落位 ADR-016 D1 / CHAT_CARD_CATALOG §0 / CHAT_PROTOCOL_TECH_SPEC / shared·androidApp AGENTS.md / chat.yaml §3.2） |
+| 2026-11-26 | 索引补录 spec `2026-11-24-local-turn-openui-unification-design.md` + plan `2026-11-24-local-turn-openui-unification.md`（本地回合 OpenUI 统一：L7 合线 turn-native + 回滚闸 + 流式预览 + 工具句柄；12 任务 + T13 修复全量交付，结论落位分层 runtime spec §3 决策 1 / CHAT_PROTOCOL_TECH_SPEC §2.10 / CHAT_CARD_CATALOG / shared·androidApp·server AGENTS.md） |
