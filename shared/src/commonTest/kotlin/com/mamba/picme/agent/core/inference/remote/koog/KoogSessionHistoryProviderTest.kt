@@ -74,9 +74,10 @@ class KoogSessionHistoryProviderTest {
     }
 
     @Test
-    fun `load never produces double system even if store breaks invariant 1`() = runTest {
-        // 防御钉住：store 未守不变式①（或 Koog 合并语义未来变更）时不得产生双 System
-        // ——部分 OpenAI 兼容网关对多 System 直接 400。
+    fun `load strips stale system from history so current prompt always wins`() = runTest {
+        // 防御钉住：store 未守不变式①漏出持久化的旧 System 时，剥旧前置新——有且仅有
+        // 一条 System 且恒为当次成品 prompt（旧 prompt 缺契约/覆盖段，让它获胜等于
+        // 静默回退到本修复要消灭的故障形态；双 System 会被部分 OpenAI 兼容网关 400）。
         val provider = KoogSessionHistoryProvider(
             FakeStore(listOf(system("stale"), user("u1"))),
             "current",
@@ -85,7 +86,8 @@ class KoogSessionHistoryProviderTest {
         val loaded = provider.load("s")
 
         assertEquals(1, loaded.count { it is Message.System })
-        assertEquals("stale", loaded.first().textContent())
+        assertEquals("current", loaded.first().textContent())
+        assertEquals(listOf("current", "u1"), loaded.map { it.textContent() })
     }
 
     @Test

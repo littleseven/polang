@@ -24,8 +24,9 @@ import com.mamba.picme.agent.core.platform.storage.ChatMemoryStore
  *   在途 run 持有自己 agent 安装的那份，不受其他 run 重建影响。
  *
  * - [load]：store 已做 decode + withoutSystem（不变式①）+ sanitizeToolPairing（不变式③）；
- *   返回前把 [systemPrompt] 前置为 `Message.System`（store 未守不变式①或 Koog 合并语义
- *   未来变更时防御性跳过——绝不产生双 System，部分 OpenAI 兼容网关对此直接 400）。
+ *   返回前剥除历史残留 System 并把 [systemPrompt] 前置为唯一 `Message.System`
+ *   （store 未守不变式①的防御：当次成品 prompt 恒胜，绝不双 System——多 System
+ *   会被部分 OpenAI 兼容网关 400）。
  * - [store]：store 内部做 [KoogMessageMemory.assembleForPersistence]（M1：withoutSystem① + 老化旧 tool result
  *   + token 预算裁剪 + trimToMaxMessages 条数上限兜底②）+ 落盘。
  *
@@ -45,8 +46,11 @@ public class KoogSessionHistoryProvider(
         val history = store.load(id)
         val prompt = systemPrompt.trim()
         if (prompt.isEmpty()) return history
-        if (history.firstOrNull() is Message.System) return history
-        return listOf(Message.System(prompt, RequestMetaInfo.Empty)) + history
+        // 防御：store 若未守不变式①漏出持久化的旧 System，剥掉再前置——保证有且仅有
+        // 一条 System 且恒为当次成品 prompt（旧 prompt 缺契约/覆盖段，让它获胜等于
+        // 静默回退到本修复要消灭的故障形态；双 System 则被部分 OpenAI 兼容网关 400）。
+        val clean = history.filterNot { it is Message.System }
+        return listOf(Message.System(prompt, RequestMetaInfo.Empty)) + clean
     }
 
     override suspend fun store(id: String, messages: List<Message>) {
