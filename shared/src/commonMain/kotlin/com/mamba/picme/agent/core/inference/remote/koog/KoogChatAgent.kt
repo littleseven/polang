@@ -462,11 +462,13 @@ class KoogChatAgent(
          * 收敛规则段是 flag-off 文本气泡路径的活指引不能改，故覆盖只能落在这里。
          */
         const val OPENUI_TOOL_MODE_OVERRIDE =
-            "\n模式覆盖（优先级高于上文工具描述与收敛规则中的渲染指引）：数据类工具\n" +
-                "（search_media / refine_media_search / get_gallery_summary / run_gallery_script）\n" +
-                "结果到手后不再调用 render_html 等渲染工具收尾——终结程序即交付物：看照片/图集 →\n" +
-                "按下方数据禁令用结果尾部句柄绑定出 PhotoGrid；统计/趋势 → 程序内 Chart 组件；\n" +
-                "render_html 仅在用户明确要求独立 HTML 沙箱卡（内容不含相册媒体）时才调用。\n"
+            "\n模式覆盖（优先级高于上文一切提及 render_html 图集卡 / media:// 出卡的指引——\n" +
+                "工具描述、收敛规则、窄化规则、脚本规则同此）：看照片/图集不调 render_html——\n" +
+                "数据类工具（search_media / refine_media_search / get_gallery_summary /\n" +
+                "run_gallery_script）结果到手后，直接按下方数据禁令在终结程序里用结果尾部句柄\n" +
+                "绑定出 PhotoGrid，终结程序即交付物；render_html 仅在用户明确要求独立 HTML\n" +
+                "沙箱卡（内容不含相册媒体）时才调用；draw_chart 不在此列——用户明确要求画图时\n" +
+                "照旧按画图规则调用。\n"
     }
 }
 

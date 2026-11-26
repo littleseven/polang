@@ -102,6 +102,15 @@ class KoogChatAgentOpenUiTurnNativeTest {
         assertTrue(languageIdx > contractIdx, "语言规则段必须位于契约段之后")
         assertTrue(prompt.contains("你是 PoLang 相册 AI 助手。"), "端侧身份行应为端侧措辞")
         assertFalse(prompt.contains("server_time"), "端侧无 server_time 工具，工具句应剔除")
+        // 模式覆盖段接线（2026-11-26 照片图集引导修复）：端侧 flag on 必注入
+        assertTrue(prompt.contains("模式覆盖（优先级高于上文"), "端侧 flag on 契约段应含模式覆盖段")
+    }
+
+    @Test
+    fun `flag off prompt has no tool mode override section`() {
+        val agent = agent(openUiTurnNative = false)
+        val prompt = agent.composeSystemPrompt(null, null, null, null)
+        assertFalse(prompt.contains("模式覆盖"), "flag off 不应含模式覆盖段")
     }
 
     @Test

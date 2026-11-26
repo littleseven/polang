@@ -21,12 +21,17 @@ import com.mamba.picme.agent.core.platform.logging.Logger
  * `OpenUiLibrary.components` 同源字面量副本）——白名单违规文案「组件全量清单见系统
  * 提示词」由此兑现。
  *
- * 两变体槽（U1 参数化，端云差异最小面；server 缺省参数组装输出与现网
- * SYSTEM_PROMPT 逐字节一致，server OpenUiTurnNativeTest 与本包
+ * 三变体槽（U1 参数化两槽 + 2026-11-26 第三槽，端云差异最小面；server 缺省参数
+ * 组装输出与现网 SYSTEM_PROMPT 逐字节一致（槽位零扰动；契约外共享资产如
+ * DSL_RULES 的演进对端云同批生效），server OpenUiTurnNativeTest 与本包
  * OpenUiTurnNativeContractTest 双钉）：
  * - [identityLine]：身份行——server 缺省「你是 PoLang 云端 Agent。」，端侧传端侧措辞；
  * - [toolNote]：结构约定段工具句——server 缺省「需要服务器时间时调用 server_time
- *   工具；」（端侧 registry 无 server_time 时传空串剔除该句）。
+ *   工具；」（端侧 registry 无 server_time 时传空串剔除该句）；
+ * - [toolModeOverride]：模式覆盖段——server 缺省空串（无覆盖段）；端侧传入
+ *   「看照片不调 render_html、终结程序即交付物」覆盖声明（端侧基础规则段
+ *   ChatPromptRules 含 render_html 收敛规则，与响应即程序冲突需覆盖；云端
+ *   prompt 无该规则段，无需覆盖）。
  * 契约其余字节端云逐字相同；组装顺序逐字节钉住（分段常量 raw string 顶格，
  * 禁 re-indent——前导空白是字符串值的一部分）。
  */

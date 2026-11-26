@@ -47,14 +47,12 @@ class OpenUiTurnNativeContractTest {
     fun toolModeOverrideSlotInjectsVerbatimBetweenQueryTailAndDslRules() {
         val override = "\n模式覆盖（测试注入）。\n"
         val prompt = OpenUiTurnNativeContract.buildSystemPrompt(toolModeOverride = override)
-        // 逐字内嵌且位置钉住：取数收尾段之后、DSL 规则之前
-        assertTrue(prompt.contains("模式覆盖（测试注入）"), "覆盖段应逐字内嵌")
-        val tailIdx = prompt.indexOf("结果尾部的 handle 按数据禁令绑定进程序。")
-        val overrideIdx = prompt.indexOf("模式覆盖（测试注入）。")
-        val dslIdx = prompt.indexOf(OpenUiPromptAssets.DSL_RULES)
-        assertTrue(tailIdx in 0 until overrideIdx, "覆盖段应在取数收尾段之后")
-        assertTrue(overrideIdx < dslIdx, "覆盖段应在 DSL 规则之前")
-        // 缺省输出与显式空串输出逐字节一致（槽零扰动）
+        // 紧邻缝逐字钉住：取数收尾段 + 覆盖段 + DSL 规则首行（防 trim/漂移）
+        assertTrue(
+            prompt.contains("绑定进程序。\n\n模式覆盖（测试注入）。\n约束（必须全部满足"),
+            "覆盖段应紧邻取数收尾段与 DSL 规则之间，无 trim 无漂移",
+        )
+        // 缺省参数输出与显式传缺省常量的输出逐字节一致（槽零扰动）
         assertEquals(
             OpenUiTurnNativeContract.buildSystemPrompt(),
             OpenUiTurnNativeContract.buildSystemPrompt(toolModeOverride = OpenUiTurnNativeContract.DEFAULT_TOOL_MODE_OVERRIDE),
