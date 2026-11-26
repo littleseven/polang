@@ -1112,7 +1112,8 @@ class ChatViewModel(
      * 本地程序预览写入节流器（Task 13，U2 跟进）：镜像 server OpenUiContentStreamTracker
      * 48 字符/80ms 粒度压低 TextSnapshot 帧直写预览轨的频率（低端机流式预览 OOM 修复）；
      * 收尾 flushTail 保尾帧（判定/清空针对最新完整文本）。
-     * 冻结违反登记：本批次第 3 个字段（同 openUiPreviewRound 批次，任务卡指令优先），
+     * 冻结违反登记：本批次第 2 个字段（同 openUiPreviewRound 批次，任务卡指令优先；
+     * _pendingNonCardTool 为批次前存量，评审 git 考证不计入）。
      * 遗留 streaming delegate 拆分时收编。
      */
     private val openUiPreviewThrottle = OpenUiPreviewStreamThrottle()
@@ -2178,6 +2179,13 @@ class ChatViewModel(
             } catch (e: Exception) {
                 Logger.e(TAG, "Failed to send message", e)
                 _streamingMessage.value = null
+                // Task 13 收尾补丁（评审 Important #2）：第四收尾点——异常自未预期路径
+                // 冒出（未经 onSuccess/onFailure/Cancel 清理）时收掉预览残留 + 节流器归零；
+                // 节奏器同点收尾（对齐 Cancellation 分支——此前漏 finish 使 paceLoop
+                // 空转至下回合，新测试覆盖此路径时实证暴露）
+                pacingController.finish()
+                _openUiStreamProgram.value = null
+                openUiPreviewThrottle.reset()
                 // 保存错误提示；工具循环熔断/迭代硬顶走本地化文案，不透传 Koog 英文原文
                 val errorContent = if (e.containsAgentLoopStuck()) {
                     stringContext().getString(R.string.chat_agent_loop_stuck)

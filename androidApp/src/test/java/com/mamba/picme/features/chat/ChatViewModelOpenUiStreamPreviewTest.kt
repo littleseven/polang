@@ -510,6 +510,42 @@ class ChatViewModelOpenUiStreamPreviewTest : ChatViewModelTestBase() {
     }
 
     /**
+     * Task 13 收尾补丁（评审 Important #2）：generic `catch (Exception)` 收尾路径——
+     * 异常自 streamChat 直接冒出（未经 Result 包装的未预期路径）时预览在场，
+     * 第四收尾点同样清预览 + 复位节流器（闭合四收尾点对称性，收掉 T8 遗留的
+     * 预览残留窗口）。流中程序预览在场 → 异常收尾后预览与占位气泡均清空，
+     * error 文案照常落库。
+     */
+    @Test
+    fun `generic exception path clears preview when engine throws`() = runTest {
+        stubToggle(true)
+        val vm = newViewModel()
+        advanceUntilIdle()
+        val inserted = mutableListOf<ChatMessageEntity>()
+        coEvery { chatMessageDao.insertMessage(capture(inserted)) } answers { }
+        var previewDuringStream: String? = null
+        val onEventSlot = slot<(ChatStreamEvent) -> Unit>()
+        coEvery { chatSessionDao.getSession("default") } returns
+            ChatSessionEntity(sessionId = "default", title = "New Chat")
+        coEvery { chatMessageDao.getMessageCount("default") } returns 1
+        coEvery { orchestrator.remoteChatEngine.streamChat(any(), any(), capture(onEventSlot)) } coAnswers {
+            onEventSlot.captured(ChatStreamEvent.TextSnapshot(program))
+            previewDuringStream = vm.openUiStreamProgram.value
+            throw RuntimeException("engine boom")
+        }
+        vm.sendMessage("帮我看看照片")
+        advanceUntilIdle()
+
+        // 前置自证：流中程序预览在场（首帧直通）——排除「预览从未置值」的空真
+        assertEquals(program, previewDuringStream)
+        // generic catch 收尾：预览与占位气泡清空（第四收尾点闭合）
+        assertNull(vm.openUiStreamProgram.value)
+        assertNull(vm.streamingMessage.value)
+        // error 文案照常落库（catch 分支的兜底气泡，role=agent + modelUsed=error）
+        assertEquals(1, inserted.count { it.role == "agent" && it.modelUsed == "error" })
+    }
+
+    /**
      * 顺车钉 T7 落卡主产线（调用点①）：带 commands 的回合经 capability dispatch 返回
      * TextReply 程序文本 → `handleAgentAction` TextReply 分支统一嗅探落 OpenUiCard。
      */
