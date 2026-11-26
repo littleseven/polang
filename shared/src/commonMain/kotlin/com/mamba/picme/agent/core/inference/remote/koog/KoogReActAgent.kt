@@ -100,9 +100,6 @@ class KoogReActAgent(
         extraHeaders = buildGatewayHeaders(),
     )
 
-    /** 持久化对话记忆（注入式；Android actual 键前缀 koog_memory_，与旧 langchain4j 路径的 memory_ 隔离，历史不迁移）。 */
-    private val historyProvider by lazy { KoogSessionHistoryProvider(memoryStore) }
-
     /**
      * 当轮 traceId 持有器：[executeTask] 的 Job 开始时写入，onLLMCallCompleted 录制 LlmCallRecord 时
      * 读取。组合根在构建本 agent 后把它注入实现 [TraceIdAware] 的工具集（CameraToolService 的
@@ -280,9 +277,9 @@ class KoogReActAgent(
     }
 
     private fun buildAgent(systemPrompt: String): AIAgent<String, String> {
-        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——把当次成品
-        // system prompt 交给 historyProvider 在 load 时重新前置，详见其 KDoc。
-        historyProvider.currentSystemPrompt = systemPrompt
+        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——provider 携带
+        // 当次成品 system prompt 在 load 时重新前置，详见 KoogSessionHistoryProvider KDoc。
+        val historyProvider = KoogSessionHistoryProvider(memoryStore, systemPrompt)
         // 自定义策略（graphStrategy 的 lambda 忽略入参 builder，直接返回预建策略）：
         // 修复 Koog 1.1.1 内建 singleRunStrategy 在 nodeSendToolResult 出边先匹配 onTextMessage
         // 导致「文本+tool_calls 同帧」响应丢工具调用的缺陷，详见 poLangSingleRunStrategy KDoc。

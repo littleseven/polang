@@ -50,7 +50,8 @@ import kotlin.time.Clock
  * StreamChatResult / ChatStreamEvent；onPartialText / onToolCall 经 processChatReAct 透传到 UI。
  *
  * **记忆快照新鲜度**：system prompt（含【关于用户】记忆快照）在 build 期烘焙；记忆快照变更时重建 AIAgent
- * （executor / memoryStore / historyProvider 复用，历史经 DataStore 跨重建留存）。
+ * （executor / memoryStore 复用，历史经 DataStore 跨重建留存；historyProvider 随 build 新建——
+ * 轻量无状态，携带当次成品 system prompt，见 KoogSessionHistoryProvider KDoc）。
  *
  * **回调闭包**：EventHandler lambda 在 build 期捕获，引用 per-run 持有字段 [currentPartialText] / [currentToolCall]
  *（runChat 开头赋值、finally 清空），避免捕获过期回调；runs 串行（processChatReAct 的 isRunning 互斥）。
@@ -77,7 +78,6 @@ class KoogChatAgent(
         extraHeaders = buildGatewayHeaders(),
     )
 
-    private val historyProvider = KoogSessionHistoryProvider(memoryStore)
     private val memoryStoreRef = memoryStore
 
     /**
@@ -193,8 +193,8 @@ class KoogChatAgent(
      * 意图级工具子集覆写（M3 分支化，2026-10-17）：引擎层按路由契约把 tool schema 裁到
      * 意图白名单时，单次 runChat 携带此覆写——[registry] 与 [systemPrompt]（子集清单段
      * 同源生成 + 动态尾段）替换构造期的全量默认值；[key] 进 AIAgent 重建键，子集切换
-     * 与记忆快照/摘要变更同级触发重建（executor/memoryStore/historyProvider 仍单份复用，
-     * 不为每个子集各建 executor）。
+     * 与记忆快照/摘要变更同级触发重建（executor/memoryStore 仍单份复用，
+     * 不为每个子集各建 executor；historyProvider 随 build 新建，轻量无状态）。
      */
     class ChatToolSetOverride(
         val key: String,
@@ -300,9 +300,9 @@ class KoogChatAgent(
     }
 
     private fun buildAgent(systemPrompt: String, registry: ToolRegistry): AIAgent<String, String> {
-        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——把当次成品
-        // system prompt 交给 historyProvider 在 load 时重新前置，详见其 KDoc。
-        historyProvider.currentSystemPrompt = systemPrompt
+        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——provider 携带
+        // 当次成品 system prompt 在 load 时重新前置，详见 KoogSessionHistoryProvider KDoc。
+        val historyProvider = KoogSessionHistoryProvider(memoryStoreRef, systemPrompt)
         // 自定义策略：修复 Koog 1.1.1 内建 singleRunStrategy 丢「文本+tool_calls 同帧」
         // 工具调用的缺陷（chat 多轮工具任务同样受影响），详见 poLangSingleRunStrategy KDoc。
         //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
