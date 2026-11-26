@@ -299,13 +299,16 @@ class KoogChatAgent(
         return agent
     }
 
-    private fun buildAgent(systemPrompt: String, registry: ToolRegistry): AIAgent<String, String> =
+    private fun buildAgent(systemPrompt: String, registry: ToolRegistry): AIAgent<String, String> {
+        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——把当次成品
+        // system prompt 交给 historyProvider 在 load 时重新前置，详见其 KDoc。
+        historyProvider.currentSystemPrompt = systemPrompt
         // 自定义策略：修复 Koog 1.1.1 内建 singleRunStrategy 丢「文本+tool_calls 同帧」
         // 工具调用的缺陷（chat 多轮工具任务同样受影响），详见 poLangSingleRunStrategy KDoc。
         //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
         // U2-2：策略配置经 [strategyConfig] flag 驱动——off = 现行内建节点路径
         // （streaming=false 无纠正），on = OpenUI turn-native（流式 + 终结程序守卫纠正）。
-        AIAgent.builder()
+        return AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
             // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。挂工具循环熔断边。
             .graphStrategy(poLangSingleRunStrategy(strategyConfig))
@@ -410,6 +413,7 @@ class KoogChatAgent(
                 }
             }
             .build()
+    }
 
     /**
      * base system prompt + 【关于用户】记忆快照 + 【会话摘要】段（M2，US-2.4）+ 技能清单段

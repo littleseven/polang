@@ -279,12 +279,15 @@ class KoogReActAgent(
         return agent
     }
 
-    private fun buildAgent(systemPrompt: String): AIAgent<String, String> =
+    private fun buildAgent(systemPrompt: String): AIAgent<String, String> {
+        // Koog ChatMemory 历史非空即整表替换 prompt 消息（丢 system）——把当次成品
+        // system prompt 交给 historyProvider 在 load 时重新前置，详见其 KDoc。
+        historyProvider.currentSystemPrompt = systemPrompt
         // 自定义策略（graphStrategy 的 lambda 忽略入参 builder，直接返回预建策略）：
         // 修复 Koog 1.1.1 内建 singleRunStrategy 在 nodeSendToolResult 出边先匹配 onTextMessage
         // 导致「文本+tool_calls 同帧」响应丢工具调用的缺陷，详见 poLangSingleRunStrategy KDoc。
         //（2026-09-25 核实：1.3.0 仍未修，本策略继续必要。）
-        AIAgent.builder()
+        return AIAgent.builder()
             // 直接传策略实例（命名 lambda 重载 graphStrategy(name){...} 是 Koog 1.1.1 JVM-only
             // 便捷 API；策略内部已命名 "polang_single_run"，语义等价）。
             .graphStrategy(poLangSingleRunStrategy(PoLangReActStrategyConfig(toolLoopGuard = toolLoopGuard)))
@@ -357,6 +360,7 @@ class KoogReActAgent(
                 }
             }
             .build()
+    }
 
     /**
      * 网关鉴权 header（与旧 RemoteReActAgent 经 MambaAgentFactory.customHeader 注入的等价）：
