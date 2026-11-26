@@ -54,6 +54,9 @@ object OpenUiTurnNativeContract {
     /** 工具句变体槽缺省（server：server_time 工具指引）。 */
     const val DEFAULT_TOOL_NOTE = "需要服务器时间时调用 server_time 工具；"
 
+    /** 模式覆盖槽缺省（server：空串 = 无覆盖段，缺省输出与现网逐字节一致）。 */
+    const val DEFAULT_TOOL_MODE_OVERRIDE = ""
+
     /**
      * 契约主体（身份行后、对话黄金示例前）：响应即程序契约 + 回复形态先定位。
      */
@@ -108,15 +111,22 @@ Query 取数语句）：
 
     /**
      * 组装系统提示词（组装顺序逐字节钉住：身份行 + 契约主体 + 对话黄金示例 +
-     * 数据卡形态段 + 结构约定段 + 工具句 + 取数收尾 + DSL 规则 + 组件全量清单）。
-     * server 侧缺省参数输出与现网 SYSTEM_PROMPT 逐字节一致。
+     * 数据卡形态段 + 结构约定段 + 工具句 + 取数收尾 + 模式覆盖槽 + DSL 规则 +
+     * 组件全量清单）。server 侧缺省参数输出与现网 SYSTEM_PROMPT 逐字节一致。
+     *
+     * [toolModeOverride]：模式覆盖槽（2026-11-26 本地回合统一批次新增）——端侧
+     * turn-native 模式下基础规则段（ChatPromptRules 收敛规则）与工具描述里的
+     * render_html 图集卡指引与「响应即程序」冲突（真机实证模型服从前者），端侧
+     * 经本槽注入覆盖声明；server 缺省空串（云端 prompt 无此冲突，逐字节不变）。
      */
     fun buildSystemPrompt(
         identityLine: String = DEFAULT_IDENTITY_LINE,
         toolNote: String = DEFAULT_TOOL_NOTE,
+        toolModeOverride: String = DEFAULT_TOOL_MODE_OVERRIDE,
     ): String =
         identityLine + CONTRACT_BODY + GOLDEN_CHAT_PROGRAM + DATA_CARD_GUIDE +
-            STRUCTURE_CONVENTIONS + toolNote + TOOL_QUERY_TAIL + OpenUiPromptAssets.DSL_RULES +
+            STRUCTURE_CONVENTIONS + toolNote + TOOL_QUERY_TAIL + toolModeOverride +
+            OpenUiPromptAssets.DSL_RULES +
             COMPONENT_LIST_INTRO + RenderOpenUiValidator.ALLOWED_COMPONENTS.joinToString(", ")
 
     /**

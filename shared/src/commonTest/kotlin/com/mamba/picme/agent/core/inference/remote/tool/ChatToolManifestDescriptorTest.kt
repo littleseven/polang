@@ -65,7 +65,7 @@ class ChatToolManifestDescriptorTest {
     fun `tool descriptions are non blank and match android byte source`() {
         val summary = descriptors.single { it.name == "get_gallery_summary" }
         assertEquals(
-            "获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用（句柄为全库媒体集，月度分布/相册概况卡绑定它）；media id 保留供 render_html 与写工具。",
+            "获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用（句柄为全库媒体集，月度分布/相册概况卡绑定它）；media id 保留供写工具（收藏/删除等）与 render_html 非常规自定义展示。",
             summary.description,
         )
 

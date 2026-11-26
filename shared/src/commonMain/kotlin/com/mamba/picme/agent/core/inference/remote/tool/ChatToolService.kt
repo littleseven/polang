@@ -152,12 +152,12 @@ class ChatToolService private constructor() : TraceIdAware {
     // ── 相册 ──────────────────────────────────────────────────────
 
     @Tool(customName = "get_gallery_summary")
-    @LLMDescription("获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用（句柄为全库媒体集，月度分布/相册概况卡绑定它）；media id 保留供 render_html 与写工具。")
+    @LLMDescription("获取本地相册摘要：照片/视频/媒体总数、含人脸数、人物聚类数、已/未打标数、语义向量数、扫描建议。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用（句柄为全库媒体集，月度分布/相册概况卡绑定它）；media id 保留供写工具（收藏/删除等）与 render_html 非常规自定义展示。")
     suspend fun getGallerySummary(): String =
         dispatchCommand(AgentCommand.GetGallerySummary(includeDetails = false))
 
     @Tool(customName = "search_media")
-    @LLMDescription("搜索本地相册，返回命中总数与前 24 个媒体 id（命中 ≤24 时全量返回；需要更多 id 用 run_gallery_script 的 gallery.query 获取）。结果不再自动出卡——需要展示给用户时随后调 render_html，用 media://{id} 引用出图集卡。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供 render_html 与写工具。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。找视频时 mediaType 传 'video'，照片+视频传 'all'。")
+    @LLMDescription("搜索本地相册，返回命中总数与前 24 个媒体 id（命中 ≤24 时全量返回；需要更多 id 用 run_gallery_script 的 gallery.query 获取）。结果不再自动出卡——展示方式遵循系统提示词的展示规则：OpenUI 契约段在场时，终结程序直接用尾部数据句柄出 PhotoGrid 照片墙，不再调任何渲染工具收尾。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供写工具（收藏/删除等）与 render_html 非常规自定义展示。query 为自然语言搜索词，如'去年夏天海边的小孩'。人物精确查询用 person 传人物分组名或称谓（如'大宝''儿子'），并可与 fromMs/toMs 组合做「人物 ∩ 时间」精确交集——不要把人物名只拼进 query（会丢人物维度，误回他人照片）。只要含人脸/人像的照片（'有人脸''有人的''人像''自拍/合照'类诉求）必须传 hasFace='true'——只把'人脸'写进 query 会丢人脸维度。找视频时 mediaType 传 'video'，照片+视频传 'all'。")
     suspend fun searchMedia(
         @LLMDescription("自然语言搜索词") query: String,
         @LLMDescription("人物分组名或称谓（如'大宝''儿子'），无则空串") person: String,
@@ -177,7 +177,7 @@ class ChatToolService private constructor() : TraceIdAware {
     }
 
     @Tool(customName = "refine_media_search")
-    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数；展示用 render_html 重出图集卡）。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供 render_html 与写工具。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
+    @LLMDescription("在上一轮搜索结果内细化过滤，返回命中总数与前 24 个媒体 id（并更新搜索基数与尾部数据句柄；出卡展示方式同 search_media 遵循系统提示词展示规则）。结果尾部附数据句柄 handle: scan/<id>，OpenUI 程序绑定照片/视频展示时使用；media id 保留供写工具（收藏/删除等）与 render_html 非常规自定义展示。如'只要夜景''找找4月的'。constraint 为细化条件；时间窄化务必传 fromMs/toMs（毫秒，据当前日期算）做精确交集，留空串=不限。上一轮无搜索基数时会返回明确错误，此时改用 search_media 重新全局搜索。")
     suspend fun refineMediaSearch(
         @LLMDescription("细化条件") constraint: String,
         @LLMDescription("时间起点（毫秒），如某月起始；空串=不限") fromMs: String,
@@ -286,7 +286,7 @@ class ChatToolService private constructor() : TraceIdAware {
     // skill（server/skills/gallery-script，端云经 load_skill 按需加载），此处只留
     // 硬约束与指针——渐进披露，常驻 prompt 每轮省约 1.5k 字符。
     @Tool(customName = "run_gallery_script")
-    @LLMDescription("在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。**调用前必须先 load_skill('gallery-script') 获取 handler 清单与调用约定，未加载不得凭空编造 handler 名**。硬约束：所有 handler 均为异步，必须用 await bridge.callAsync(name, args) 调用（bridge.call 已禁用，调用会报错）；return 结果对象回传给你总结；纯统计/盘点脚本 return 只回统计摘要——需要给用户看图集时用 render_html + media://{id} 出图集卡（id 来自本脚本 gallery.query 或 search_media 结果，禁止虚构）。")
+    @LLMDescription("在端侧沙箱执行 JavaScript 做相册盘点/统计分析（取数只读、数据不出端；删除/收藏等写操作走 capability.dispatch，会弹窗经用户确认）。**调用前必须先 load_skill('gallery-script') 获取 handler 清单与调用约定，未加载不得凭空编造 handler 名**。硬约束：所有 handler 均为异步，必须用 await bridge.callAsync(name, args) 调用（bridge.call 已禁用，调用会报错）；return 结果对象回传给你总结；纯统计/盘点脚本 return 只回统计摘要——需要给用户看图集时遵循系统提示词的展示规则（OpenUI 契约段在场时用 search_media 拿数据句柄出 PhotoGrid，本脚本不产句柄；media id 只许来自本脚本 gallery.query 或 search_media 结果，禁止虚构）。")
     suspend fun runGalleryScript(
         @LLMDescription("JS 源码；handler 清单与示例见 gallery-script 技能（先 load_skill），return 结果对象") code: String
     ): String = dispatchCommand(AgentCommand.ExecuteScript(code = code))

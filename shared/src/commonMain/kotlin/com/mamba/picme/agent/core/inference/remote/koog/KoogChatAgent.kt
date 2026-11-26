@@ -163,6 +163,7 @@ class KoogChatAgent(
             OpenUiTurnNativeContract.buildSystemPrompt(
                 identityLine = OPENUI_IDENTITY_LINE,
                 toolNote = "",
+                toolModeOverride = OPENUI_TOOL_MODE_OVERRIDE,
             ) + "\n\n" + openUiReplyLanguageRuleSegment(config.replyLanguage)
         } else {
             ""
@@ -451,6 +452,21 @@ class KoogChatAgent(
 
         /** 端侧身份行（与 RemoteChatEngine.buildChatSystemPrompt 首句同源措辞；句式对齐契约身份行）。 */
         const val OPENUI_IDENTITY_LINE = "你是 PoLang 相册 AI 助手。"
+
+        /**
+         * 端侧模式覆盖段（2026-11-26 照片图集引导修复）：基础规则段（ChatPromptRules
+         * 收敛规则）与工具描述里的「看照片 → render_html 出图集卡收尾」指引在
+         * turn-native 模式下与「响应即程序」直接冲突（1.0.96 真机实证模型服从
+         * 收敛规则，搜索照片出 HTML 卡而非 PhotoGrid 程序）——本段在契约段内、
+         * DSL 规则前显式作废该指引。工具描述已中性化（双模共用不能写死路径），
+         * 收敛规则段是 flag-off 文本气泡路径的活指引不能改，故覆盖只能落在这里。
+         */
+        const val OPENUI_TOOL_MODE_OVERRIDE =
+            "\n模式覆盖（优先级高于上文工具描述与收敛规则中的渲染指引）：数据类工具\n" +
+                "（search_media / refine_media_search / get_gallery_summary / run_gallery_script）\n" +
+                "结果到手后不再调用 render_html 等渲染工具收尾——终结程序即交付物：看照片/图集 →\n" +
+                "按下方数据禁令用结果尾部句柄绑定出 PhotoGrid；统计/趋势 → 程序内 Chart 组件；\n" +
+                "render_html 仅在用户明确要求独立 HTML 沙箱卡（内容不含相册媒体）时才调用。\n"
     }
 }
 
