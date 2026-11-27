@@ -40,6 +40,11 @@ enum class OpenUiNavigateTarget(val wireName: String, val takesParam: Boolean) {
     /** 回忆页（Pager 页 4）。 */
     MEMORY("memory", takesParam = false),
 
+    /** 聊天照片全量翻页浏览（param = scan 句柄 id，照片浏览卡「查看全部」专用出口）：
+     *  ChatScreen 就地拦截——handle 全量命中集（Room 存完整结果，60 cap 只在投影层）
+     *  端侧解析 uri 进 chat 内全屏翻页预览，不上行 MainPagerHost 跳页。 */
+    SCAN_PHOTOS("scan_photos", takesParam = true),
+
     /** 任务中心（NavHost 路由，任务卡「查看全部」同款出口）。 */
     TASK_CENTER("task_center", takesParam = false),
 

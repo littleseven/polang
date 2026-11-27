@@ -125,6 +125,7 @@
     <string name="chat_gacha_pick_hint">Touchez une carte pour la prévisualiser, puis confirmez</string>
     <string name="chat_gacha_expired">Cette série de propositions a expiré — lancez une nouvelle optimisation</string>
     <string name="chat_gacha_confirm_failed">Échec de l\'application, veuillez réessayer</string>
+    <string name="chat_scan_photos_unavailable">Impossible d\'ouvrir toutes les photos</string>
     <string name="chat_gacha_reroll_unavailable">Impossible de remélanger pour le moment</string>
     <string name="remove_background">Supprimer l\'arrière-plan</string>
     <string name="remove_background_failed">Échec de la suppression de l\'arrière-plan</string>

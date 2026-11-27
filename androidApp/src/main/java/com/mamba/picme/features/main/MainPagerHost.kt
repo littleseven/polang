@@ -225,6 +225,9 @@ fun MainPagerHost(
                             onSwitchPage(MAIN_PAGE_DEDUP)
                         }
                         OpenUiNavigateTarget.PEOPLE -> onSwitchPage(MAIN_PAGE_PEOPLE)
+                        // ChatScreen 就地拦截（chat 内全屏翻页预览），正常不到本层；
+                        // 兜底跳相册主页优于无响应
+                        OpenUiNavigateTarget.SCAN_PHOTOS -> onSwitchPage(MAIN_PAGE_GALLERY)
                         OpenUiNavigateTarget.MEMORY -> onSwitchPage(MAIN_PAGE_MEMORY)
                         OpenUiNavigateTarget.TASK_CENTER -> navController.navigate(
                             Screen.TaskCenter.route,

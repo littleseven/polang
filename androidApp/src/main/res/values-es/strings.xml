@@ -125,6 +125,7 @@
     <string name="chat_gacha_pick_hint">Toca una tarjeta para previsualizarla y luego confirma</string>
     <string name="chat_gacha_expired">Este conjunto de candidatos ha caducado — inicia una nueva optimización</string>
     <string name="chat_gacha_confirm_failed">No se pudo aplicar; inténtalo de nuevo</string>
+    <string name="chat_scan_photos_unavailable">No se pudieron abrir todas las fotos</string>
     <string name="chat_gacha_reroll_unavailable">Barajar no está disponible ahora mismo</string>
     <string name="remove_background">Quitar fondo</string>
     <string name="remove_background_failed">No se pudo quitar el fondo</string>

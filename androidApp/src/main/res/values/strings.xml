@@ -128,6 +128,7 @@
     <string name="chat_gacha_pick_hint">Tap a card to preview it, then confirm</string>
     <string name="chat_gacha_expired">This candidate set has expired — start a new optimization</string>
     <string name="chat_gacha_confirm_failed">Failed to apply, please try again</string>
+    <string name="chat_scan_photos_unavailable">Couldn\'t open all photos</string>
     <string name="chat_gacha_reroll_unavailable">Shuffling is unavailable right now</string>
     <string name="remove_background">Remove background</string>
     <string name="remove_background_failed">Failed to remove background</string>

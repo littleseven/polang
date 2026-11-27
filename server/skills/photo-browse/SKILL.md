@@ -37,7 +37,7 @@ description: 把「看看照片」类浏览诉求组织成分组网格浏览卡�
 ```
 photos = Query("local_handle", { handle: "local://scan/f9d33db29ed6#photos" }, [])
 root = Card([
-  CardHeader("海边的下午", subtitle = "共 37 张 · 精选前 12", actionLabel = "查看全部", action = @ToAssistant("查看全部 海边的照片")),
+  CardHeader("海边的下午", subtitle = "共 37 张 · 精选前 12", actionLabel = "查看全部", action = @Navigate("scan_photos", "f9d33db29ed6")),
   PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, photos[4].id, photos[5].id, photos[6].id, photos[7].id, photos[8].id, photos[9].id, photos[10].id, photos[11].id], columns = 3),
   Markdown("找到 37 张海边照片，先给你相关度最高的 12 张。想换个筛法（比如「只要日落的」）直接说。")
 ])
@@ -48,8 +48,11 @@ fallbackSummary = "37 张海边照片，数据在原设备"
 
 - **CardHeader 分组头**：标题从用户 query 语境派生（地点/时间/主题），subtitle 写
   「共 N 张」（N > 12 时补「· 精选前 12」）；`actionLabel = "查看全部"` **必配**
-  `action = @ToAssistant("查看全部 <分组语境>")`——缺 action 的「查看全部」点击无效
-  （端侧有兜底但显式文案语境更准）。
+  `action = @Navigate("scan_photos", "<handleId>")`——handleId 即本卡绑定句柄的
+  id 段（`local://scan/<id>#photos` 的 `<id>`），点击全屏翻页看该句柄的**全量**
+  命中集（不发消息、不消耗回合）；缺 action 的「查看全部」点击无效（端侧有兜底
+  但会退回发消息，绕远路）。**不要把「查看全部」写成 @ToAssistant**——模型收到后
+  没有全量展示手段，只能再出一张 12 张的卡，用户永远翻不到全部。
 - **PhotoGrid 装照片**：方形 1:1 + 人脸聚焦 + 密缝，是相册 APP 签名形态；
   **单件最多 12 张**，`photos` 数组写字面量展开（`photos[0].id` … `photos[11].id`）——
   N ≤ 12 时数组长度就写 N，不写越界下标；columns 缺省 3（2|3|4 可调）。
@@ -73,7 +76,7 @@ fallbackSummary = "37 张海边照片，数据在原设备"
 - [ ] 照片展示全部走本技能的浏览卡（原生横滑图集卡已退役，没有可透出的系统卡）
 - [ ] PhotoGrid 的 photos 数组 ≤12 项（多分组时全卡合计 ≤12），全部 `photos[i].id` 投影，无字面量数字 id
 - [ ] N < 12 时数组长度 = N，没有越界下标
-- [ ] CardHeader 有 actionLabel 就配了 action（@ToAssistant，文案带分组语境）
+- [ ] CardHeader 有 actionLabel 就配了 action（「查看全部」= @Navigate("scan_photos", handleId)，handleId 与本卡 Query 句柄一致）
 - [ ] 网格一律 PhotoGrid，没有 Grid+Image 拼装
 - [ ] 没有向用户展示 handle id
 - [ ] `root = ` 独占一行，程序不包 markdown 代码围栏

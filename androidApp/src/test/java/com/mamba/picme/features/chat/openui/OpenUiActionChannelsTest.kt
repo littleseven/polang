@@ -22,6 +22,7 @@ class OpenUiActionChannelsTest {
         assertEquals(OpenUiNavigateTarget.MEMORY, OpenUiNavigateTarget.ofWireName("memory"))
         assertEquals(OpenUiNavigateTarget.TASK_CENTER, OpenUiNavigateTarget.ofWireName("task_center"))
         assertEquals(OpenUiNavigateTarget.SETTINGS, OpenUiNavigateTarget.ofWireName("settings"))
+        assertEquals(OpenUiNavigateTarget.SCAN_PHOTOS, OpenUiNavigateTarget.ofWireName("scan_photos"))
     }
 
     @Test
@@ -35,10 +36,14 @@ class OpenUiActionChannelsTest {
 
     @Test
     fun `only param-taking destinations declare so`() {
-        assertTrue(OpenUiNavigateTarget.GALLERY_SEARCH.takesParam)
-        assertTrue(OpenUiNavigateTarget.ORGANIZE.takesParam)
+        val paramTaking = setOf(
+            OpenUiNavigateTarget.GALLERY_SEARCH,
+            OpenUiNavigateTarget.ORGANIZE,
+            OpenUiNavigateTarget.SCAN_PHOTOS,
+        )
+        paramTaking.forEach { target -> assertTrue("${target.wireName} 应收参数", target.takesParam) }
         OpenUiNavigateTarget.entries
-            .filter { target -> target != OpenUiNavigateTarget.GALLERY_SEARCH && target != OpenUiNavigateTarget.ORGANIZE }
+            .filter { target -> target !in paramTaking }
             .forEach { target -> assertTrue("${target.wireName} 不收参数", !target.takesParam) }
     }
 
@@ -53,6 +58,12 @@ class OpenUiActionChannelsTest {
         assertEquals(
             OpenUiNavigateTarget.TASK_CENTER to null,
             resolveOpenUiNavigate(listOf(OpenUiValue.Str("task_center"))),
+        )
+        assertEquals(
+            OpenUiNavigateTarget.SCAN_PHOTOS to "f9d33db29ed6",
+            resolveOpenUiNavigate(
+                listOf(OpenUiValue.Str("scan_photos"), OpenUiValue.Str("f9d33db29ed6")),
+            ),
         )
         // 未知目的地 / 缺首参 / 首参非 Str → null（宿主告警降级）
         assertNull(resolveOpenUiNavigate(listOf(OpenUiValue.Str("explode"))))

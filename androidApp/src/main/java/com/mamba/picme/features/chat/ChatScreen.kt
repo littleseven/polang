@@ -169,6 +169,7 @@ import com.mamba.picme.features.chat.openui.OpenUiNavigateTarget
 import com.mamba.picme.features.chat.openui.OpenUiStreamingCard
 import com.mamba.picme.features.chat.openui.OpenUiWriteTools
 import com.mamba.picme.features.chat.openui.resolveOpenUiNavigate
+import com.mamba.picme.features.chat.openui.resolveScanPhotoUris
 import androidx.compose.material.icons.outlined.Menu
 import androidx.activity.compose.BackHandler
 import androidx.core.net.toUri
@@ -322,6 +323,7 @@ fun ChatScreen(
     // 抽卡条确认/换一组失败 toast 文案（闭包回调内无法取 stringResource，提前取）
     val gachaRerollUnavailableText = stringResource(R.string.chat_gacha_reroll_unavailable)
     val gachaConfirmFailedText = stringResource(R.string.chat_gacha_confirm_failed)
+    val scanPhotosUnavailableText = stringResource(R.string.chat_scan_photos_unavailable)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     // openui P2：OpenUI 卡 local_handle Query 取数接缝（LocalHandleStore 与 gallery 工具共用同一实例）
@@ -958,13 +960,61 @@ fun ChatScreen(
                                                             } else {
                                                                 null
                                                             }
-                                                        if (navigate != null) {
-                                                            onOpenUiNavigate(navigate.first, navigate.second)
-                                                        } else {
-                                                            Logger.w(
-                                                                "Chat",
-                                                                "OpenUI 自定义动作不可路由: $name args=${args.size}",
-                                                            )
+                                                        when {
+                                                            // 浏览卡「查看全部」（2026-11-27）：就地拦截——handle
+                                                            // 全量命中集端侧解析进 chat 内全屏翻页预览（同
+                                                            // OPEN_PHOTO 集合语义），不上行跳页不消耗对话回合
+                                                            navigate?.first == OpenUiNavigateTarget.SCAN_PHOTOS -> {
+                                                                val handleId = navigate?.second
+                                                                if (handleId.isNullOrBlank()) {
+                                                                    Logger.w("Chat", "scan_photos 缺 handleId 参数")
+                                                                    Toast.makeText(
+                                                                        context,
+                                                                        scanPhotosUnavailableText,
+                                                                        Toast.LENGTH_SHORT,
+                                                                    ).show()
+                                                                } else {
+                                                                    scope.launch {
+                                                                        val uris = resolveScanPhotoUris(
+                                                                            openUiHandleLookup,
+                                                                            openUiPhotoResolver,
+                                                                            handleId,
+                                                                        )
+                                                                        if (uris == null) {
+                                                                            Logger.w(
+                                                                                "Chat",
+                                                                                "scan_photos 句柄失效或为空: $handleId",
+                                                                            )
+                                                                            Toast.makeText(
+                                                                                context,
+                                                                                scanPhotosUnavailableText,
+                                                                                Toast.LENGTH_SHORT,
+                                                                            ).show()
+                                                                        } else {
+                                                                            imagePreview = ChatImagePreviewState(
+                                                                                pages = uris.map { uri ->
+                                                                                    ImagePreviewPage(
+                                                                                        messageId = item.message.id,
+                                                                                        rawUri = uri,
+                                                                                        isEditableResult = false,
+                                                                                        isSaved = false,
+                                                                                    )
+                                                                                },
+                                                                                initialIndex = 0,
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                            navigate != null -> {
+                                                                onOpenUiNavigate(navigate.first, navigate.second)
+                                                            }
+                                                            else -> {
+                                                                Logger.w(
+                                                                    "Chat",
+                                                                    "OpenUI 自定义动作不可路由: $name args=${args.size}",
+                                                                )
+                                                            }
                                                         }
                                                     },
                                                     // 动作三通道之访问 API：Mutation 写工具白名单

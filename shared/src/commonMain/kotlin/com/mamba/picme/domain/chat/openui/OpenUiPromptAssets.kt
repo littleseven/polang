@@ -104,13 +104,13 @@ object OpenUiPromptAssets {
      * 相册 APP 构图黄金示例（2026-10-31 相册 APP 组合方式批次）：CardHeader 时间分组
      * 标题 + PhotoGrid 方形照片网格 + AvatarRow 人物头像条——相册 APP 签名形态一行调用，
      * 不再 Grid+Image / Row 拼装。actionLabel 必配 action（2026-10-31 真机回归补：
-     * 只传 actionLabel 不传 action 曾致「查看全部」点击无效；@ToAssistant 以用户消息
-     * 上行回话，端侧有同文案兜底但显式文案语境更准）。
+     * 只传 actionLabel 不传 action 曾致「查看全部」点击无效；2026-11-27 起「查看全部」
+     * = @Navigate("scan_photos", 句柄 id) 全屏翻页看全量命中集，端侧缺省兜底仍发消息）。
      */
     const val GOLDEN_PHOTO_PROGRAM =
         "photos = Query(\"local_handle\", { handle: \"local://scan/f9d33db29ed6#photos\" }, [])\n" +
             "root = Card([CardHeader(\"2026年7月\", subtitle = \"128 张\", " +
-            "actionLabel = \"查看全部\", action = @ToAssistant(\"查看全部 2026年7月的照片\")), " +
+            "actionLabel = \"查看全部\", action = @Navigate(\"scan_photos\", \"f9d33db29ed6\")), " +
             "PhotoGrid(photos = [photos[0].id, photos[1].id, photos[2].id, photos[3].id, " +
             "photos[4].id, photos[5].id], columns = 3), " +
             "AvatarRow([{photo: photos[0].id, label: \"妈妈\"}, {photo: photos[1].id, label: \"宝宝\"}])])"
@@ -289,8 +289,8 @@ object OpenUiPromptAssets {
      替代 Grid+Image 拼装，元素写 photos[0].id 投影、禁字面量数字）/ AvatarRow(items*=[{photo*,
      label?}])（人物圆形头像横滑条：圆形人脸聚焦 + 名字居下，photo 写 photos[0].id 投影）；
      CardHeader 增可选 actionLabel/action（分组标题尾部「查看全部」动作位——
-     CardHeader("2026年7月", subtitle = "128 张", actionLabel = "查看全部",
-     action = @ToAssistant("查看全部 2026年7月的照片"))，有 actionLabel 必配 action）；
+     CardHeader("2026年7月", actionLabel = "查看全部",
+     action = @Navigate("scan_photos", "f9d33db29ed6"))，有 actionLabel 必配 action）；
    - 布局可控性批次（2026-10-31）：CompareRow(beforePhoto*, afterPhoto*, beforeLabel?,
      afterLabel?, beforeSrc?, afterSrc?, aspect?)（前后对比：左右等宽双图统一帧 + 等比
      缩放裁剪 + 图下标签——修图/优化效果对比首选；photo 写 photos[0].id 投影、src 是
@@ -437,7 +437,7 @@ object OpenUiPromptAssets {
    相册 APP 构图规则（2026-10-31，对标 Google Photos/Apple 照片/小米相册签名形态——
    相册类卡片按此构图，别再自由拼装）：
    - 时间分组网格（相册主视图签名形态）→ CardHeader("2026年7月", subtitle = "128 张",
-     actionLabel = "查看全部", action = @ToAssistant("查看全部 2026年7月的照片")) +
+     actionLabel = "查看全部", action = @Navigate("scan_photos", "f9d33db29ed6")) +
      PhotoGrid(photos = [...], columns = 3)；
    - 人物区（面孔签名形态）→ AvatarRow([{photo: photos[i].id, label: "妈妈"}, ...])；
    - 回顾卡（年度/月度杂志感）→ Banner 首屏 + StatRow 关键数字 + PhotoGrid 摘选；
@@ -445,8 +445,10 @@ object OpenUiPromptAssets {
      subtitle = 日期, trailing = "128 张"), ...])；
    - 回忆条（大卡横滑）→ VisualCardBlock([...], layout = "carousel")（既有件）；
    ⚠️ 照片网格 ≥2 张一律 PhotoGrid，禁用 Grid+Image 拼装（帧随各图真实比例会犬牙交错，
-   布局门禁会退回）；CardHeader 有 actionLabel 必须配 action（@ToAssistant("查看全部 xx")
-   以用户消息上行回话——缺省端侧虽兜底发同文案，显式写语境更准，lint 会提示）；
+   布局门禁会退回）；CardHeader 有 actionLabel 必须配 action——「查看全部」写
+   @Navigate("scan_photos", "<handleId>")（handleId = 本卡 Query 句柄 id 段，端侧
+   全屏翻页看全量命中集；缺省端侧只兜底发消息绕回模型，模型没有全量展示手段，
+   lint 会提示）；
    相册 APP 构图黄金示例（时间分组网格 + 人物头像条——相册卡签名骨架）：
 """ + GOLDEN_PHOTO_PROGRAM + """
    版式范式菜单（2026-10-31 布局可控性批次；标准骨架——结构照此组合）：
@@ -468,9 +470,11 @@ object OpenUiPromptAssets {
    不是只会发消息）：
    1. 本地操作 → @Navigate("目的地"[, "参数"])：自定义动作，App 内页面跳转，目的地
       只用闭集线名——gallery（相册主页）/ gallery_search（第二参=搜索词，跳相册按词
-      搜索，「查看全部某分组照片」首选，比发消息快且不消耗回合）/ organize（第二参
-      可选 "scan" 预选扫描 Tab）/ people（人物页）/ memory（回忆页）/ task_center
-      （任务中心）/ settings（设置）；禁臆造其他页面名；
+      搜索）/ scan_photos（第二参=scan 句柄 id，即工具结果尾部「handle: scan/<id>」
+      的 id 段——照片浏览卡「查看全部」的首选出口：全屏翻页看该卡句柄的全量命中集，
+      比发消息快且不消耗回合）/ organize（第二参可选 "scan" 预选扫描 Tab）/ people
+      （人物页）/ memory（回忆页）/ task_center（任务中心）/ settings（设置）；
+      禁臆造其他页面名；
    2. 访问 API → Mutation 语句 + @Run(ref)：先声明
       `fav = Mutation("工具名", { 参数 })` 再 `@Run(fav)` 触发执行，白名单工具——
       favorite_media { id: 照片id } 收藏 / unfavorite_media { id: 照片id } 取消收藏
@@ -479,7 +483,8 @@ object OpenUiPromptAssets {
       或 Callout 提示）；@Run 失败会中断 Action 链后续动作并 toast 兜底；高风险操作
       （删除等）不在白名单，不要写；
    3. 访问 Agent → @ToAssistant("文案")：以用户消息发进对话，触发新一轮 Agent 处理——
-      需要 LLM 理解/展开/再取数的意图走这里（如「查看全部」要重新组织内容时）；
+      需要 LLM 理解/展开/再取数的意图走这里（如「换个筛法」「只要日落的」要重新
+      组织内容时）；
    组合：点击要同时做几件事用 Action([...]) 顺序执行，如
       fav = Mutation("favorite_media", { id: photos[0].id })
       Button("收藏并逛相册", Action([@Run(fav), @Navigate("gallery")]))；
