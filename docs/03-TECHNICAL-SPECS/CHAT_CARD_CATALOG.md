@@ -724,7 +724,7 @@ partsJson 实例见 §0.2 `tool_html`。**回灌**（toolCallId 同为 `"<messag
 }
 ```
 
-**UI**：通栏结果图；LRU 清理后 → `ExpiredImagePlaceholder` 灰框过期占位；点击进 `ChatImagePreviewOverlay`（保存/删除/OCR）。
+**UI**：通栏结果图；LRU 清理后 → `ExpiredImagePlaceholder` 灰框过期占位；点击进 `ChatMediaPagerOverlay`（2026-11-27 统一为相册 MediaPager：缩放/上滑删除/信息面板/OCR；编辑结果页外挂「保存到相册」）。
 **渲染组件**：`ChatMessageItem` isImage / isEditResult 分支（原生 Compose，Coil；`ChatImageLive` 判定存活）。媒体红线：不经 LLM 排版。
 **测试**：`ChatImageLiveTest` / `ChatImageRenderer*Test` / `ChatViewModelEditResultTest`。
 **parts 协议（✅ M1 已落地）**：`MessagePart.Image(partId, ref, saved=false)` 与 `MessagePart.EditResult(partId, ref?, description, suggestions?, saved?)`——Image 的 `ref`：user 图 = 内部存储路径（saved 恒缺省）、agent 图 = 结果图 URI（保存后 `"saved": true` 写出）；EditResult 的 `description` = content 列（**回灌唯一通道**），`ref` 为 null 时整键不写出（UI 落 legacy 兜底）。partsJson 实例见 §0.2 `image` / `tool_image_edit`。**回灌**（[PRIVACY] 媒体红线：图片本体不进上下文）——Image → 英文中性占位：user `[user sent an image]` / agent `[assistant generated an image]`（`toHistoryPair` 落 `("user"|"agent", 占位)`——role 升格后标注自消息级 role 列，保多轮回合结构）；EditResult → `TextMessage(ASSISTANT, description)`（只回灌文字说明，防多轮编辑上下文断裂；结果图/ref/suggestions 均不进）。**端到端**（EditResult）：`edit_image` tool_call（`*_delta` 相对调整带步进截断：美颜 ±10/亮度 ±15 等，绝对值不限幅）→ `ChatEditProcessor` Recipe 渲染 → `tool_image_edit` 行（图 + 说明 + suggestions）→ 气泡内结果图 + 建议条；agent Image 三来源：`adjust_image` / AI 优化 fallback / 抽卡「就用这张」行改写（见 §4.5）。**M4**：agent 结果图（IMAGE + role 守卫）/ EDIT_RESULT 拍平走**整消息直通**（contentType `legacy_message`，整颗渲染不拆 part，见 §1.3 直通清单；数据源 = parts，枚举合并后 agent 语义由 `role != USER` 守卫；user 图走 USER 整颗单 item，见 §3.1）。
