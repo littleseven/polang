@@ -1,6 +1,7 @@
 package com.mamba.picme.features.chat.openui
 
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -37,14 +38,19 @@ private const val SESSION_PHOTO_RESOLVE_PARALLELISM = 8
  * 对齐（索引槽位），解析失败（null，已删除/未索引）跳过，mapNotNull 语义不变。
  * 替代 OpenUiCardHost 会话照片的串行 `mapNotNull { resolve(it)?.uri }`：~300 张
  * 串行在扫描负载下秒级白付，用户不点照片也全量执行（PhotoGrid 串行灰格同病灶）。
+ *
+ * 聚合前必须 [joinAll]：coroutineScope block 的返回表达式在 block 同步完成时即求值，
+ * launch 的子协程此时仍排队在调度器上未执行（2026-11-27 真机实证：非 immediate
+ * Main 调度器下 slots 恒空，函数恒返回空列表）。
  */
 internal suspend fun OpenUiPhotoResolver.resolveAllUrisInOrder(ids: List<Long>): List<String> = coroutineScope {
     val slots = arrayOfNulls<OpenUiPhoto?>(ids.size)
     val gate = Semaphore(SESSION_PHOTO_RESOLVE_PARALLELISM)
-    ids.forEachIndexed { index, photoId ->
+    val jobs = ids.mapIndexed { index, photoId ->
         launch {
             gate.withPermit { slots[index] = resolve(photoId) }
         }
     }
+    jobs.joinAll()
     slots.filterNotNull().map { photo -> photo.uri }
 }
