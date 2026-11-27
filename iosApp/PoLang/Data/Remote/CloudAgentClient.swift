@@ -1,33 +1,18 @@
 import Foundation
+import SharedKit
 
 // MARK: - Cloud Agent Client（ADR-018 M2，iOS 对等端；spec cloud-agent.yaml §5）
 //
 // 全仓首个 SSE 客户端（无 EventSource 先例，平台差异台账登记）：
-// URLSession `bytes(for:)` AsyncSequence 行解析，`\n\n` 分块、块内取 `data:` 前缀行、
-// JSON 按 kind 四型分发，未知 kind / 解析失败一律忽略（容错 null）。
+// URLSession `bytes(for:)` AsyncSequence 行解析，`\n\n` 分块、块内取 `data:` 前缀行。
+//
+// AG-UI v2（2026-11-28，spec《2026-11-28-ag-ui-migration-design》M3）：
+// iOS 无线上存量，直接只实现 v2——`POST /agent/v2/sessions/{id}/messages`，
+// 帧解析 = shared commonMain `AgUiSseParser`（单一解码源；未知 type / 非法 JSON
+// 服务端演进容错 nil 跳过）。v1 kind 帧模型（CloudAgentFrame/CloudAgentSseParser）已删除。
 //
 // 🔴 BYOK 零留存红线：apiKey 只出现在 `postMessage` 的 X-User-Api-Key 头——
 // 不进 URL、不进 body、不进日志、不进任何持久化；其余方法连参数都没有。
-
-/// SSE 下行帧（kind 闭集，语义对齐 Android CloudFrame；未知 kind 容错忽略不产生帧）。
-enum CloudAgentFrame {
-    /// event 帧：agent_event 行 JSON（id/type/source/role/payload/created_at；
-    /// message/html_card/action/observation 型由消费方分派，历史 action 型可解析忽略）。
-    case event([String: Any])
-    /// 工具桥下行帧（传输层信号，不落事件流）。
-    case toolRequest(requestId: String, tool: String, args: [String: String], timeoutMs: Int)
-    /// OpenUI program 流式预览帧（openui P2；瞬态传输信号，不落事件流，同 tool_request 口径）。
-    case openUiDelta(program: String)
-    /// done 帧（带回合性能数据与 OpenUI 语言协议版本；旧服务端无字段 = nil 容错）。
-    case done(
-        sessionStatus: String,
-        promptTokens: Int64?,
-        completionTokens: Int64?,
-        elapsedMs: Int64?,
-        langVersion: Int?
-    )
-    case error(message: String)
-}
 
 enum CloudAgentClientError: LocalizedError {
     case http(Int, String)
@@ -39,58 +24,6 @@ enum CloudAgentClientError: LocalizedError {
         case .http(let code, let body): return "HTTP \(code): \(body)"
         case .badResponse(let detail): return detail
         case .connectTimeout: return "connect timeout"
-        }
-    }
-}
-
-/// SSE 块解析（纯逻辑）：取 `data:` 前缀行 JSON，按 kind 分发；无法识别一律 nil 容错跳过。
-enum CloudAgentSseParser {
-    static let defaultToolTimeoutMs = 120_000
-
-    /// lines = 一个 `\n\n` 块内的全部行（空行已剔除）。
-    static func parseBlock(lines: [String]) -> CloudAgentFrame? {
-        let dataLines = lines.compactMap { line -> String? in
-            guard line.hasPrefix("data:") else { return nil }
-            return String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-        }
-        guard !dataLines.isEmpty,
-              let data = dataLines.joined(separator: "\n").data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
-
-        switch json["kind"] as? String {
-        case "event":
-            guard let event = json["event"] as? [String: Any] else { return nil }
-            return .event(event)
-        case "tool_request":
-            guard let requestId = json["request_id"] as? String, !requestId.isEmpty else { return nil }
-            let rawArgs = json["args"] as? [String: Any] ?? [:]
-            var args: [String: String] = [:]
-            for (key, value) in rawArgs {
-                args[key] = value as? String ?? String(describing: value)
-            }
-            let timeoutMs = (json["timeout_ms"] as? NSNumber)?.intValue ?? defaultToolTimeoutMs
-            return .toolRequest(requestId: requestId,
-                                tool: json["tool"] as? String ?? "",
-                                args: args,
-                                timeoutMs: timeoutMs)
-        case "openui_delta":
-            // OpenUI 流式预览帧；空前缀无意义直接忽略（对齐 Android CloudSseParser）
-            guard let program = json["program"] as? String, !program.isEmpty else { return nil }
-            return .openUiDelta(program: program)
-        case "done":
-            let usage = json["usage"] as? [String: Any]
-            return .done(
-                sessionStatus: json["session_status"] as? String ?? "",
-                promptTokens: (usage?["prompt_tokens"] as? NSNumber)?.int64Value,
-                completionTokens: (usage?["completion_tokens"] as? NSNumber)?.int64Value,
-                elapsedMs: (json["elapsed_ms"] as? NSNumber)?.int64Value,
-                langVersion: (json["lang_version"] as? NSNumber)?.intValue
-            )
-        case "error":
-            return .error(message: json["message"] as? String ?? "")
-        default:
-            return nil
         }
     }
 }
@@ -131,7 +64,7 @@ struct CloudAgentClient {
         return json
     }
 
-    /// POST /agent/sessions/{id}/messages（SSE 长连接）。
+    /// POST /agent/v2/sessions/{id}/messages（SSE 长连接，AG-UI 事件流）。
     /// 🔴 BYOK 零留存锚点：[byokApiKey] 只在本方法的 X-User-Api-Key 头出现。
     /// replyLanguage（2026-11-22 OpenUI 多语言批次）：ReplyLanguage 枚举 name 经
     /// X-App-Language 头上报，服务端据此追加语言规则段 + 兜底文案五语化；nil 走简中缺省。
@@ -142,9 +75,9 @@ struct CloudAgentClient {
         content: String,
         byokApiKey: String?,
         replyLanguage: String? = nil,
-        onFrame: @escaping (CloudAgentFrame) -> Void
+        onFrame: @escaping (AgUiFrame) -> Void
     ) async throws {
-        var req = URLRequest(url: Self.baseURL.appendingPathComponent("/agent/sessions/\(sessionId)/messages"))
+        var req = URLRequest(url: Self.baseURL.appendingPathComponent("/agent/v2/sessions/\(sessionId)/messages"))
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(token, forHTTPHeaderField: "X-App-Token")
@@ -168,13 +101,13 @@ struct CloudAgentClient {
             throw CloudAgentClientError.http(status, bodyText)
         }
 
-        // SSE 读循环：空行 = 块边界；块内 data: 行聚合解析。
+        // SSE 读循环：空行 = 块边界；块聚合后交 shared AgUiSseParser（未知 type 容错 nil）。
         var blockLines: [String] = []
         for try await line in bytes.lines {
             if Task.isCancelled { break }
             if line.isEmpty {
                 if !blockLines.isEmpty {
-                    if let frame = CloudAgentSseParser.parseBlock(lines: blockLines) {
+                    if let frame = AgUiSseParser.shared.parseBlock(block: blockLines.joined(separator: "\n")) {
                         onFrame(frame)
                     }
                     blockLines = []
@@ -184,7 +117,8 @@ struct CloudAgentClient {
             }
         }
         // 流尾无空行收尾的兜底块
-        if !blockLines.isEmpty, let frame = CloudAgentSseParser.parseBlock(lines: blockLines) {
+        if !blockLines.isEmpty,
+           let frame = AgUiSseParser.shared.parseBlock(block: blockLines.joined(separator: "\n")) {
             onFrame(frame)
         }
     }

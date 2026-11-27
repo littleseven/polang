@@ -49,6 +49,8 @@ final class CloudAgentChatStore: ObservableObject {
     private var turnTask: Task<Void, Never>?
     private var msgSeq = 0
     private var prepareStarted = false
+    /// AG-UI v2 回合级翻译器（send 时重建；文本块聚合/工具参数累计状态不跨回合）。
+    private var translator = AgUiCloudTurnTranslator()
 
     init(client: CloudAgentClient = .shared) {
         self.client = client
@@ -144,6 +146,7 @@ final class CloudAgentChatStore: ObservableObject {
         guard state == .chat, !inFlight, !text.isEmpty else { return }
         append(Message(id: nextId(), role: .user, text: text))
         inFlight = true
+        translator = AgUiCloudTurnTranslator()
         let key = byokApiKey.isEmpty ? nil : byokApiKey
         let sid = sessionId
         let token = appToken
@@ -173,81 +176,79 @@ final class CloudAgentChatStore: ObservableObject {
         inFlight = false
     }
 
-    // MARK: - 帧处理（spec §5 sse_frames：仅 event message/assistant 上屏；tool_request 并发执行）
+    // MARK: - 帧处理（AG-UI v2，2026-11-28 M3：AgUiCloudTurnTranslator 事件分发；设备工具桥并发执行）
 
-    private func onFrame(_ frame: CloudAgentFrame) {
+    private func onFrame(_ frame: AgUiFrame) {
         guard state == .chat else { return }
-        switch frame {
-        case .event(let event):
-            handleEvent(event)
-        case .toolRequest(let requestId, let tool, let args, _):
-            append(Message(id: nextId(), role: .tool, text: tool))
-            // 端执行不阻塞收帧循环：并发执行，完成即上行
-            let sid = sessionId
-            let token = appToken
-            Task { [weak self] in
+        translator.onFrame(
+            frame,
+            onEvent: { [weak self] event in
                 guard let self else { return }
-                let result = await executeTool(tool: tool, args: args)
-                // 产物拦截（注册制，contracts.md C4）：run_gallery_script 图卡信封 →
-                // 本地 HTML 卡逐张上屏，上行只带 summary+stats——HTML 不出端、
-                // 不进 LLM 上下文（对齐 Android CloudAgentTurnRunner）。
-                let artifact = CloudAgentScriptRunner.parseHtmlArtifact(result)
-                if let artifact {
-                    for card in artifact.cards {
-                        self.appendHtmlCard(html: card.html, summary: card.summary)
-                    }
+                switch event {
+                case .assistantText(let text):
+                    append(Message(id: nextId(), role: .assistant, text: text))
+                case .openUiCard(let program, _):
+                    // 发卡/程序形态终结：工具行摘要（Android 调试页同口径）
+                    append(Message(id: nextId(), role: .tool, text: "render_ui_openui(len=\(program.count))"))
+                case .htmlCard(let html, let summary):
+                    appendHtmlCard(html: html, summary: summary)
+                case .openUiCardDelta:
+                    break // 主聊天流式预览由 ChatViewModel 消费；调试页 M1 不上屏
+                case .done:
+                    inFlight = false
+                case .error(let message):
+                    append(Message(id: nextId(), role: .error, text: message))
+                    inFlight = false
                 }
-                let postResult: String
-                if let artifact {
-                    var up: [String: Any] = [
-                        "html_card": "emitted",
-                        "summary": artifact.cards.map { card in card.summary }
-                            .joined(separator: "；"),
-                    ]
-                    // stats 为 JSON 值串（parseHtmlArtifact 保证），回嵌为原始 JSON 值
-                    if let stats = artifact.stats, let data = stats.data(using: .utf8),
-                       let value = try? JSONSerialization.jsonObject(with: data) {
-                        up["stats"] = value
-                    }
-                    postResult = Self.jsonString(of: up) ?? "{\"html_card\":\"emitted\"}"
-                } else {
-                    postResult = result
-                }
-                do {
-                    try await client.postToolResult(
-                        token: token, sessionId: sid, requestId: requestId,
-                        ok: !result.hasPrefix(Self.errorPrefix), result: postResult
-                    )
-                } catch {
-                    // 上行失败只影响本轮工具回路，降级记日志（不含 key）
-                    NSLog("PoLang:CloudAgent postToolResult failed: \(error.localizedDescription)")
-                }
+            },
+            onToolRequest: { [weak self] requestId, tool, args in
+                self?.handleToolRequest(requestId: requestId, tool: tool, args: args)
             }
-        case .openUiDelta:
-            break // 主聊天流式预览由 ChatViewModel 消费；调试页 M1 不上屏（帧解析不崩即可）
-        case .done:
-            inFlight = false
-        case .error(let message):
-            append(Message(id: nextId(), role: .error, text: message))
-            inFlight = false
-        }
+        )
     }
 
-    private func handleEvent(_ event: [String: Any]) {
-        guard let payload = event["payload"] as? [String: Any],
-              let type = event["type"] as? String else { return }
-        switch type {
-        case "message":
-            guard let role = event["role"] as? String, role == "assistant",
-                  let content = payload["content"] as? String else { return }
-            append(Message(id: nextId(), role: .assistant, text: content))
-        case "html_card":
-            // render_html 服务端工具产物卡（§4.9 挂账清偿；html 为空不上屏空卡）
-            if let html = payload["html"] as? String, !html.isEmpty {
-                appendHtmlCard(html: html, summary: payload["summary"] as? String ?? "")
+    /// 设备工具桥：端执行不阻塞收帧循环（并发执行，完成即上行；产物拦截 HTML 不出端）。
+    private func handleToolRequest(requestId: String, tool: String, args: [String: String]) {
+        append(Message(id: nextId(), role: .tool, text: tool))
+        let sid = sessionId
+        let token = appToken
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await executeTool(tool: tool, args: args)
+            // 产物拦截（注册制，contracts.md C4）：run_gallery_script 图卡信封 →
+            // 本地 HTML 卡逐张上屏，上行只带 summary+stats——HTML 不出端、
+            // 不进 LLM 上下文（对齐 Android CloudAgentTurnRunner）。
+            let artifact = CloudAgentScriptRunner.parseHtmlArtifact(result)
+            if let artifact {
+                for card in artifact.cards {
+                    self.appendHtmlCard(html: card.html, summary: card.summary)
+                }
             }
-        default:
-            break // action/observation/finish 不上屏（tool 行由 tool_request 帧驱动）
+            let postResult: String
+            if let artifact {
+                var up: [String: Any] = [
+                    "html_card": "emitted",
+                    "summary": artifact.cards.map { card in card.summary }
+                        .joined(separator: "；"),
+                ]
+                // stats 为 JSON 值串（parseHtmlArtifact 保证），回嵌为原始 JSON 值
+                if let stats = artifact.stats, let data = stats.data(using: .utf8),
+                   let value = try? JSONSerialization.jsonObject(with: data) {
+                    up["stats"] = value
+                }
+                postResult = Self.jsonString(of: up) ?? "{\"html_card\":\"emitted\"}"
+            } else {
+                postResult = result
+            }
+            do {
+                try await client.postToolResult(
+                    token: token, sessionId: sid, requestId: requestId,
+                    ok: !result.hasPrefix(Self.errorPrefix), result: postResult
+                )
+            } catch {
+                // 上行失败只影响本轮工具回路，降级记日志（不含 key）
+                NSLog("PoLang:CloudAgent postToolResult failed: \(error.localizedDescription)")
+            }
         }
     }
 

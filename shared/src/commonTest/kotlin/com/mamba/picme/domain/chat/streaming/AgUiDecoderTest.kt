@@ -1,9 +1,12 @@
 package com.mamba.picme.domain.chat.streaming
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * AG-UI 解码器测试（spec《2026-11-28-ag-ui-migration-design》§6）：
@@ -131,5 +134,30 @@ class AgUiDecoderTest {
         assertEquals(emptyList(), adapter.onFrame(AgUiFrame.RunError("boom", null)))
         assertEquals(emptyList(), adapter.onFrame(AgUiFrame.Custom("device_tool_request", null)))
         assertEquals(emptyList(), adapter.onFrame(AgUiFrame.ToolCallResult("m", "act-1", "ok")))
+    }
+
+    // ---------- iOS 桥接预序列化出口（K/N NSDictionary 包装拿不到 kotlinx toString 语义） ----------
+
+    @Test
+    fun `custom value serializes to json string`() {
+        val value = buildJsonObject {
+            put("request_id", "r-1")
+            put("tool_name", "search_media")
+        }
+        val frame = AgUiFrame.Custom("device_tool_request", value)
+        val jsonText = frame.valueAsJsonString()
+        assertTrue(jsonText != null && "\"request_id\":\"r-1\"" in jsonText)
+        assertTrue("\"tool_name\":\"search_media\"" in jsonText!!)
+        assertNull(AgUiFrame.Custom("device_tool_request", null).valueAsJsonString())
+    }
+
+    @Test
+    fun `run finished metadata serializes to json string`() {
+        val metadata = buildJsonObject {
+            put("elapsed_ms", 123)
+        }
+        val jsonText = AgUiFrame.RunFinished("s", "r", metadata).metadataAsJsonString()
+        assertTrue(jsonText != null && "\"elapsed_ms\":123" in jsonText)
+        assertNull(AgUiFrame.RunFinished("s", "r", null).metadataAsJsonString())
     }
 }

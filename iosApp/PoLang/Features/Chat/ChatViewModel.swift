@@ -489,9 +489,11 @@ final class ChatViewModel: ObservableObject {
         let byokKey = session.byokApiKey.isEmpty ? nil : session.byokApiKey
         // 帧序管道：SSE reader 串行产帧 → MainActor 消费任务串行回灌（保序；流结束排空后收尾）
         let pipe = CloudFramePipe()
+        // AG-UI v2 回合级翻译器（文本块聚合 / 工具参数累计，2026-11-28 M3）
+        let translator = AgUiCloudTurnTranslator()
         let consumer = Task { @MainActor [weak self] in
             while let frame = await pipe.next() {
-                self?.handleCloudFrame(frame, sessionId: sessionId, token: token,
+                self?.handleCloudFrame(frame, translator: translator, sessionId: sessionId, token: token,
                                        outcome: &outcome, placeholderId: placeholderId)
             }
         }
@@ -512,39 +514,44 @@ final class ChatViewModel: ObservableObject {
         return outcome
     }
 
-    /// 单帧处理：事件映射 + 占位气泡更新 + 工具端执行 + 卡快照入队。
+    /// 单帧处理：AG-UI 翻译器事件分发 + 占位气泡更新 + 工具端执行 + 卡快照入队。
     private func handleCloudFrame(
-        _ frame: CloudAgentFrame,
+        _ frame: AgUiFrame,
+        translator: AgUiCloudTurnTranslator,
         sessionId: String,
         token: String,
         outcome: inout CloudTurnOutcome,
         placeholderId: String
     ) {
-        for event in CloudTurnEventMapper.map(frame: frame) {
-            switch event {
-            case .assistantText(let text):
-                outcome.answer += outcome.answer.isEmpty ? text : "\n\n\(text)"
-                updateStreamingPlaceholder(placeholderId, content: outcome.answer)
-            case .openUiCard(let program, let fallbackSummary):
-                // 卡前文本同款快照：SSE 结束后按序落库
-                outcome.cardQueue.append((outcome.answer, program, fallbackSummary))
-                outcome.answer = ""
-            case .openUiCardDelta(let program):
-                openUiStreamProgram = program // 瞬态内存轨；正式卡落库后让位
-            case .htmlCard(let html, let summary):
-                emitCloudHtmlCard(html: html, summary: summary)
-            case .error(let message):
-                outcome.serverError = message
-            case .done(let promptTokens, let completionTokens, let elapsedMs, let langVersion):
-                outcome.donePerformance = CloudTurnEventMapper.performance(
-                    promptTokens: promptTokens, completionTokens: completionTokens, elapsedMs: elapsedMs)
-                outcome.doneLangVersion = langVersion
+        translator.onFrame(
+            frame,
+            onEvent: { [weak self] event in
+                guard let self else { return }
+                switch event {
+                case .assistantText(let text):
+                    outcome.answer += outcome.answer.isEmpty ? text : "\n\n\(text)"
+                    updateStreamingPlaceholder(placeholderId, content: outcome.answer)
+                case .openUiCard(let program, let fallbackSummary):
+                    // 卡前文本同款快照：SSE 结束后按序落库
+                    outcome.cardQueue.append((outcome.answer, program, fallbackSummary))
+                    outcome.answer = ""
+                case .openUiCardDelta(let program):
+                    openUiStreamProgram = program // 瞬态内存轨；正式卡落库后让位
+                case .htmlCard(let html, let summary):
+                    emitCloudHtmlCard(html: html, summary: summary)
+                case .error(let message):
+                    outcome.serverError = message
+                case .done(let promptTokens, let completionTokens, let elapsedMs, let langVersion):
+                    outcome.donePerformance = AgUiCloudTurnTranslator.performance(
+                        promptTokens: promptTokens, completionTokens: completionTokens, elapsedMs: elapsedMs)
+                    outcome.doneLangVersion = langVersion
+                }
+            },
+            onToolRequest: { [weak self] requestId, tool, args in
+                self?.executeCloudTool(requestId: requestId, tool: tool, args: args,
+                                       sessionId: sessionId, token: token)
             }
-        }
-        if case .toolRequest(let requestId, let tool, let args, _) = frame {
-            executeCloudTool(requestId: requestId, tool: tool, args: args,
-                             sessionId: sessionId, token: token)
-        }
+        )
     }
 
     /// 端执行工具（shared IosCloudAgentToolBridge + run_gallery_script 无头沙盒）+ 上行；

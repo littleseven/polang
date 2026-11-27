@@ -42,6 +42,16 @@ sealed interface AgUiFrame {
 }
 
 /**
+ * iOS 桥接（2026-11-28 M3）：kotlinx [JsonObject] 字段的 JSON 文本出口——
+ * K/N 把 Kotlin Map 导出为 NSDictionary 包装，Swift 侧拿不到 kotlinx `toString()`
+ * 的 JSON 序列化语义（拿到的是 plist description），故由 Kotlin 侧预序列化。
+ */
+fun AgUiFrame.Custom.valueAsJsonString(): String? = value?.toString()
+
+/** 同 [valueAsJsonString]：RUN_FINISHED metadata → JSON 文本。 */
+fun AgUiFrame.RunFinished.metadataAsJsonString(): String? = metadata?.toString()
+
+/**
  * SSE block → [AgUiFrame] 解析。纯逻辑：未知 type / 非法 JSON / 缺关键字段一律 null
  * 容错跳过（`CloudSseParser` 先例——服务端后续新增事件族时旧端零感知）。
  */
