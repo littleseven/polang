@@ -281,7 +281,7 @@ object RenderOpenUiValidator {
             // 2026-10-31 真机回归「查看全部点击无效」：只传 actionLabel 不传 action 时端侧
             // 虽有同文案 @ToAssistant 兜底，但显式 action 文案语境更准（兜底只有标题上下文）
             if (NAMED_ACTION_LABEL.containsMatchIn(args) && !NAMED_ACTION.containsMatchIn(args)) {
-                warnings += "CardHeader 有 actionLabel 但缺 action——尾部「查看全部」类动作位请显式配 action = @ToAssistant(\"查看全部 <分组语境>\")（以用户消息上行回话；缺省端侧仅兜底发同文案，语境不准）"
+                warnings += "CardHeader 有 actionLabel 但缺 action——尾部「查看全部」类动作位请显式配 action：照片浏览卡用 @Navigate(\"scan_photos\", \"<handleId>\")（端侧全屏翻页看全量命中集，handleId = 本卡 Query 句柄 id 段），其它语义用 @ToAssistant(\"<意图>\")（缺省端侧仅兜底发消息绕回模型，语境不准且无法全量展示）"
             }
         }
         // 2026-11-01 review Y6：同病灶扩展到 ListItem（命名键 = 形态）与 ListBlock（对象字段

@@ -125,6 +125,7 @@
     <string name="chat_gacha_pick_hint">點選一張候選預覽，確認後套用</string>
     <string name="chat_gacha_expired">該組候選已過期，可重新發起優化</string>
     <string name="chat_gacha_confirm_failed">套用失敗，請重試</string>
+    <string name="chat_scan_photos_unavailable">無法開啟全部照片</string>
     <string name="chat_gacha_reroll_unavailable">換一組暫不可用，請稍後再試</string>
     <string name="remove_background">去背景</string>
     <string name="remove_background_failed">去背景失敗</string>
