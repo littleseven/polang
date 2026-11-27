@@ -213,7 +213,9 @@ import com.mamba.picme.features.chat.components.EngineerTaskFullpageDialog
 import com.mamba.picme.features.chat.components.USE_OPENUI_TASKCARD_RENDER
 import com.mamba.picme.features.chat.components.GuestNudgeBanner
 import com.mamba.picme.features.chat.components.GachaCandidateStrip
-import com.mamba.picme.features.chat.components.ChatImagePreviewOverlay
+import com.mamba.picme.features.chat.components.CHAT_PLACEHOLDER_ASSET_ID
+import com.mamba.picme.features.chat.components.ChatMediaPagerOverlay
+import com.mamba.picme.features.chat.components.shareChatLocalImage
 import com.mamba.picme.features.gallery.MediaViewModel
 import com.mamba.picme.agent.core.model.context.MediaAsset
 import com.mamba.picme.features.gallery.components.TRASH_TAG_PREVIEW_CHAT
@@ -261,6 +263,8 @@ fun ChatScreen(
     onNavigateToSettings: () -> Unit,
     mediaViewModel: MediaViewModel,
     onNavigateToPhotoEditor: (uri: String, autoOptimize: Boolean) -> Unit = { _, _ -> },
+    /** 证件照导航（2026-11-27 预览统一 MediaPager 后底栏证件照入口；仅图库媒体可路由） */
+    onNavigateToIDPhoto: (uri: String) -> Unit = {},
     /** 任务中心入口（US-12 顶栏任务图标） */
     onNavigateToTaskCenter: () -> Unit = {},
     /** OpenUI 卡 @Navigate 出口（2026-11-01 动作三通道）：目的地闭集 + 可选参数，业务映射在外层 */
@@ -1185,10 +1189,14 @@ fun ChatScreen(
 
             // 图片全屏预览（横滑翻页）——组合序在 HTML 卡全屏查看器之后（z 序置顶：
             // 查看器内 media:// 缩略图点击进原生预览时叠在查看器之上，dismiss 回查看器）
-            // 底栏三件套（分享/编辑/删除）能力面对齐相册 MediaPager（2026-11-19）
-            ChatImagePreviewOverlay(
+            // 2026-11-27 统一：直接复用相册 MediaPager 组件（ChatMediaPagerOverlay 桥接），
+            // 与相册页预览同一页面（缩放/上滑删除/信息面板/OCR/证件照全量继承）；
+            // 依赖 Room 行的回调按 asset.id 守卫（0 = 未入册 chat 私有图，见占位常量）
+            ChatMediaPagerOverlay(
                 state = imagePreview,
                 assetsByUri = previewAssetsByUri,
+                isTrashSupported = mediaViewModel.isTrashSupported,
+                ocrState = mediaViewModel.ocrState,
                 onSave = { messageId, onDone ->
                     viewModel.saveEditResult(messageId) { ok ->
                         if (ok) {
@@ -1203,9 +1211,44 @@ fun ChatScreen(
                         onDone(ok)
                     }
                 },
-                onShare = { asset -> shareMediaAssets(context, listOf(asset)) },
-                onEdit = { page -> onNavigateToPhotoEditor(page.rawUri, false) },
-                onDelete = { asset -> trashPreviewAsset(asset) },
+                onShare = { asset ->
+                    if (asset.id > CHAT_PLACEHOLDER_ASSET_ID) {
+                        shareMediaAssets(context, listOf(asset))
+                    } else {
+                        shareChatLocalImage(context, asset.uri)
+                    }
+                },
+                onEdit = { asset -> onNavigateToPhotoEditor(asset.uri, false) },
+                onAiOptimize = { asset -> onNavigateToPhotoEditor(asset.uri, true) },
+                onIdPhoto = { asset ->
+                    if (asset.id > CHAT_PLACEHOLDER_ASSET_ID) onNavigateToIDPhoto(asset.uri)
+                },
+                onDelete = { asset ->
+                    if (asset.id > CHAT_PLACEHOLDER_ASSET_ID) trashPreviewAsset(asset)
+                },
+                onSwipeUpDelete = { asset ->
+                    if (asset.id > CHAT_PLACEHOLDER_ASSET_ID) {
+                        mediaViewModel.requestTrash(asset, TRASH_TAG_PREVIEW_CHAT)
+                    }
+                },
+                onStartOcr = { uriString ->
+                    mediaViewModel.recognizeTextFromCurrentImage(context, uriString.toUri())
+                },
+                onDismissOcr = { mediaViewModel.clearOcrResult() },
+                onTriggerSummary = { id ->
+                    if (id > CHAT_PLACEHOLDER_ASSET_ID) mediaViewModel.triggerSummaryOnDemand(id)
+                },
+                onPageViewed = { uri -> mediaViewModel.markMediaViewed(uri) },
+                onReTag = { uri ->
+                    val container = (context.applicationContext as PoLangApplication).container
+                    val resultJson = container.tagGenerationScheduler.processSingleSync(uri.toString())
+                    if (resultJson != null) mediaViewModel.refreshLabels()
+                    resultJson
+                },
+                onDescribeImage = { uri ->
+                    val container = (context.applicationContext as PoLangApplication).container
+                    container.tagGenerationScheduler.describeImage(uri.toString())
+                },
                 onPageChanged = { page ->
                     if (page.isEditableResult) viewModel.touchEditImage(page.rawUri)
                 },

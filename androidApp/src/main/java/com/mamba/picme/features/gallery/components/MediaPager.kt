@@ -160,6 +160,9 @@ fun MediaPager(
     onNavigateToEditor: (MediaAsset) -> Unit,
     onAiOptimize: (MediaAsset) -> Unit,
     onIdPhoto: (MediaAsset) -> Unit = {},
+    /** 宿主自定义分享出口（如 chat 私有目录 file 图经 FileProvider 分享）；
+     * null = 内置 ACTION_SEND 直发 `asset.uri`（content:// 相册媒体场景）。 */
+    onShare: ((MediaAsset) -> Unit)? = null,
     onReTag: suspend (Uri) -> String? = { null },
     onDescribeImage: suspend (Uri) -> String? = { null },
     onTriggerSummary: (Long) -> Unit = {},
@@ -495,12 +498,17 @@ fun MediaPager(
                         val selectedAsset = assets.getOrNull(pagerState.currentPage)
                         Log.d("Gallery", "Share media from pager: ${selectedAsset?.id}")
                         selectedAsset?.let { asset ->
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                putExtra(Intent.EXTRA_STREAM, asset.uri.toUri())
-                                type = if (asset.type == MediaType.VIDEO) "video/*" else "image/*"
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            val shareOverride = onShare
+                            if (shareOverride != null) {
+                                shareOverride(asset)
+                            } else {
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    putExtra(Intent.EXTRA_STREAM, asset.uri.toUri())
+                                    type = if (asset.type == MediaType.VIDEO) "video/*" else "image/*"
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, null))
                             }
-                            context.startActivity(Intent.createChooser(shareIntent, null))
                         }
                     },
                     onStartEdit = {

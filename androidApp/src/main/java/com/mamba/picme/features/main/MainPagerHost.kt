@@ -210,6 +210,12 @@ fun MainPagerHost(
                         navOptions { launchSingleTop = true }
                     )
                 },
+                onNavigateToIDPhoto = { uri ->
+                    navController.navigate(
+                        Screen.IDPhoto.createRoute(sourceUri = uri),
+                        navOptions { launchSingleTop = true }
+                    )
+                },
                 onNavigateToTaskCenter = {
                     navController.navigate(Screen.TaskCenter.route, navOptions { launchSingleTop = true })
                 },
