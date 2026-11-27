@@ -120,8 +120,8 @@ object Migrations {
                 it[LlmChannels.authStyle] = "bearer"
                 it[LlmChannels.apiToken] = ""
                 it[LlmChannels.modelMapJson] = serializeModelMap(mapOf(
-                    "deepseek-chat" to "glm-5.2",
-                    "kimi-k2.6" to "glm-5.2",
+                    "deepseek-chat" to "glm-5.4",
+                    "kimi-k2.6" to "glm-5.4",
                 ))
                 it[LlmChannels.defaultModel] = CHANNEL_DEFAULT_MODEL.getValue("GLM 直连")
                 it[LlmChannels.enabled] = 0
@@ -231,6 +231,6 @@ private val CHANNEL_DEFAULT_MODEL = mapOf(
     "Cloudflare" to "deepseek/deepseek-chat",
     "TokenHub" to "deepseek-v4-flash-202605",
     "DeepSeek 直连" to "deepseek-v4-flash",
-    "GLM 直连" to "glm-5.2",
+    "GLM 直连" to "glm-5.4",
     "Kimi 直连" to "kimi-k2.7-code",
 )

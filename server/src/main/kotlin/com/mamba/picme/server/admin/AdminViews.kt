@@ -1602,7 +1602,7 @@ object AdminViews {
                         name = "model_map"
                         rows = "6"
                         cols = "50"
-                        +(existing?.modelMap?.let { renderModelMapLines(it) } ?: "deepseek-chat=glm-5.2")
+                        +(existing?.modelMap?.let { renderModelMapLines(it) } ?: "deepseek-chat=glm-5.4")
                     }
                 }
                 p {

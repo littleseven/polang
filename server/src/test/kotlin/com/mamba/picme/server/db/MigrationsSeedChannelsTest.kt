@@ -56,7 +56,7 @@ class MigrationsSeedChannelsTest {
         assertEquals("deepseek/deepseek-chat", byName["Cloudflare"]!!.defaultModel)
         assertEquals("deepseek-v4-flash-202605", byName["TokenHub"]!!.defaultModel)
         assertEquals("deepseek-v4-flash", byName["DeepSeek 直连"]!!.defaultModel)
-        assertEquals("glm-5.2", byName["GLM 直连"]!!.defaultModel)
+        assertEquals("glm-5.4", byName["GLM 直连"]!!.defaultModel)
         assertEquals("kimi-k2.7-code", byName["Kimi 直连"]!!.defaultModel)
     }
 
