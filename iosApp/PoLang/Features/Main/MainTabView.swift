@@ -221,6 +221,13 @@ struct MainTabView: View {
                         switchPage(1)
                     case .modelCenter:
                         router.showModelCenter = true
+                    case .organizeHub:
+                        // 对位 Android MainActivity：ORGANIZE_HUB → 整理页 ORGANIZE Tab
+                        //（segment 为 OrganizeHomeView AppStorage，经 UserDefaults 键驱动）
+                        UserDefaults.standard.set(
+                            OrganizeHomeView.Segment.organize.rawValue,
+                            forKey: "organize_home_segment")
+                        switchPage(1)
                     }
                 })
         }
