@@ -167,6 +167,8 @@ class CloudAgentChatViewModel(
                     text,
                     byokApiKey,
                     replyLanguage,
+                    // AG-UI 回滚闸（spec《AG-UI 迁移》M2，与主聊天同一 DataStore 闸）
+                    agUiEnabled = settingsRepository.cloudAgUiEnabledFlow.first(),
                 ) { event ->
                     when (event) {
                         is CloudTurnEvent.AssistantText ->

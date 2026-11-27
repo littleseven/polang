@@ -1,5 +1,6 @@
 package com.mamba.picme.data.remote.picme
 
+import com.mamba.picme.domain.chat.streaming.AgUiFrame
 import kotlinx.coroutines.test.runTest
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -140,6 +141,52 @@ class CloudAgentClientTest {
         assertEquals("ENGLISH", server.takeRequest().getHeader("X-App-Language"))
         assertEquals(null, server.takeRequest().getHeader("X-App-Language"))
         server.shutdown()
+    }
+
+    // ── v2（AG-UI）端点（spec《AG-UI 迁移》M2） ─────────────────────
+
+    @Test
+    fun `postMessageV2 posts to v2 url and parses ag-ui frames`() = runTest {
+        val server = MockWebServer()
+        val sse = "data: {\"type\":\"RUN_STARTED\",\"threadId\":\"s_1\",\"runId\":\"run-abc\"}\n\n" +
+            "data: {\"type\":\"TEXT_MESSAGE_START\",\"messageId\":\"m1\",\"role\":\"assistant\"}\n\n" +
+            "data: {\"type\":\"TEXT_MESSAGE_CONTENT\",\"messageId\":\"m1\",\"delta\":\"你好\"}\n\n" +
+            "data: {\"type\":\"TEXT_MESSAGE_END\",\"messageId\":\"m1\"}\n\n" +
+            "data: {\"type\":\"RUN_FINISHED\",\"threadId\":\"s_1\",\"runId\":\"run-abc\",\"metadata\":{\"elapsed_ms\":10}}\n\n"
+        server.enqueue(MockResponse().setResponseCode(200).setHeader("Content-Type", "text/event-stream").setBody(sse))
+        server.start()
+        val client = CloudAgentClient(server.url("/").toString().removeSuffix("/"))
+        val frames = mutableListOf<AgUiFrame>()
+        val result = client.postMessageV2("tok", "s_1", "hi", byokApiKey = null, onFrame = { frame -> frames.add(frame) })
+        assertTrue(result.isSuccess)
+        assertEquals("/agent/v2/sessions/s_1/messages", server.takeRequest().path)
+        assertEquals(5, frames.size)
+        assertTrue(frames[0] is AgUiFrame.RunStarted)
+        assertTrue(frames[1] is AgUiFrame.TextMessageStart)
+        assertEquals("你好", (frames[2] as AgUiFrame.TextMessageContent).delta)
+        assertTrue(frames[3] is AgUiFrame.TextMessageEnd)
+        assertTrue(frames[4] is AgUiFrame.RunFinished)
+        server.shutdown()
+    }
+
+    @Test
+    fun `postMessageV2 http 404 surfaces failure for route-miss fallback`() = runTest {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(404).setBody("Not Found"))
+        server.start()
+        val client = CloudAgentClient(server.url("/").toString().removeSuffix("/"))
+        val result = client.postMessageV2("tok", "s_1", "hi", byokApiKey = null, onFrame = {})
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.startsWith("HTTP 404") == true)
+        server.shutdown()
+    }
+
+    @Test
+    fun `ag ui endpoint supported flag flips after mark`() {
+        val client = CloudAgentClient("http://localhost")
+        assertTrue(client.agUiEndpointSupported)
+        client.markAgUiEndpointUnsupported()
+        assertTrue(!client.agUiEndpointSupported)
     }
 
     @Test

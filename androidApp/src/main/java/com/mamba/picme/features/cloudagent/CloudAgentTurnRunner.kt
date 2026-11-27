@@ -7,8 +7,12 @@ import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
 import com.mamba.picme.domain.chat.openui.OpenUiProgramSummary
+import com.mamba.picme.domain.chat.streaming.AgUiFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import org.json.JSONObject
 
 /** 云端回合上屏/收尾信号（Chat 主页与调试页共用）。 */
@@ -70,58 +74,95 @@ class CloudAgentTurnRunner(
         byokApiKey: String?,
         /** App 界面语言（shared `ReplyLanguage.name`；null 走服务端简中缺省）。 */
         replyLanguage: String? = null,
+        /**
+         * AG-UI 回滚闸（spec《AG-UI 迁移》M2，DataStore `cloud_ag_ui_enabled` 默认 true）：
+         * true = 优先 v2 端点，路由缺失（老服务端 404/406 无 error 体）自动回落 v1 同会话重发
+         * （v2 路由未命中不产生副作用，重发安全）；false = 强制 v1 kind 帧链路。
+         */
+        agUiEnabled: Boolean = true,
         onEvent: (CloudTurnEvent) -> Unit,
-    ): Result<Unit> = api.postMessage(
-        appToken,
-        sessionId,
-        text,
-        byokApiKey?.takeIf { key -> key.isNotBlank() },
-        replyLanguage,
-    ) { frame ->
-        when (frame) {
-            is CloudFrame.Event -> handleEvent(frame.event, onEvent)
-            is CloudFrame.OpenUiDelta -> onEvent(CloudTurnEvent.OpenUiCardDelta(frame.program))
-            is CloudFrame.ToolRequest -> {
-                onEvent(CloudTurnEvent.ToolCall(frame.tool))
-                toolScope.launch {
-                    val result = deviceToolExecutor.execute(frame.tool, frame.args)
-                    // 产物拦截（注册制）：run_gallery_script 的图卡信封 → 本地 HTML 卡逐张
-                    // 直接上屏（复用 ChatViewModel 的 html_card 落库管线），上行只带 summary+stats——
-                    // HTML 不出端、不进 LLM 上下文（对齐 chat 链路产物拦截的省 token 语义）。
-                    val artifact = CloudAgentScriptTools.parseHtmlArtifact(result)
-                    if (artifact != null) {
-                        artifact.cards.forEach { (html, summary) ->
-                            onEvent(CloudTurnEvent.HtmlCard(html, summary))
-                        }
-                    }
-                    api.postToolResult(
-                        appToken,
-                        sessionId,
-                        frame.requestId,
-                        ok = !CloudAgentToolContract.isError(result),
-                        result = artifact?.let { parsed ->
-                            JSONObject()
-                                .put("html_card", "emitted")
-                                .put("summary", parsed.cards.joinToString("；") { it.second })
-                                .apply {
-                                    parsed.stats?.let { s ->
-                                        put("stats", runCatching { JSONObject(s) }.getOrElse { s })
-                                    }
-                                }
-                                .toString()
-                        } ?: result,
-                    ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
+    ): Result<Unit> {
+        val key = byokApiKey?.takeIf { k -> k.isNotBlank() }
+        if (agUiEnabled && api.agUiEndpointSupported) {
+            val translator = AgUiCloudTurnTranslator()
+            val v2 = api.postMessageV2(appToken, sessionId, text, key, replyLanguage) { frame ->
+                translator.onFrame(frame, onEvent) { requestId, tool, args ->
+                    handleDeviceToolRequest(appToken, sessionId, requestId, tool, args, onEvent)
                 }
             }
-            is CloudFrame.Done -> onEvent(
-                CloudTurnEvent.Done(
-                    promptTokens = frame.promptTokens,
-                    completionTokens = frame.completionTokens,
-                    elapsedMs = frame.elapsedMs,
-                    langVersion = frame.langVersion,
-                ),
-            )
-            is CloudFrame.Error -> onEvent(CloudTurnEvent.Error(frame.message))
+            if (v2.isSuccess || !isAgUiRouteMissing(v2.exceptionOrNull())) return v2
+            api.markAgUiEndpointUnsupported()
+            Logger.w(TAG, "AG-UI v2 endpoint missing, fall back to v1 (session=${sessionId.take(8)})")
+        }
+        return api.postMessage(appToken, sessionId, text, key, replyLanguage) { frame ->
+            when (frame) {
+                is CloudFrame.Event -> handleEvent(frame.event, onEvent)
+                is CloudFrame.OpenUiDelta -> onEvent(CloudTurnEvent.OpenUiCardDelta(frame.program))
+                is CloudFrame.ToolRequest -> {
+                    onEvent(CloudTurnEvent.ToolCall(frame.tool))
+                    handleDeviceToolRequest(appToken, sessionId, frame.requestId, frame.tool, frame.args, onEvent)
+                }
+                is CloudFrame.Done -> onEvent(
+                    CloudTurnEvent.Done(
+                        promptTokens = frame.promptTokens,
+                        completionTokens = frame.completionTokens,
+                        elapsedMs = frame.elapsedMs,
+                        langVersion = frame.langVersion,
+                    ),
+                )
+                is CloudFrame.Error -> onEvent(CloudTurnEvent.Error(frame.message))
+            }
+        }
+    }
+
+    /**
+     * v2 路由缺失判定：HTTP 404/406 且响应体不含服务端业务 error 体——
+     * 新服务端的业务 404（session_not_found 等）带 `{"error":...}` JSON，不属路由缺失，
+     * 照常上抛（ChatViewModel 会话失效重建重试语义不变）。
+     */
+    private fun isAgUiRouteMissing(e: Throwable?): Boolean {
+        val msg = e?.message ?: return false
+        if (!msg.startsWith("HTTP 404") && !msg.startsWith("HTTP 406")) return false
+        return !msg.contains("\"error\"")
+    }
+
+    /** 设备工具桥：端执行 + postToolResult 上行（v1 tool_request 帧 / v2 CUSTOM 帧共用）。 */
+    private fun handleDeviceToolRequest(
+        appToken: String,
+        sessionId: String,
+        requestId: String,
+        tool: String,
+        args: JSONObject,
+        onEvent: (CloudTurnEvent) -> Unit,
+    ) {
+        toolScope.launch {
+            val result = deviceToolExecutor.execute(tool, args)
+            // 产物拦截（注册制）：run_gallery_script 的图卡信封 → 本地 HTML 卡逐张
+            // 直接上屏（复用 ChatViewModel 的 html_card 落库管线），上行只带 summary+stats——
+            // HTML 不出端、不进 LLM 上下文（对齐 chat 链路产物拦截的省 token 语义）。
+            val artifact = CloudAgentScriptTools.parseHtmlArtifact(result)
+            if (artifact != null) {
+                artifact.cards.forEach { (html, summary) ->
+                    onEvent(CloudTurnEvent.HtmlCard(html, summary))
+                }
+            }
+            api.postToolResult(
+                appToken,
+                sessionId,
+                requestId,
+                ok = !CloudAgentToolContract.isError(result),
+                result = artifact?.let { parsed ->
+                    JSONObject()
+                        .put("html_card", "emitted")
+                        .put("summary", parsed.cards.joinToString("；") { it.second })
+                        .apply {
+                            parsed.stats?.let { s ->
+                                put("stats", runCatching { JSONObject(s) }.getOrElse { s })
+                            }
+                        }
+                        .toString()
+                } ?: result,
+            ).onFailure { e -> Logger.w(TAG, "postToolResult failed: ${e.message}") }
         }
     }
 
@@ -188,5 +229,125 @@ class CloudAgentTurnRunner(
 
     companion object {
         private const val TAG = "CloudAgent"
+    }
+}
+
+/**
+ * v2（AG-UI）帧 → [CloudTurnEvent] 翻译器（spec《AG-UI 迁移》§4 映射表的端侧倒影）。
+ * 单回合状态（文本块聚合 / 工具参数累计），每回合由 [CloudAgentTurnRunner.runTurn] 新建。
+ *
+ * 与 v1 [CloudAgentTurnRunner.handleEvent] 对齐的口径：
+ * - TEXT_MESSAGE_* 聚合成整条文本后走同一 `looksLikeProgram` 嗅探（程序 → OpenUiCard，
+ *   否则 AssistantText）；多块流式增量经 `looksLikeProgramPrefix` 门判出 OpenUiCardDelta
+ *   （单 chunk 块 = 非流式整条消息，不出预览帧，对齐 v1 openui_delta 仅程序流产出的语义）；
+ *   role=user 块整段跳过（用户消息本地已先上屏）；
+ * - TOOL_CALL_START → StepStarted（toolCallId `act-{eventId}` 解析回服务端事件 id）；
+ *   ARGS 累计到 END 全量解析（render_ui_openui → OpenUiCard，坏帧记日志容错同 v1）；
+ * - TOOL_CALL_RESULT → StepFinished（`act-0` 孤儿帧跳过，同 v1 actionEventId=0 口径）；
+ * - CUSTOM(device_tool_request) → 设备工具桥（ToolCall 上屏由调用方回调触发）；
+ * - RUN_FINISHED metadata → Done；RUN_ERROR → Error；RUN_STARTED 仅回合边界信号。
+ */
+private class AgUiCloudTurnTranslator {
+
+    /** 进行中文本块：messageId → (role, 累计文本, content 帧计数)。 */
+    private data class TextBlock(val role: String, val buf: StringBuilder, var chunks: Int)
+
+    private val textBlocks = mutableMapOf<String, TextBlock>()
+    private val toolNames = mutableMapOf<String, String>()
+    private val toolArgs = mutableMapOf<String, StringBuilder>()
+
+    fun onFrame(
+        frame: AgUiFrame,
+        onEvent: (CloudTurnEvent) -> Unit,
+        onToolRequest: (requestId: String, tool: String, args: JSONObject) -> Unit,
+    ) {
+        when (frame) {
+            is AgUiFrame.RunStarted -> Unit // 回合边界信号（v1 无对应物），暂不上屏
+            is AgUiFrame.TextMessageStart -> textBlocks[frame.messageId] =
+                TextBlock(frame.role, StringBuilder(), 0)
+            is AgUiFrame.TextMessageContent -> textBlocks[frame.messageId]?.let { block ->
+                block.buf.append(frame.delta)
+                block.chunks++
+                // 流式程序预览：第二 chunk 起（单 chunk = 非流式整条消息）且前缀像程序
+                if (block.role == "assistant" && block.chunks >= 2 &&
+                    OpenUiProgramSummary.looksLikeProgramPrefix(block.buf.toString())
+                ) {
+                    onEvent(CloudTurnEvent.OpenUiCardDelta(block.buf.toString()))
+                }
+            }
+            is AgUiFrame.TextMessageEnd -> textBlocks.remove(frame.messageId)?.let { block ->
+                if (block.role != "assistant") return@let
+                val content = block.buf.toString()
+                if (OpenUiProgramSummary.looksLikeProgram(content)) {
+                    onEvent(
+                        CloudTurnEvent.OpenUiCard(
+                            program = content,
+                            fallbackSummary = OpenUiProgramSummary.extractFallbackSummary(content),
+                        ),
+                    )
+                } else {
+                    onEvent(CloudTurnEvent.AssistantText(content))
+                }
+            }
+            is AgUiFrame.ToolCallStart -> {
+                toolNames[frame.toolCallId] = frame.toolCallName
+                toolArgs[frame.toolCallId] = StringBuilder()
+                parseActEventId(frame.toolCallId)?.let { stepId ->
+                    onEvent(CloudTurnEvent.StepStarted(stepId, frame.toolCallName))
+                }
+            }
+            is AgUiFrame.ToolCallArgs -> toolArgs[frame.toolCallId]?.append(frame.delta)
+            is AgUiFrame.ToolCallEnd -> {
+                val args = toolArgs.remove(frame.toolCallId)?.toString() ?: ""
+                if (toolNames.remove(frame.toolCallId) == CloudAgentToolContract.TOOL_RENDER_UI_OPENUI) {
+                    // 与 v1 action 帧同口径：坏 args 记日志忽略，不拖垮整回合
+                    runCatching {
+                        val argsJson = JSONObject(args)
+                        CloudTurnEvent.OpenUiCard(
+                            program = argsJson.getString("program"),
+                            fallbackSummary = argsJson.optString("fallbackSummary"),
+                        )
+                    }.onSuccess { card -> onEvent(card) }
+                        .onFailure { e ->
+                            Logger.w(TAG, "render_ui_openui v2 args ignored: ${e.message}")
+                        }
+                }
+            }
+            is AgUiFrame.ToolCallResult -> {
+                val stepId = parseActEventId(frame.toolCallId)
+                // act-0 = 渲染门控例行孤儿帧（v1 actionEventId=0 同口径跳过）
+                if (stepId != null && stepId != 0L) {
+                    onEvent(CloudTurnEvent.StepFinished(stepId, !frame.content.startsWith("error")))
+                }
+            }
+            is AgUiFrame.Custom -> if (frame.name == CUSTOM_DEVICE_TOOL_REQUEST) {
+                val value = frame.value
+                val requestId = value?.get("request_id")?.jsonPrimitive?.content.orEmpty()
+                val tool = value?.get("tool")?.jsonPrimitive?.content.orEmpty()
+                if (requestId.isNotBlank() && tool.isNotBlank()) {
+                    onEvent(CloudTurnEvent.ToolCall(tool))
+                    val args = value?.get("args")?.toString()?.let { runCatching { JSONObject(it) }.getOrNull() }
+                        ?: JSONObject()
+                    onToolRequest(requestId, tool, args)
+                }
+            }
+            is AgUiFrame.RunFinished -> onEvent(
+                CloudTurnEvent.Done(
+                    promptTokens = frame.metadata?.get("prompt_tokens")?.jsonPrimitive?.longOrNull,
+                    completionTokens = frame.metadata?.get("completion_tokens")?.jsonPrimitive?.longOrNull,
+                    elapsedMs = frame.metadata?.get("elapsed_ms")?.jsonPrimitive?.longOrNull,
+                    langVersion = frame.metadata?.get("openui_lang_version")?.jsonPrimitive?.intOrNull,
+                ),
+            )
+            is AgUiFrame.RunError -> onEvent(CloudTurnEvent.Error(frame.message))
+        }
+    }
+
+    private fun parseActEventId(toolCallId: String): Long? =
+        toolCallId.removePrefix("act-").toLongOrNull()
+
+    companion object {
+        private const val TAG = "CloudAgent"
+        private const val CUSTOM_DEVICE_TOOL_REQUEST = "device_tool_request"
     }
 }

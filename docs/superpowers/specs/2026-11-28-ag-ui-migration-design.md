@@ -1,7 +1,7 @@
 # 云端 Agent 链路 AG-UI 迁移设计
 
 > **日期**：2026-11-28
-> **状态**：在途（M1 实施中）
+> **状态**：在途（M1/M2 已实施，M3 iOS 跟随待启动）
 > **上游**：ADR-016（parts 文档模型）、ADR-018（云端 Agent 事件溯源）、[AG-UI 协议](https://docs.ag-ui.com/concepts/events)
 > **下游同步**：`CHAT_PROTOCOL_TECH_SPEC.md` §2.9、`server/AGENTS.md` 路由清单（交付时同原子提交）
 
@@ -20,8 +20,8 @@
 
 | 期 | 内容 | 状态 |
 |---|---|---|
-| **M1** | server `TurnFrameSink` 重构 + `AgUiFrameSink` + v2 端点 + 映射表测试；shared/commonMain `AgUiSseParser` + `AgUiTurnAdapter` + commonTest | 在途 |
-| M2 | Android 主聊天切 v2（DataStore 回滚闸 + v1 回落）；删 `CloudSseParser` | 待 |
+| **M1** | server `TurnFrameSink` 重构 + `AgUiFrameSink` + v2 端点 + 映射表测试；shared/commonMain `AgUiSseParser` + `AgUiTurnAdapter` + commonTest | ✅（2026-11-28） |
+| **M2** | Android 主聊天切 v2（DataStore 回滚闸 `cloud_ag_ui_enabled` + 404/406 无 error 体回落 v1 + 粘性标记）；`CloudSseParser` 保留至 v1 下线（回落路径依赖，删除并入 M4） | ✅（2026-11-28） |
 | M3 | iOS 经 shared decoder 跟随（ios-follow 管线，PARITY 验收） | 待 |
 | M4 | interrupt HITL / STATE_DELTA / REASONING 迁移评估；v1 端点下线 | 待 |
 

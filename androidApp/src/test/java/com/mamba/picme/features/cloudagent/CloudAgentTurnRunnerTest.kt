@@ -4,6 +4,7 @@ import com.mamba.picme.core.agenttools.CloudAgentScriptTools
 import com.mamba.picme.core.agenttools.DeviceToolExecutor
 import com.mamba.picme.data.remote.picme.CloudAgentApi
 import com.mamba.picme.data.remote.picme.CloudFrame
+import com.mamba.picme.domain.chat.streaming.AgUiFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -43,6 +44,17 @@ class CloudAgentTurnRunnerTest {
             framesScript(onFrame)
             return Result.success(Unit)
         }
+
+        // v2 默认模拟老服务端路由缺失（404 无 error 体）→ 本类 v1 用例经回落路径到达 postMessage
+        override suspend fun postMessageV2(
+            token: String,
+            sessionId: String,
+            content: String,
+            byokApiKey: String?,
+            replyLanguage: String?,
+            onFrame: (AgUiFrame) -> Unit,
+        ): Result<Unit> = Result.failure(RuntimeException("HTTP 404: Not Found"))
+
         override suspend fun postToolResult(token: String, sessionId: String, requestId: String, ok: Boolean, result: String): Result<Unit> {
             toolResults.add(Triple(requestId, ok, result))
             return Result.success(Unit)

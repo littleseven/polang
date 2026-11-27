@@ -3,6 +3,8 @@ package com.mamba.picme.data.remote.picme
 import com.mamba.picme.core.common.Logger
 import com.mamba.picme.data.remote.APP_CHANNEL_HEADER
 import com.mamba.picme.data.remote.appChannelValue
+import com.mamba.picme.domain.chat.streaming.AgUiFrame
+import com.mamba.picme.domain.chat.streaming.AgUiSseParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -100,6 +102,27 @@ interface CloudAgentApi {
         replyLanguage: String? = null,
         onFrame: (CloudFrame) -> Unit,
     ): Result<Unit>
+
+    /**
+     * AG-UI v2 回合（spec《AG-UI 迁移》M2）：`POST /agent/v2/sessions/{id}/messages`，
+     * SSE 帧经 shared `AgUiSseParser` 解析。老服务端无 v2 路由时返回 404/406（响应体
+     * 无服务端 JSON error 体），调用方据此回落 [postMessage]。
+     */
+    suspend fun postMessageV2(
+        token: String,
+        sessionId: String,
+        content: String,
+        byokApiKey: String?,
+        replyLanguage: String? = null,
+        onFrame: (AgUiFrame) -> Unit,
+    ): Result<Unit>
+
+    /** v2 端点是否可用（进程内粘性；路由缺失回落后置 false，免每回合双发探测）。 */
+    val agUiEndpointSupported: Boolean get() = true
+
+    /** 记录 v2 路由缺失（404/406 回落发生时由调用方上报）。 */
+    fun markAgUiEndpointUnsupported() {}
+
     suspend fun postToolResult(token: String, sessionId: String, requestId: String, ok: Boolean, result: String): Result<Unit>
 }
 
@@ -143,6 +166,16 @@ class CloudAgentClient(
         }
         .build()
     private val jsonMedia = "application/json".toMediaType()
+
+    /** v2 路由缺失粘性标记（老服务端无 /agent/v2 路由时置位，后续回合直接走 v1）。 */
+    @Volatile
+    private var agUiRouteMissing = false
+
+    override val agUiEndpointSupported: Boolean get() = !agUiRouteMissing
+
+    override fun markAgUiEndpointUnsupported() {
+        agUiRouteMissing = true
+    }
 
     override suspend fun createSession(token: String, channel: String, model: String, byokBaseUrl: String): Result<JSONObject> =
         withContext(Dispatchers.IO) {
@@ -207,13 +240,52 @@ class CloudAgentClient(
         byokApiKey: String?,
         replyLanguage: String?,
         onFrame: (CloudFrame) -> Unit,
+    ): Result<Unit> = postSse(
+        url = "$baseUrl/agent/sessions/$sessionId/messages",
+        token = token,
+        content = content,
+        byokApiKey = byokApiKey,
+        replyLanguage = replyLanguage,
+        parseBlock = CloudSseParser::parseBlock,
+        onFrame = onFrame,
+    )
+
+    override suspend fun postMessageV2(
+        token: String,
+        sessionId: String,
+        content: String,
+        byokApiKey: String?,
+        replyLanguage: String?,
+        onFrame: (AgUiFrame) -> Unit,
+    ): Result<Unit> = postSse(
+        url = "$baseUrl/agent/v2/sessions/$sessionId/messages",
+        token = token,
+        content = content,
+        byokApiKey = byokApiKey,
+        replyLanguage = replyLanguage,
+        parseBlock = AgUiSseParser::parseBlock,
+        onFrame = onFrame,
+    )
+
+    /**
+     * SSE 回合共用骨架（v1 kind 帧 / v2 AG-UI 帧仅 URL 与解析器不同）：
+     * POST content → 逐 block 解析回调。不用 runCatching：协程取消必须穿透
+     * （停止按钮语义，ClaudeChatClient.chat 先例）。
+     */
+    private suspend fun <T> postSse(
+        url: String,
+        token: String,
+        content: String,
+        byokApiKey: String?,
+        replyLanguage: String?,
+        parseBlock: (String) -> T?,
+        onFrame: (T) -> Unit,
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        // 不用 runCatching：协程取消必须穿透（停止按钮语义，ClaudeChatClient.chat 先例）
         try {
             val body = JSONObject().put("content", content).toString()
-            Logger.d("CloudAgent", "postMessage session=${sessionId.take(8)}")
+            Logger.d("CloudAgent", "postSse ${url.substringAfter(baseUrl)}")
             val req = Request.Builder()
-                .url("$baseUrl/agent/sessions/$sessionId/messages")
+                .url(url)
                 .header("X-App-Token", token)
                 .apply { if (!byokApiKey.isNullOrBlank()) header("X-User-Api-Key", byokApiKey) }
                 // 界面语言头（OpenUI 多语言）：服务端据此追加语言规则段 + 兜底文案五语化
@@ -239,7 +311,7 @@ class CloudAgentClient(
                         if (idx == -1) break
                         val block = sb.substring(0, idx)
                         sb.delete(0, idx + 2)
-                        CloudSseParser.parseBlock(block)?.let(onFrame)
+                        parseBlock(block)?.let(onFrame)
                     }
                 }
             }
