@@ -1070,6 +1070,9 @@ image_preview_overlay:
     background: "black"                   # 纯黑底（不看主题）
     dismiss: [back_key, top_bar_back_button]   # 单击图片 = 切换栏显隐（不再直接关闭）
     pager: horizontal_swipe               # 多页集合横滑翻页（放大态禁翻页）
+  paging_set:                             # 翻页集口径（OpenUI 卡照片点击，2026-11-28 修复）
+    rule: "翻页集 = handle 全量命中集（Room 存完整搜索结果，投影 60 cap 仅 LLM 面，与「查看全部」scan_photos 同口径），初始页 = 点击项在全量有序集中的自然下标（双向翻页，相册语义；替代 2026-11-01「点击位移至首位」）"
+    race_guard: "卡组合期预解析未就绪时（冷启动负 id 反查需数秒），点击时按需同步解析全量集；仍不含点击项（已删除等）才退卡内展示子集兜底"
     zoom: "Telephoto 双指/双击缩放（普通图 4x，长图 3x FillWidth 阅读模式）——2026-11-27 随 MediaPager 恢复"
     swipe_up_delete: "上滑移入回收站（页高 25% 阈值 + 提示胶囊）；仅图库媒体页生效（占位图回调空操作）"
   top_bar:                                 # = MediaPager 顶栏（视觉契约见 gallery.yaml 查看器）

@@ -402,7 +402,8 @@ fun ChatScreen(
 
     /**
      * Html 卡本地媒体缩略图点击 → 原生横滑预览（2026-11-15）：集合语义对齐
-     * OpenUI PhotoGrid（onPhotoClick）——卡内全部 media 引用为翻页集，点击项为初始页。
+     * OpenUI PhotoGrid（onPhotoClick）——卡内全部 media 引用为翻页集，点击项为初始页
+     * （OpenUI 侧 2026-11-28 起为全量集自然下标；本 HTML 路径仍点击项首位）。
      * id→uri 解析走 [LocalMediaWebViewAssets.mediaUriResolver]（组合根注入的真源），
      * Room 主键查询下放 IO 线程（resolver 允许阻塞，主线程禁查）。
      */
@@ -936,10 +937,10 @@ fun ChatScreen(
                                                     onViewStateChange = { viewState ->
                                                         viewModel.persistOpenUiViewStateAsync(item.message.id, viewState)
                                                     },
-                                                    // Image 点击看大图：chat 内预览浮层单页（不跳 PhotoEditor 编辑页）
-                                                    onPhotoClick = { uris ->
-                                                        // 集合语义（2026-11-01）：多 URI = 集合组件（PhotoGrid/Timeline）
-                                                        // → 多页横滑翻页预览（Gallery 语义）；单 URI = 单图预览
+                                                    // Image 点击看大图：chat 内预览浮层（不跳 PhotoEditor 编辑页）
+                                                    // 2026-11-28：翻页集 = handle 全量命中集（宿主已解析），
+                                                    // initialIndex = 点击项在全量有序集中的自然下标（双向翻页）
+                                                    onPhotoClick = { uris, initialIndex ->
                                                         imagePreview = ChatImagePreviewState(
                                                             pages = uris.map { uri ->
                                                                 ImagePreviewPage(
@@ -949,7 +950,7 @@ fun ChatScreen(
                                                                     isSaved = false,
                                                                 )
                                                             },
-                                                            initialIndex = 0,
+                                                            initialIndex = initialIndex,
                                                         )
                                                     },
                                                     // 卡内回话入口（CardHeader「查看全部」等）：

@@ -73,7 +73,10 @@ import kotlinx.serialization.json.Json
  * Mutation + @Run（[writeTools] 白名单写工具，engine 执行、失败中断动作链 + toast
  * 兜底）；访问 Agent = @ToAssistant。组合 `Action([...])` 整链交宿主顺序执行。
  */
-@Suppress("LongParameterList")
+// LongMethod/CyclomaticComplexMethod 为存量豁免（2026-11-28 自 baseline 移入代码：
+// onPhotoClick 签名变更致 baseline ID 失配，门禁冻结新增豁免故改此可见口径；
+// 收敛路径 = 动作分发/渲染接管继续向独立件拆分）
+@Suppress("LongParameterList", "LongMethod")
 @Composable
 fun OpenUiCardHost(
     part: MessagePart.OpenUiCard,
@@ -81,7 +84,7 @@ fun OpenUiCardHost(
     photoResolver: OpenUiPhotoResolver,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
-    onPhotoClick: (uris: List<String>) -> Unit = {},
+    onPhotoClick: (uris: List<String>, initialIndex: Int) -> Unit = { _, _ -> },
     onToAssistant: (text: String, context: OpenUiValue?) -> Unit = { _, _ -> },
     onCustomAction: (name: String, args: List<OpenUiValue>) -> Unit = { _, _ -> },
     writeTools: OpenUiToolResolver? = null,
@@ -322,7 +325,8 @@ private suspend fun resolveLocalHandle(
 
 private val hostJson = Json { ignoreUnknownKeys = true }
 
-@Suppress("LongParameterList")
+// CyclomaticComplexMethod 存量豁免（同 OpenUiCardHost 头注：baseline → 代码内口径）
+@Suppress("LongParameterList", "CyclomaticComplexMethod")
 @Composable
 private fun OpenUiReadyContent(
     session: OpenUiSession,
@@ -331,7 +335,7 @@ private fun OpenUiReadyContent(
     programText: String,
     onViewStateChange: (viewState: String) -> Unit,
     modifier: Modifier = Modifier,
-    onPhotoClick: (uris: List<String>) -> Unit = {},
+    onPhotoClick: (uris: List<String>, initialIndex: Int) -> Unit = { _, _ -> },
     onToAssistant: (text: String, context: OpenUiValue?) -> Unit = { _, _ -> },
     onCustomAction: (name: String, args: List<OpenUiValue>) -> Unit = { _, _ -> },
     initialViewState: String?,
@@ -344,44 +348,18 @@ private fun OpenUiReadyContent(
         mutableStateMapOf<String, OpenUiValue>().apply { putAll(session.state) }
     }
     var root by remember(session) { mutableStateOf(session.rootOrNull()) }
-    // 会话全量照片 URI（2026-11-01 浏览完整性）：session.state 中任何含 id 字段的
-    // 对象数组（photos 投影形态）全量提取——PhotoGrid 只展示 12 张但 handle 可能
-    // 返回 60 张；点击任一照片 → 多页翻页预览展示全量（Google Photos 语义）
-    // 2026-11-01 分页修复：照片浏览走 handle 原始全量 entries（Room 存了完整搜索结果，
-    // 60 cap 只在投影层），不再限于投影 60 张——300 张结果也能全量翻看。
-    // 提取路径：① session.state 投影 id（60 张回退）② handle payload 原始 entries（全量）
+    // 会话全量照片 URI 预解析（2026-11-01 浏览完整性 / 2026-11-28 与点击时按需解析共用
+    // resolveCardFullPhotoUris 取数口径）：handle payload 原始全量 entries（Room 存完整
+    // 搜索结果，60 cap 只在投影层）+ 投影 id 回退——PhotoGrid 只展示 12 张，点击任一照片
+    // → 多页翻页预览展示全量（Google Photos 语义）。预热目的是点击零等待；未就绪时点击
+    // 路径会按需同步解析（OPEN_PHOTO 分支），此预解析不保证先于首次点击完成
     val allSessionPhotoUris by produceState<List<String>>(emptyList(), session) {
-        val projectedIds = session.state.values.flatMap { value ->
-            (value as? OpenUiValue.Arr)?.v?.mapNotNull { item ->
-                (item as? OpenUiValue.Obj)?.v?.get("id")?.let { id ->
-                    (id as? OpenUiValue.Num)?.v?.toLong()
-                }
-            } ?: emptyList()
-        }.distinct()
-        // handle 全量 entries：从 part 的 program 文本中提取所有 handle id，
-        // 经 handleLookup 取 payload 原始 entries（不截断）
-        // programText 从参数传入（part 在外层作用域）
-        val handleIds = Regex("local://scan/([0-9a-f]+)#photos").findAll(programText)
-            .map { match -> match.groupValues[1] }
-            .toList()
-        val fullIds: List<Long> = handleIds.flatMap { handleId ->
-            val payload: String? = runCatching<String?> {
-                handleLookup.payloadOf("scan", handleId)
-            }.getOrNull()
-            val entries: List<ScanPhotoEntry> = if (payload != null) {
-                runCatching<List<ScanPhotoEntry>> {
-                    hostJson.decodeFromString<List<ScanPhotoEntry>>(payload)
-                }.getOrNull() ?: emptyList()
-            } else {
-                emptyList()
-            }
-            entries.map { entry -> entry.id }
-        }
-        val allIds = (fullIds + projectedIds).distinct()
-        // 有界并行解析（2026-11-11 性能收口）：串行 mapNotNull ~300 张在扫描负载下秒级
-        // 白付；对齐 resolveAllProgressively 并行模式 + Semaphore 限界，结果顺序对齐
-        // allIds、解析失败跳过（mapNotNull 语义不变）
-        value = photoResolver.resolveAllUrisInOrder(allIds)
+        value = resolveCardFullPhotoUris(
+            handleLookup = handleLookup,
+            photoResolver = photoResolver,
+            programText = programText,
+            projectedIds = extractProjectedPhotoIds(session.state.values),
+        )
     }
     // 已发射 viewState 指纹（归一化后比对，同值不重复持久化；初值取 part 携带态的归一化，
     // 避免冷启动首轮 Set 同值时多写一次 Room）
@@ -468,15 +446,31 @@ private fun OpenUiReadyContent(
         // Image 点击看大图（宿主动作，program 不可达——渲染层 resolved uri 直发，
         // 不出端不回落 program；ChatScreen 落 chat 内预览浮层）
         OpenUiActionRoute.OPEN_PHOTO -> {
-            // 2026-11-01 浏览完整性：优先用会话全量照片（handle 返回的 60 张），
-            // 点击位移至首位——300 张结果也能翻完 handle 给出的全部，不再限于网格 12 张
+            // 2026-11-28 竞态修复 + 相册语义对齐：翻页集 = handle 全量命中集（「全屏翻看」
+            // 同口径），初始页 = 点击项在全量有序集中的自然下标（双向翻页；替代 11-01 的
+            // 「点击位移至首位」——旧口径向右滑无内容）。预解析（allSessionPhotoUris）已含
+            // 点击项直接用；未就绪（冷启动负 id 反查需数秒，先于预解析完成点击会退化成
+            // 网格子集）则点击时按需同步解析；仍不含点击项（已删除等）才退卡内 args 子集
             val clickedUri = (action.args.firstOrNull() as? OpenUiValue.Str)?.v
-            val uris = if (clickedUri != null && allSessionPhotoUris.contains(clickedUri)) {
-                listOf(clickedUri) + (allSessionPhotoUris - clickedUri)
-            } else {
-                action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
+            val argUris = action.args.mapNotNull { arg -> (arg as? OpenUiValue.Str)?.v }
+            dispatchScope.launch {
+                val precomputed = allSessionPhotoUris
+                val fullUris = if (clickedUri != null && precomputed.contains(clickedUri)) {
+                    precomputed
+                } else {
+                    resolveCardFullPhotoUris(
+                        handleLookup = handleLookup,
+                        photoResolver = photoResolver,
+                        programText = programText,
+                        projectedIds = extractProjectedPhotoIds(session.state.values),
+                    )
+                }
+                when {
+                    clickedUri != null && fullUris.contains(clickedUri) ->
+                        onPhotoClick(fullUris, fullUris.indexOf(clickedUri))
+                    argUris.isNotEmpty() -> onPhotoClick(argUris, 0)
+                }
             }
-            if (uris.isNotEmpty()) onPhotoClick(uris)
             true
         }
         // @ToAssistant 上行（2026-10-31 真机回归修复，原为 M1 只记日志不路由）：

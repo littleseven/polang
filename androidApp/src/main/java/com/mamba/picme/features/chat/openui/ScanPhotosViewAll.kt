@@ -2,6 +2,7 @@ package com.mamba.picme.features.chat.openui
 
 import com.mamba.picme.data.local.HandleLookup
 import com.mamba.picme.domain.chat.openui.OpenUiContract
+import com.mamba.picme.domain.chat.openui.OpenUiValue
 import com.mamba.picme.domain.chat.openui.ScanPhotoEntry
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -34,6 +35,40 @@ internal suspend fun resolveScanPhotoUris(
     val ids = parseScanPhotoIds(handleLookup.payloadOf(OpenUiContract.DOMAIN_SCAN, handleId))
         ?: return null
     return photoResolver.resolveAllUrisInOrder(ids).takeIf { uris -> uris.isNotEmpty() }
+}
+
+private val scanPhotoHandleRegex = Regex("local://scan/([0-9a-f]+)#photos")
+
+/** 卡 program 文本中照片清单 handle（`local://scan/<id>#photos` 绑定）的 id 段全量提取。 */
+internal fun extractScanPhotoHandleIds(programText: String): List<String> =
+    scanPhotoHandleRegex.findAll(programText).map { match -> match.groupValues[1] }.toList()
+
+/** session.state 投影（[{id, date}] 形态对象数组，cap 60）的照片 id 提取，作 handle 全量集的回退。 */
+internal fun extractProjectedPhotoIds(stateValues: Collection<OpenUiValue>): List<Long> =
+    stateValues.flatMap { value ->
+        (value as? OpenUiValue.Arr)?.v?.mapNotNull { item ->
+            ((item as? OpenUiValue.Obj)?.v?.get("id") as? OpenUiValue.Num)?.v?.toLong()
+        } ?: emptyList()
+    }.distinct()
+
+/**
+ * 卡级全量照片 uri 清单（OpenUiCardHost 预解析与照片点击时按需解析共用同一取数口径）：
+ * handle payload 原始 entries（完整搜索结果，60 cap 只在投影层）优先 + 投影 id 回退，
+ * 保序去重后批量解析；解析失败（已删除/未索引）跳过。任一环节失败 → 空列表（调用方兜底）。
+ */
+internal suspend fun resolveCardFullPhotoUris(
+    handleLookup: HandleLookup,
+    photoResolver: OpenUiPhotoResolver,
+    programText: String,
+    projectedIds: List<Long>,
+): List<String> {
+    val fullIds = extractScanPhotoHandleIds(programText).flatMap { handleId ->
+        val payload = runCatching { handleLookup.payloadOf(OpenUiContract.DOMAIN_SCAN, handleId) }
+            .getOrNull()
+        parseScanPhotoIds(payload) ?: emptyList()
+    }
+    val allIds = (fullIds + projectedIds).distinct()
+    return photoResolver.resolveAllUrisInOrder(allIds)
 }
 
 private val scanPhotosJson = Json { ignoreUnknownKeys = true }
