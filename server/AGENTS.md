@@ -15,7 +15,7 @@
 
 **版本**：0.9.57
 
-**最后更新**：2026-11-27
+**最后更新**：2026-11-28
 
 **状态**：生效中 / 已上线
 
@@ -113,7 +113,8 @@ server/
 │   │   ├── SkillTools.kt         # load_skill Koog 工具（@Tool annotation 同 server_time 范式；Koog 无框架级 Skill 抽象，走官方 Tool 扩展点；2026-11-08 工具名/描述/参数描述/error 前缀真引用 shared AgentSkillContract，与端侧 ChatToolService.loadSkill 逐字节一致）
 │   │   ├── TurnUsage.kt          # 回合级 LLM 用量累计（done 帧 elapsed_ms/usage 数据源；流式 End 帧 metaInfo 与非流式 onLLMCallCompleted 两路互斥累加）
 │   │   ├── ToolArgsWireJson.kt   # 工具参数 wire JSON 合规转义（Koog 1.3.0 私有 JSON 树 toString 零转义缺陷修复，replayPending 回放同径）
-│   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）；done 帧自 2026-11-11 起携 `lang_version`（OpenUI 语言协议版本，真引用 shared `OpenUiContract.LANG_VERSION`——端侧落 OpenUiCard part 比对，高于端侧版本时提示升级，旧端忽略未知字段）
+│   │   ├── TurnFrameSink.kt      # 回合 SSE 出站帧汇（AG-UI 迁移 M1，2026-11-28）：TurnFrameSink 接口 + LegacyKindFrameSink（v1 kind 帧逐字节）+ AgUiFrameSink（v2 AG-UI 事件流——快照差分 TEXT_MESSAGE_* 真 delta、终结 Message 去重、act-{eventId} 配对锚、CUSTOM 桥帧）；eventJson/writeSseFrame 同文件 internal 收口
+│   │   └── AgentRoutes.kt        # /agent/** REST + SSE（BYOK X-User-Api-Key 零留存）；done 帧自 2026-11-11 起携 `lang_version`（OpenUI 语言协议版本，真引用 shared `OpenUiContract.LANG_VERSION`——端侧落 OpenUiCard part 比对，高于端侧版本时提示升级，旧端忽略未知字段）；2026-11-28 起 messages 回合处理器 v1/v2 双端点共用（agentTurnMessages 抽函数，仅 sinkFactory 不同）
 │   ├── recommend/RuleEngine.kt   # 规则查询 + 参数组装
 │   ├── cos/CosService.kt         # COS 预签名 URL
 │   ├── ratelimit/RateLimiter.kt  # 内存令牌桶 + 日预算
@@ -175,6 +176,7 @@ server/
 | GET | `/agent/sessions/{id}/events` | P1 | ✅ | X-App-Token | 事件流分页回放（after/limit） |
 | GET | `/agent/sessions/{id}/final-program` | P1 | ✅ | X-App-Token | OpenUI 扫码预览取数（0.9.35）：返回会话最终 assistant 程序文本；owner 会话同 /events 口径，skill-debug 合成会话对任意有效 token 放行（程序文本无隐私，照片句柄 id 跨设备无意义）；无最终程序 404 `no_final_program` |
 | POST | `/agent/sessions/{id}/messages` | P1 | ✅ | X-App-Token | 跑一轮（SSE 事件帧；BYOK 经 X-User-Api-Key 透传，零留存；per-user 并发=1，占用回 409 `round_in_flight` 不耗配额；**2026-11-22 起读 `X-App-Language` 头**（shared `ReplyLanguage.name`）——system prompt 尾部追加 `openUiReplyLanguageRuleSegment` 语言规则段（程序内一切用户可见文案跟随界面语言，DSL 词汇/handle id 不翻译）+ `ensureValidProgram` 兜底文案五语化，缺失/非法回落简中兼容旧端） |
+| POST | `/agent/v2/sessions/{id}/messages` | P1 | ✅ | X-App-Token | AG-UI 事件流跑一轮（AG-UI 迁移 M1，2026-11-28，spec《2026-11-28-ag-ui-migration-design》）：与 v1 同一 runTurn 实现仅出站帧汇不同（`TurnFrameSink` 双实现）——RUN_STARTED/RUN_FINISHED(metadata)/RUN_ERROR 回合边界、ACTION→TOOL_CALL_*、流式快照差分 TEXT_MESSAGE_*、设备工具桥 CUSTOM(device_tool_request)；v1 端点逐字节保留作线上兼容兜底 |
 | POST | `/agent/sessions/{id}/tool-results` | P1 | ✅ | X-App-Token | 端侧工具结果上行（409 tool_request_not_pending；ADR-018 工具桥） |
 | POST | `/agent/sessions/{id}/finish` | P1 | ✅ | X-App-Token | 关闭会话（终态） |
 | POST | `/auth/email/send` | P0 | ✅ | 无 | 发送验证码（Play 审核邮箱命中 env 旁路时直接回 sent+dev 不发信） |
@@ -325,5 +327,5 @@ nginx picme 反代段落仓库 SSOT：`server/deploy/nginx/api.polang.net.conf`�
 ---
 
 > **维护者**：项目开发者
-> **最后更新**：2026-11-26
+> **最后更新**：2026-11-28
 > **状态**：生效中
