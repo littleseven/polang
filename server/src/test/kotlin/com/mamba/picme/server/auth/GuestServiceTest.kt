@@ -93,4 +93,31 @@ class GuestServiceTest {
         TestDb.init(AnonymousDevices)
         GuestService.resetQuota(9999) // 不抛
     }
+
+    @Test
+    fun `backfills platform when existing row has null platform`() = runBlocking {
+        TestDb.init(AnonymousDevices)
+        GuestService.checkAndIncrementQuota("dev-p1", limit) // 无 platform 建行（老客户端形态）
+        assertEquals(null, transaction { AnonymousDevices.selectAll().single()[AnonymousDevices.platform] })
+
+        GuestService.checkAndIncrementQuota("dev-p1", limit, "android")
+        assertEquals("android", transaction { AnonymousDevices.selectAll().single()[AnonymousDevices.platform] })
+    }
+
+    @Test
+    fun `does not overwrite existing platform`() = runBlocking {
+        TestDb.init(AnonymousDevices)
+        GuestService.checkAndIncrementQuota("dev-p2", limit, "ios")
+        GuestService.checkAndIncrementQuota("dev-p2", limit, "android")
+        assertEquals("ios", transaction { AnonymousDevices.selectAll().single()[AnonymousDevices.platform] })
+    }
+
+    @Test
+    fun `backfills platform even when quota exhausted`() = runBlocking {
+        TestDb.init(AnonymousDevices)
+        repeat(limit) { GuestService.checkAndIncrementQuota("dev-p3", limit) } // 无 platform 用满额度
+        val blocked = GuestService.checkAndIncrementQuota("dev-p3", limit, "android")
+        assertFalse(blocked.allowed)
+        assertEquals("android", transaction { AnonymousDevices.selectAll().single()[AnonymousDevices.platform] })
+    }
 }

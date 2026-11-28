@@ -62,6 +62,7 @@ object Accounts : Table("account") {
     val llmCallsLimit = integer("llm_calls_limit").default(100) // 试用额度（次）
     val createdAt = long("created_at")
     val deletedAt = long("deleted_at").nullable()   // 软删除时间戳；NULL=未删除
+    val lastPlatform = varchar("last_platform", 16).nullable() // 最近一次请求 X-Platform（android | ios | null=未见）；认证拦截器自愈更新
     override val primaryKey = PrimaryKey(id)
 
     init {

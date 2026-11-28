@@ -191,6 +191,22 @@ object AccountService {
         return AuthResult(true, hash, row[Accounts.email])
     }
 
+    /**
+     * 记录账号最近一次请求的 X-Platform（认证拦截器逐请求调用，自愈语义：值变化才落库）。
+     * 背景：主聊天走云端 Agent 不写 llm_call_log，后台用户列表平台列无法从调用流水推导，
+     * 故在账号维度直接维护「最后所见平台」。
+     */
+    suspend fun touchLastPlatform(tokenHash: String, platform: String) {
+        newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+            Accounts.update({
+                Accounts.tokenHash eq tokenHash and
+                    (Accounts.lastPlatform.isNull() or (Accounts.lastPlatform neq platform))
+            }) {
+                it[Accounts.lastPlatform] = platform
+            }
+        }
+    }
+
     /** tokenHash → account.id；用于 llm_call_log 写入归属。 */
     suspend fun idForTokenHash(tokenHash: String): Int? {
         return newSuspendedTransaction(Dispatchers.IO, Db.instance) {

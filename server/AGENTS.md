@@ -13,7 +13,7 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.57
+**版本**：0.9.58
 
 **最后更新**：2026-11-28
 
@@ -27,7 +27,7 @@
 
 **核心职责**：
 - **AI 网关**：`LlmProxy` + `ChannelRegistry` — 按模型自动路由到 Cloudflare AI Gateway 或腾讯 TokenHub；`stream=true` 请求 SSE 逐 chunk 透传（原样转发 stream/stream_options），usage 从流尾帧解析计费（含 `prompt_tokens_details.cached_tokens` 前缀缓存命中采集，`llm_call_log.cached_tokens`，2026-10-17）；非流式请求强制 `stream=false` 走完整响应体解析
-- **账号体系**：`EmailService` + `AccountService` + `AppTokenAuth` — 邮箱注册、动态 Token、SHA-256 校验
+- **账号体系**：`EmailService` + `AccountService` + `AppTokenAuth` — 邮箱注册、动态 Token、SHA-256 校验；`account.last_platform`（2026-11-28）= 账号维度「最后所见平台」，认证拦截器逐请求自愈更新（值变化才落库）——云端 Agent 路径不写 llm_call_log，后台用户列表平台列改以本列为准、llm_call_log 推导作历史兜底
 - **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量/渠道/设置/问题诊断/发包 + M2 推理追溯：调用流水/Agent 会话回放）
 - **推荐引擎**：`RuleEngine` — 纯规则型场景推荐（规避算法备案）
 - **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite；访客放行（`X-Device-Id` 作滥用闸门，首启下载阶段用户未注册，不放行则系统性丢失新装样本）；`device_id` 独立列（不进 payload）支撑设备维漏斗串联；转化漏斗统计（装机→模型下载→必备模型就绪→扫描启动→扫描完成）+ 分地区成功率走 `/admin/telemetry/downloads`（2026-11-22）
@@ -74,7 +74,7 @@ server/
 │   │   ├── AppTokenAuth.kt       # X-App-Token 认证插件
 │   │   ├── EmailService.kt       # 验证码发送（Resend API，按 lang 渲染五语模板，缺省中英双语）
 │   │   ├── EmailLanguage.kt      # 邮件语言枚举（EN/zh-CN/zh-TW/ES/FR + 双语缺省）+ BCP-47 标签归一化
-│   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理
+│   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理；platform 建行写入 + NULL 行请求级自愈回填（2026-11-28，不覆盖已有值）
 │   │   └── AiEngineerWhitelistService.kt # AI 工程师交付白名单
 │   ├── admin/
 │   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页 + M2 推理追溯三路由：/admin/llm/calls、/admin/agent/sessions[/{id}] + /admin/telemetry/downloads 下载遥测）
