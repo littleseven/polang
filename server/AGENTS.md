@@ -13,7 +13,7 @@
 
 **阅读对象**：RD、CR、AI Agent
 
-**版本**：0.9.60
+**版本**：0.9.61
 
 **最后更新**：2026-11-28
 
@@ -28,7 +28,7 @@
 **核心职责**：
 - **AI 网关**：`LlmProxy` + `ChannelRegistry` — 按模型自动路由到 Cloudflare AI Gateway 或腾讯 TokenHub；`stream=true` 请求 SSE 逐 chunk 透传（原样转发 stream/stream_options），usage 从流尾帧解析计费（含 `prompt_tokens_details.cached_tokens` 前缀缓存命中采集，`llm_call_log.cached_tokens`，2026-10-17）；非流式请求强制 `stream=false` 走完整响应体解析
 - **账号体系**：`EmailService` + `AccountService` + `AppTokenAuth` — 邮箱注册、动态 Token、SHA-256 校验；`account.last_platform`（2026-11-28）= 账号维度「最后所见平台」，认证拦截器逐请求自愈更新（值变化才落库）——云端 Agent 路径不写 llm_call_log，后台用户列表平台列改以本列为准、llm_call_log 推导作历史兜底
-- **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量/渠道/设置/问题诊断/发包 + M2 推理追溯：调用流水/Agent 会话回放）
+- **管理后台**：`AdminRoutes` + `AdminViews` + `AdminQueries` — SSR HTML 运营后台（概览/用户/流量/渠道/设置/问题诊断/发包 + M2 推理追溯：调用流水/Agent 会话回放）；全部 admin 响应统一 `Cache-Control: no-store`（2026-11-28：此前无缓存头，浏览器启发式缓存会让后台长期停留在旧版页面）
 - **推荐引擎**：`RuleEngine` — 纯规则型场景推荐（规避算法备案）
 - **遥测收集**：`TelemetryRoute` — 批量匿名事件写入 SQLite；访客放行（`X-Device-Id` 作滥用闸门，首启下载阶段用户未注册，不放行则系统性丢失新装样本）；`device_id` 独立列（不进 payload）支撑设备维漏斗串联；转化漏斗统计（装机→模型下载→必备模型就绪→扫描启动→扫描完成）+ 分地区成功率走 `/admin/telemetry/downloads`（2026-11-22）
 - **COS 存储**：`CosService` — 腾讯 COS 上传/元数据/预签名 URL；APK 下载 URL 渠道路由（`apkPublicUrl(channel)`：debug 轨可经 `APK_DEBUG_PUBLIC_BASE` 指向北京轻量国内镜像，release 轨恒走 `cos.polang.net`）

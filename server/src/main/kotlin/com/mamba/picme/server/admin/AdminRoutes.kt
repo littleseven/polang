@@ -40,6 +40,7 @@ import io.ktor.http.content.forEachPart
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import io.ktor.http.Cookie
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -90,6 +91,7 @@ fun Route.adminRoute(
     val skillDebugScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     route("/admin") {
         get("/login") {
+            call.noStore()
             if (adminToken.isBlank()) {
                 call.respondText("admin disabled", contentType = ContentType.Text.Plain, status = HttpStatusCode.ServiceUnavailable)
             } else {
@@ -98,6 +100,7 @@ fun Route.adminRoute(
         }
 
         post("/login") {
+            call.noStore()
             val params = call.receiveParameters()
             val password = params["password"] ?: ""
             if (adminToken.isNotBlank() && password == adminToken) {
@@ -1080,7 +1083,17 @@ fun Route.adminRoute(
 }
 
 /** 受保护页面统一鉴权：空 token → 503；X-Admin-Token header 直连（CLI）→ 放行；cookie 无效 → 跳登录。返回 false 表示已响应、调用方应 return。 */
+/**
+ * admin 页面一律禁缓存（2026-11-28）：后台页面此前不发任何 Cache-Control，
+ * 浏览器启发式缓存会让后台长期停留在旧版本页面（发新版后用户仍看到没有新功能的旧页，
+ * 普通刷新不一定回源）。所有 admin 响应统一 no-store。
+ */
+private fun ApplicationCall.noStore() {
+    response.headers.append(HttpHeaders.CacheControl, "no-store")
+}
+
 private suspend fun ApplicationCall.adminGuard(adminToken: String): Boolean {
+    noStore()
     if (adminToken.isBlank()) {
         respondText("admin disabled", contentType = ContentType.Text.Plain, status = HttpStatusCode.ServiceUnavailable)
         return false
