@@ -76,6 +76,29 @@ class AdminRoutesTest {
     }
 
     @Test
+    fun `admin pages send Cache-Control no-store`() = testApplication {
+        seed()
+        application { routing { adminRoute(token, cos, balance) } }
+        val c = createClient { followRedirects = false }
+
+        // 登录页、未授权重定向、已授权页面、登录失败响应都禁缓存
+        // （2026-11-28：无 Cache-Control 时浏览器启发式缓存会让后台停留在旧版页面）
+        assertEquals("no-store", c.get("/admin/login").headers[HttpHeaders.CacheControl])
+        assertEquals("no-store", c.get("/admin").headers[HttpHeaders.CacheControl])
+        assertEquals(
+            "no-store",
+            c.get("/admin") { cookie(AdminAuth.COOKIE_NAME, cookieVal) }.headers[HttpHeaders.CacheControl],
+        )
+        assertEquals(
+            "no-store",
+            c.post("/admin/login") {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody("password=wrong")
+            }.headers[HttpHeaders.CacheControl],
+        )
+    }
+
+    @Test
     fun `full admin auth and view flow`() = testApplication {
         seed()
         application { routing { adminRoute(token, cos, balance) } }
