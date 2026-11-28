@@ -783,7 +783,7 @@ fun Route.adminRoute(
                 AdminViews.downloadStatsPage(
                     AdminQueries.modelDownloadStats(days),
                     AdminQueries.modelDownloadStatsByModel(days),
-                    AdminQueries.telemetryFunnel(days),
+                    AdminQueries.telemetryFunnel(),
                     days,
                 ),
                 ContentType.Text.Html,
@@ -794,7 +794,7 @@ fun Route.adminRoute(
         get("/telemetry/downloads/funnel/{stage}") {
             if (!call.adminGuard(adminToken)) return@get
             val days = call.request.queryParameters["days"]?.toIntOrNull()?.coerceIn(1, 90) ?: 30
-            val drill = AdminQueries.telemetryFunnelDrill(call.parameters["stage"].orEmpty(), days)
+            val drill = AdminQueries.telemetryFunnelDrill(call.parameters["stage"].orEmpty())
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "unknown_funnel_stage"))
             call.respondText(AdminViews.funnelDrillPage(drill, days), ContentType.Text.Html)
         }
