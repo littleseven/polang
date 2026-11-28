@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -160,6 +161,84 @@ class DownloadStatsTest {
     }
 
     @Test
+    fun `telemetryFunnelDrill breaks down transition by region and lists dropped devices`() = runBlocking {
+        TestDb.init(TelemetryEvents)
+        // dev-1 CN 走通到 ready；dev-2 US 卡在下载；dev-3 CN 到 ready 未扫描
+        insert(now, """{"modelId":"a","outcome":"completed","region":"CN","appVersion":"0.9.53"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD, deviceId = "dev-1")
+        insert(now, """{"requiredCount":7}""", type = TELEMETRY_TYPE_MODELS_READY, deviceId = "dev-1")
+        insert(now - 1000, """{"modelId":"a","outcome":"failed","region":"US","appVersion":"0.9.52"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD, deviceId = "dev-2")
+        insert(now, """{"modelId":"b","outcome":"completed","region":"CN","appVersion":"0.9.53"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD, deviceId = "dev-3")
+        insert(now, """{"requiredCount":7}""", type = TELEMETRY_TYPE_MODELS_READY, deviceId = "dev-3")
+
+        val drill = AdminQueries.telemetryFunnelDrill("ready", days = 30, now = now)!!
+        assertEquals("ready", drill.stage)
+        assertEquals("download", drill.prevStage)
+        assertEquals(3L, drill.reachedPrev)
+        assertEquals(2L, drill.reachedThis)
+        assertEquals(2.0 / 3.0, drill.conversion!!, 0.0001)
+        // 分地区：CN 2→2（100%），US 1→0（流失 1）
+        assertEquals(2, drill.byRegion.size)
+        val cn = drill.byRegion.first { it.region == "CN" }
+        assertEquals(2L, cn.reachedPrev)
+        assertEquals(2L, cn.reachedThis)
+        assertEquals(1.0, cn.conversionFromPrev!!, 0.0001)
+        val us = drill.byRegion.first { it.region == "US" }
+        assertEquals(1L, us.dropped)
+        // 流失设备 = dev-2（到达 download 未到 ready），归因取最近 download 事件
+        assertEquals(1, drill.devices.size)
+        assertEquals("US", drill.devices[0].region)
+        assertEquals("0.9.52", drill.devices[0].appVersion)
+        assertEquals(listOf("a"), drill.devices[0].models)
+        assertFalse(drill.devicesTruncated)
+    }
+
+    @Test
+    fun `telemetryFunnelDrill first stage lists reached devices and rejects unknown stage`() = runBlocking {
+        TestDb.init(TelemetryEvents)
+        insert(now, """{"modelId":"a","outcome":"completed","region":"CN"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD, deviceId = "dev-1")
+
+        val drill = AdminQueries.telemetryFunnelDrill("download", days = 30, now = now)!!
+        assertNull(drill.prevStage)
+        assertNull(drill.conversion)
+        assertEquals(1L, drill.reachedThis)
+        assertEquals(1, drill.devices.size) // 第一级清单 = 到达设备
+
+        assertNull(AdminQueries.telemetryFunnelDrill("bogus", days = 30, now = now))
+    }
+
+    @Test
+    fun `funnelDrillPage renders summary region table and device list`() {
+        val drill = FunnelDrillRow(
+            stage = "ready", label = "必备模型就绪",
+            prevStage = "download", prevLabel = "开始下载模型",
+            reachedPrev = 3, reachedThis = 2,
+            byRegion = listOf(FunnelDrillRegionRow("CN", 2, 2), FunnelDrillRegionRow("US", 1, 0)),
+            devices = listOf(
+                FunnelDrillDeviceRow("dev-12••••3456", "US", listOf("qwen3_vl_2b"), "0.9.52", 1_700_000_000_000L),
+            ),
+            devicesTruncated = false,
+        )
+        val html = AdminViews.funnelDrillPage(drill, days = 30)
+        assertTrue(html.contains("漏斗下钻：必备模型就绪"))
+        assertTrue(html.contains("到达上级（开始下载模型）"))
+        assertTrue(html.contains("66.7%"))
+        assertTrue(html.contains("流失设备清单"))
+        assertTrue(html.contains("dev-12••••3456"))
+        assertTrue(html.contains("qwen3_vl_2b"))
+        assertTrue(html.contains("返回下载遥测"))
+
+        // 第一级形态：无上级列，设备清单为到达设备
+        val first = drill.copy(
+            stage = "download", label = "开始下载模型", prevStage = null, prevLabel = null,
+            reachedPrev = 3, reachedThis = 3,
+        )
+        val firstHtml = AdminViews.funnelDrillPage(first, days = 30)
+        assertTrue(firstHtml.contains("到达设备（漏斗入口）"))
+        assertTrue(firstHtml.contains("到达设备清单"))
+        assertTrue(firstHtml.contains("占比"))
+    }
+
+    @Test
     fun `downloadStatsPage renders funnel region rows and empty state`() {
         val rows = listOf(
             DownloadRegionStatRow("CN", completed = 9, failed = 1, cancelled = 2, integrityFailed = 1, avgSpeedKbps = 2048.0),
@@ -176,6 +255,11 @@ class DownloadStatsTest {
         assertTrue(html.contains("转化漏斗"))
         assertTrue(html.contains("开始下载模型"))
         assertTrue(html.contains("60.0%"))
+        // 漏斗图形态：水平漏斗条 + 下钻链接
+        assertTrue(html.contains("funnel-fill"))
+        assertTrue(html.contains("/admin/telemetry/downloads/funnel/ready?days=30"))
+        assertTrue(html.contains("级间 60.0%（流失 40）"))
+        assertTrue(html.contains("整体 60.0%"))
         assertTrue(html.contains("CN"))
         assertTrue(html.contains("90.0%"))
         assertTrue(html.contains("2048 KB/s"))

@@ -190,7 +190,8 @@ server/
 | POST | `/admin/settings/whitelist` | P1 | ✅ | ADMIN_TOKEN | 添加 AI 工程师白名单邮箱 |
 | POST | `/admin/settings/whitelist/revoke` | P1 | ✅ | ADMIN_TOKEN | 移除 AI 工程师白名单邮箱 |
 | GET | `/admin/diagnosis` | P1 | ✅ | ADMIN_TOKEN | 用户上报问题列表（状态流转 / 手动同步 GitHub） |
-| GET | `/admin/telemetry/downloads` | P1 | ✅ | ADMIN_TOKEN | 下载遥测（2026-11-22）：按 device_id 四级漏斗（下载→就绪→扫描启动→扫描完成，含级间转化率）+ 分地区成功率聚合 + 分模型×分地区成功率/平均耗时/速度/模型大小/下载源（`AdminQueries.modelDownloadStatsByModel`；大小=终态事件 bytes 最大值，源=payload `source` 字段，0.9.53+ 客户端上报），`days` 参数 1-90 默认 30 |
+| GET | `/admin/telemetry/downloads` | P1 | ✅ | ADMIN_TOKEN | 下载遥测（2026-11-22）：按 device_id 四级漏斗（下载→就绪→扫描启动→扫描完成）+ 分地区成功率聚合 + 分模型×分地区成功率/平均耗时/速度/模型大小/下载源（`AdminQueries.modelDownloadStatsByModel`；大小=终态事件 bytes 最大值，源=payload `source` 字段，0.9.53+ 客户端上报），`days` 参数 1-90 默认 30；2026-11-28 漏斗表格升级为 CSS 水平漏斗图（条宽∝到达设备数，级间转化+流失数+整体转化，整级可点击下钻） |
+| GET | `/admin/telemetry/downloads/funnel/{stage}` | P1 | ✅ | ADMIN_TOKEN | 漏斗下钻页（2026-11-28）：某级转化摘要卡 + 分地区转化明细（地区=设备最近 download 事件 region 归因）+ 设备清单（第一级=到达设备，其余=到达上级未达本级的流失设备；id 脱敏、按最后事件倒序、200 台截断）；stage 白名单 download/ready/scan_started/scan_completed（`FUNNEL_STAGES` 同源），白名单外 404 |
 | GET | `/admin/llm/calls` | P1 | ✅ | ADMIN_TOKEN | 调用流水（llm_call_log id 倒序游标 `before`，单页 50，满页才给下一页链接防末页死循环；`status`/`provider`/`model`/`account_id` 筛选；非法 `before`/`account_id` 回 400） |
 | GET | `/admin/agent/sessions` | P1 | ✅ | ADMIN_TOKEN | Agent 会话列表（seq 倒序游标 `before_seq`，单页 50；`account_id` 筛选；非法游标/参数回 400；stalled = running 且最后事件 >30min，状态列直显 stalled 不显示 running 徽标，2026-11-07） |
 | GET | `/admin/agent/sessions/{id}` | P1 | ✅ | ADMIN_TOKEN | 会话事件回放（事件 id 升序 `after` 游标，单页 200；未知 sessionId 回 404） |
