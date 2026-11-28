@@ -1,7 +1,7 @@
-# 追问选项重设计（FollowupBar 胶囊 Chip 流）设计 spec
+# 追问选项重设计（FollowupBar 全宽列表条）设计 spec
 
 > 日期：2026-11-28
-> 状态：已评审（方向 A 用户拍板 2026-11-28，Ardot 三方向 mockup 比选）
+> 状态：已评审（方向 B 用户拍板 2026-11-28，Ardot 三方向 mockup 比选 + 导出图复核）
 > 范围：chat 回复尾部「后续选项」的视觉与组件重设计；OpenUI 体系三端（shared / Android / iOS）+ prompt 资产 + Ardot 画布收口
 > 非范围：Buttons/Button 既有组件语义、@ToAssistant 动作通道、server 侧代码
 
@@ -15,23 +15,24 @@
 - 靠「标签 ≤8 字」prompt 硬约束防横排溢出，长选项被迫竖排（direction=column）割裂形态；
 - 该形态从未经设计（画布无此组件），是 M3 默认样式的偶然产物。
 
-Ardot 三方向 mockup（A 胶囊 Chip 流 / B 全宽列表条 / C 气泡预告式）比选后
-**用户拍板方向 A**（mockup 帧 `followup/A-chips`，Chat 页 x=3565）。
+Ardot 三方向 mockup（A 胶囊 Chip 流 / B 全宽列表条 / C 气泡预告式）比选、导出图复核后
+**用户拍板方向 B**（mockup 帧 `followup/B-list`，Chat 页 x=3998）。
 
 ## 2. 视觉定稿
 
 | 属性 | 值 |
 |------|------|
-| 容器 | 流式换行（wrap），横向间距 8dp、行间距 8dp |
-| 胶囊 | 高 34dp（padding 16/7）、cornerRadius 17dp（=高度一半，pill） |
-| 配色 | 底 `surfaceVariant`（Dark #2C2C2C / Light #F2F2F2）、文字 `onSurface` 14sp |
+| 容器 | 竖排列表，条间距 8dp，每条**全宽**（fill） |
+| 选项条 | cornerRadius 12dp、padding 14/12、底 `surfaceVariant`（Dark #2C2C2C / Light #F2F2F2） |
+| 条内布局 | 左：标签文字 `onSurface` 14sp（fill 撑开）；右：chevron `›` `onSurfaceVariant` 16sp（垂直居中，渲染层内置装饰，LLM DSL 不写） |
 | pressed 态 | 底色加深至 `surfaceContainerHigh`（Dark #222222 / Light #EDEDED，双模均比 surfaceVariant 深一级） |
 | 与上文间距 | 12dp（AgentMsg 尾部） |
-| 对齐 | 正文同侧左对齐；数据卡内追加时跟随卡内布局 |
+| 对齐 | 正文同宽；数据卡内追加时跟随卡内布局 |
 | 数量 | ≤3（不放宽；与既有「一卡 Button ≤3」lint 口径解耦，FollowupBar 自校验） |
-| 文字放宽 | 标签 ≤12 字（wrap 天然防溢出，废除「>8 字改竖排」fallback） |
+| 文字放宽 | 标签 ≤12 字（全宽行单行从容容纳，废除「>8 字改竖排」fallback；超长 ellipsis 不换行） |
 
-绿色（`primary`）不用于追问选项：留 给卡内主 CTA，追问是轻引导用中性色。
+绿色（`primary`）不用于追问选项：留给卡内主 CTA，追问是轻引导用中性色。
+方向 B 相对 A 的收益：点击面积大（触控友好）、长标签零换行焦虑、与卡内列表语言一致。
 
 ## 3. 技术方案
 
@@ -64,19 +65,22 @@ FollowupBar([Button("挑最佳镜头", @ToAssistant("从上周的照片里挑出
 ### 3.3 双端渲染
 
 - **Android** `OpenUiContentRenderers.kt`：新增 `OpenUiContentFollowupBar`——
-  `FlowRow`（wrap）+ pill 胶囊（`RoundedCornerShape(50)`）、底 `surfaceVariant`、
-  文字 `onSurface` 14sp、`clip + clickable` pressed 加深；子 Button 递归取
-  label/actions 喂 `onAction`（复用现有 action 通道，零协议变更）；
+  竖排 `Column`（gap 8），每条全宽 `Row`（label fill + chevron hug，垂直居中）、
+  `RoundedCornerShape(12)`、底 `surfaceVariant`、`clip + clickable` pressed 加深；
+  chevron 用 Material 图标 `Icons.AutoMirrored.Filled.KeyboardArrowRight` 16sp
+  `onSurfaceVariant`（渲染层内置）；子 Button 递归取 label/actions 喂 `onAction`
+  （复用现有 action 通道，零协议变更）；
 - **iOS** `OpenUiNodeRenderer.swift`：`OpenUiFollowupBarComponent` 对等实现
-  （wrap 用自定义 `Layout`，圆角胶囊 + 按压态），样式值对齐 §2 表；
+  （VStack + HStack，SF Symbol `chevron.right` 同级样式），样式值对齐 §2 表；
 - 双端 token 全部走现有 scheme 语义色，**零新增 token**。
 
 ### 3.4 Ardot 画布收口
 
-1. `followup/A-chips`（561:1）的 Chip 子树组件化为 `followup_chip` 迁入
+1. `followup/B-list`（561:11）的 OptionRow 子树组件化为 `followup_row` 迁入
    ChatComponents 页（438:328），登记 `components.json`（含双模预览 PNG）；
-2. 正典 `chat/conversation`（111:383）AgentMsg2 尾部接组件实例（对齐 §2 定稿值）；
-3. 删除 `followup/B-list`（561:11）、`followup/C-ghost-bubbles`（561:23）两帧；
+2. 正典 `chat/conversation`（111:383）AgentMsg2 尾部接组件实例（对齐 §2 定稿值，
+   chevron 修正为垂直居中——mockup 自检发现的基线微偏在此一并修掉）；
+3. 删除 `followup/A-chips`（561:1）、`followup/C-ghost-bubbles`（561:23）两帧；
 4. `ardot-health-check.py` 退出码归零（新组件子树 literal=0）+ Light 验证
    （`ardot-preview-mode.sh` + `ardot-light-verify.py`）+ `export-ardot-snapshot.py` 快照入库。
 
@@ -94,7 +98,7 @@ FollowupBar([Button("挑最佳镜头", @ToAssistant("从上周的照片里挑出
   黄金示例钉住；GOLDEN_FOLLOWUP_PROGRAM 过结构校验 + lint 三闸（现有口径）；
 - Android 单测：FollowupBar 渲染分支 dispatch 注册（现有 renderer 测试模式）；
 - iOS：PoLangUnitTests 对等加渲染注册断言；
-- 真机/模拟器目检：Dark/Light 双模 + 三选项 wrap（含一个 12 字长标签）+ 点击发出消息。
+- 真机/模拟器目检：Dark/Light 双模 + 三选项全宽列表（含一个 12 字长标签不换行不截断）+ 点击发出消息。
 
 ## 6. 不做的事（YAGNI）
 
