@@ -180,6 +180,9 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
         // 本地回合 OpenUI 统一回滚闸（默认开=turn-native 程序卡；关=文本气泡回滚位）
         val LOCAL_TURN_OPENUI_ENABLED = booleanPreferencesKey("local_turn_openui_enabled")
 
+        // 云端回合 AG-UI(v2) 回滚闸（默认开=v2 端点；关=强制 v1 kind 帧链路）
+        val CLOUD_AG_UI_ENABLED = booleanPreferencesKey("cloud_ag_ui_enabled")
+
         // 服务端邮箱认证
         val SERVER_AUTH_TOKEN = stringPreferencesKey("server_auth_token")
         val SERVER_AUTH_EMAIL = stringPreferencesKey("server_auth_email")
@@ -1355,6 +1358,25 @@ class UserPreferencesRepository(private val context: Context) : UserSettingsRepo
     override suspend fun updateLocalTurnOpenUiEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[PreferencesKeys.LOCAL_TURN_OPENUI_ENABLED] = enabled
+        }
+    }
+
+    // ── 云端回合 AG-UI(v2) 回滚闸 ─────────────────────────────
+    override val cloudAgUiEnabledFlow: Flow<Boolean> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.CLOUD_AG_UI_ENABLED] ?: true
+        }
+
+    override suspend fun updateCloudAgUiEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.CLOUD_AG_UI_ENABLED] = enabled
         }
     }
 

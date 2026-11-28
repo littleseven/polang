@@ -2,119 +2,229 @@ import XCTest
 import SharedKit
 @testable import PoLang
 
-// MARK: - CloudTurnEventMapper 契约测试（② 程序嗅探 + 事件映射 + done 性能装配）
+// MARK: - AgUiCloudTurnTranslator 契约测试（AG-UI v2，2026-11-28 M3）
+//
+// 全管线：SSE block 文本 → shared AgUiSseParser（SharedKit 导出验证）→ 翻译器 →
+// CloudTurnEvent / 设备工具桥回调。语义对位 Android CloudAgentTurnRunnerAgUiTest
+// （iOS 子集：无步骤时间线，TOOL_CALL_RESULT 不上屏）。
 
 final class CloudTurnRunnerTests: XCTestCase {
 
-    // ── 程序嗅探（message 帧 content 分派） ──
+    private struct TurnOutput {
+        var events: [CloudTurnEvent] = []
+        var toolRequests: [(requestId: String, tool: String, args: [String: String])] = []
+    }
 
-    func testAssistantProgramContentSniffsToOpenUiCard() {
-        let program = "// summary: 上周共 327 张照片\nroot = Card([Text(\"hi\")])"
-        let events = CloudTurnEventMapper.mapEvent([
-            "type": "message", "role": "assistant",
-            "payload": ["content": program],
+    /// SSE block 序列（不含块间空行）逐块过 shared parser + 翻译器。
+    private func translate(_ blocks: [String]) -> TurnOutput {
+        let translator = AgUiCloudTurnTranslator()
+        var output = TurnOutput()
+        for block in blocks {
+            guard let frame = AgUiSseParser.shared.parseBlock(block: block) else { continue }
+            translator.onFrame(
+                frame,
+                onEvent: { output.events.append($0) },
+                onToolRequest: { output.toolRequests.append(($0, $1, $2)) }
+            )
+        }
+        return output
+    }
+
+    private func textBlock(_ messageId: String, _ role: String, _ chunks: [String]) -> [String] {
+        var blocks = [
+            #"data: {"type":"TEXT_MESSAGE_START","messageId":"\#(messageId)","role":"\#(role)"}"#,
+        ]
+        for chunk in chunks {
+            let escaped = chunk
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            blocks.append(#"data: {"type":"TEXT_MESSAGE_CONTENT","messageId":"\#(messageId)","delta":"\#(escaped)"}"#)
+        }
+        blocks.append(#"data: {"type":"TEXT_MESSAGE_END","messageId":"\#(messageId)"}"#)
+        return blocks
+    }
+
+    private let runFinished = #"data: {"type":"RUN_FINISHED","threadId":"s_1","runId":"run-abc"}"#
+
+    func testAssistantTextBlockAggregates() {
+        let out = translate(
+            [#"data: {"type":"RUN_STARTED","threadId":"s_1","runId":"run-abc"}"#]
+                + textBlock("m1", "assistant", ["你有 42 张照片"])
+                + [runFinished]
+        )
+        XCTAssertEqual(out.events, [
+            .assistantText("你有 42 张照片"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
         ])
-        guard case .openUiCard(let gotProgram, let fallbackSummary) = events.first else {
-            return XCTFail("程序 content 应嗅探为 OpenUiCard: \(events)")
-        }
-        XCTAssertEqual(gotProgram, program)
-        XCTAssertEqual(fallbackSummary, "上周共 327 张照片")
+        XCTAssertTrue(out.toolRequests.isEmpty)
     }
 
-    func testAssistantPlainTextFallsBackToAssistantText() {
-        // 防跨线污染：LLM 模仿历史把程序当文本输出的门判由嗅探兜住；纯文本正常走 AssistantText
-        let events = CloudTurnEventMapper.mapEvent([
-            "type": "message", "role": "assistant",
-            "payload": ["content": "今天天气不错，root 这个词出现在句子里但不是声明"],
+    func testUserRoleBlockSkipped() {
+        let out = translate(textBlock("u1", "user", ["hi"]) + [runFinished])
+        XCTAssertEqual(out.events, [
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
         ])
-        guard case .assistantText(let text) = events.first else {
-            return XCTFail("纯文本应降级 AssistantText: \(events)")
-        }
-        XCTAssertTrue(text.contains("今天天气不错"))
     }
 
-    func testUserEchoMessageSkipped() {
-        XCTAssertTrue(CloudTurnEventMapper.mapEvent([
-            "type": "message", "role": "user",
-            "payload": ["content": "hi"],
-        ]).isEmpty, "user 回声跳过（本地已先上屏）")
-    }
-
-    // ── html_card / render_ui_openui action 帧 ──
-
-    func testHtmlCardEventParses() {
-        let events = CloudTurnEventMapper.mapEvent([
-            "type": "html_card", "payload": ["html": "<b>x</b>", "summary": "一段摘要"],
+    func testStreamedProgramChunksEmitDeltaThenCard() {
+        let program = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        let out = translate(
+            textBlock("stream-1", "assistant", ["// summary: 统计\nroot = Card([", "Text(\"hi\")])"])
+                + [runFinished]
+        )
+        XCTAssertEqual(out.events, [
+            .openUiCardDelta(program: program),
+            .openUiCard(program: program, fallbackSummary: "统计"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
         ])
-        guard case .htmlCard(let html, let summary) = events.first else {
-            return XCTFail("应为 htmlCard: \(events)")
-        }
-        XCTAssertEqual(html, "<b>x</b>")
-        XCTAssertEqual(summary, "一段摘要")
     }
 
-    func testEmptyHtmlCardNotEmitted() {
-        XCTAssertTrue(CloudTurnEventMapper.mapEvent([
-            "type": "html_card", "payload": ["html": ""],
-        ]).isEmpty, "html 为空不上屏空卡")
+    func testSingleChunkProgramEmitsCardWithoutDelta() {
+        let program = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        let out = translate(textBlock("m1", "assistant", [program]) + [runFinished])
+        XCTAssertEqual(out.events.first, .openUiCard(program: program, fallbackSummary: "统计"))
+        XCTAssertFalse(out.events.contains { if case .openUiCardDelta = $0 { return true }; return false })
     }
 
-    func testRenderUiOpenuiActionFrameEmitsCard() {
-        let argsJson = #"{"program":"root = Card([Text(\"x\")])","fallbackSummary":"x"}"#
-        let events = CloudTurnEventMapper.mapEvent([
-            "type": "action", "id": 7,
-            "payload": ["tool": "render_ui_openui", "argsJson": argsJson],
+    func testMultiChunkPlainTextDoesNotEmitProgramDelta() {
+        let out = translate(textBlock("m1", "assistant", ["你好，", "这是回答。"]) + [runFinished])
+        XCTAssertEqual(out.events.first, .assistantText("你好，这是回答。"))
+    }
+
+    func testRenderUiOpenUiToolArgsEmitCard() {
+        let out = translate([
+            #"data: {"type":"TOOL_CALL_START","toolCallId":"act-4","toolCallName":"render_ui_openui"}"#,
+            #"data: {"type":"TOOL_CALL_ARGS","toolCallId":"act-4","delta":"{\"program\":\"root = Card([])\",\"fallbackSummary\":\"327 张\"}"}"#,
+            #"data: {"type":"TOOL_CALL_END","toolCallId":"act-4"}"#,
+            runFinished,
         ])
-        guard case .openUiCard(let program, let fallbackSummary) = events.first else {
-            return XCTFail("render_ui_openui action 应发卡: \(events)")
-        }
-        XCTAssertEqual(program, #"root = Card([Text("x")])"#)
-        XCTAssertEqual(fallbackSummary, "x")
+        XCTAssertEqual(out.events.first, .openUiCard(program: "root = Card([])", fallbackSummary: "327 张"))
     }
 
-    func testMalformedActionFrameIgnored() {
-        // 坏帧（argsJson 非合法 JSON）记日志忽略，不拖垮整回合
-        XCTAssertTrue(CloudTurnEventMapper.mapEvent([
-            "type": "action", "id": 7,
-            "payload": ["tool": "render_ui_openui", "argsJson": "{broken"],
-        ]).isEmpty)
-        // 其它工具 action 帧不出卡
-        XCTAssertTrue(CloudTurnEventMapper.mapEvent([
-            "type": "action", "id": 8,
-            "payload": ["tool": "search_media", "argsJson": "{}"],
-        ]).isEmpty)
+    func testMalformedToolArgsTolerated() {
+        let out = translate([
+            #"data: {"type":"TOOL_CALL_START","toolCallId":"act-5","toolCallName":"render_ui_openui"}"#,
+            #"data: {"type":"TOOL_CALL_ARGS","toolCallId":"act-5","delta":"not-json"}"#,
+            #"data: {"type":"TOOL_CALL_END","toolCallId":"act-5"}"#,
+            runFinished,
+        ])
+        XCTAssertEqual(out.events, [
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
     }
 
-    // ── 帧级映射 ──
-
-    func testOpenUiDeltaFrameMapsToDeltaEvent() {
-        guard case .openUiCardDelta(let program) =
-            CloudTurnEventMapper.map(frame: .openUiDelta(program: "root = Card")).first else {
-            return XCTFail("openUiDelta 帧应映射 delta 事件")
-        }
-        XCTAssertEqual(program, "root = Card")
+    func testToolCallResultProducesNoEvent() {
+        // iOS 无步骤时间线（M1 登记缺口）：observation 对应的 TOOL_CALL_RESULT 不上屏
+        let out = translate([
+            #"data: {"type":"TOOL_CALL_RESULT","messageId":"act-11-result","toolCallId":"act-11","content":"找到 3 张"}"#,
+            runFinished,
+        ])
+        XCTAssertEqual(out.events, [
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
     }
 
-    func testToolRequestFrameProducesNoEvent() {
-        // 工具执行由宿主直驱（端执行 + 上行），不经事件流
-        XCTAssertTrue(CloudTurnEventMapper.map(
-            frame: .toolRequest(requestId: "r1", tool: "search_media", args: [:], timeoutMs: 1000)).isEmpty)
+    func testDeviceToolRequestCustomFrameRoutedToBridge() {
+        let out = translate([
+            #"data: {"type":"CUSTOM","name":"device_tool_request","value":{"request_id":"tr_1","tool":"search_media","args":{"query":"猫","limit":5},"timeout_ms":120000}}"#,
+            runFinished,
+        ])
+        XCTAssertEqual(out.toolRequests.count, 1)
+        XCTAssertEqual(out.toolRequests.first?.requestId, "tr_1")
+        XCTAssertEqual(out.toolRequests.first?.tool, "search_media")
+        XCTAssertEqual(out.toolRequests.first?.args["query"], "猫")
+        // 数值参数字符串化（v1 tool_request 同口径）
+        XCTAssertEqual(out.toolRequests.first?.args["limit"], "5")
     }
 
-    // ── done 性能装配（对齐 Android toLlmPerformanceOrNull 映射） ──
+    func testUnknownCustomNameIgnored() {
+        let out = translate([
+            #"data: {"type":"CUSTOM","name":"future_custom","value":{"x":1}}"#,
+            runFinished,
+        ])
+        XCTAssertTrue(out.toolRequests.isEmpty)
+    }
 
-    func testDonePerformanceMapping() {
-        let perf = CloudTurnEventMapper.performance(promptTokens: 100, completionTokens: 50, elapsedMs: 2000)
+    func testRunFinishedMetadataMapsToDone() {
+        let out = translate([
+            #"data: {"type":"RUN_FINISHED","threadId":"s_1","runId":"run-abc","metadata":{"prompt_tokens":1280,"completion_tokens":96,"elapsed_ms":8432,"openui_lang_version":2}}"#,
+        ])
+        XCTAssertEqual(out.events, [
+            .done(promptTokens: 1280, completionTokens: 96, elapsedMs: 8432, langVersion: 2),
+        ])
+    }
+
+    func testRunErrorMapsToErrorEvent() {
+        let out = translate([
+            #"data: {"type":"RUN_ERROR","message":"quota exhausted","code":"internal_error"}"#,
+        ])
+        XCTAssertEqual(out.events, [.error("quota exhausted")])
+    }
+
+    func testUnknownTypeTolerated() {
+        // 服务端后续新增事件族旧端零感知（shared parser 容错 nil）
+        let out = translate([
+            #"data: {"type":"STEP_STARTED","name":"future"}"#,
+            runFinished,
+        ])
+        XCTAssertEqual(out.events, [
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
+    func testRewrittenStreamBlockReplacedByEvtFinalBlockSingleCard() {
+        // 改写场景（ensureValidProgram normalize 改写过）：stream 预览块 END 暂存候选，
+        // evt 终结块 START 丢弃候选 —— 只有 evt 权威全文出一张卡
+        let streamed = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        let normalized = "// summary: 统计\nroot = Card([Text(\"hi\"), Text(\"v2\")])"
+        let out = translate(
+            textBlock("stream-1", "assistant", ["// summary: 统计\nroot = Card([", "Text(\"hi\")])"])
+                + textBlock("evt-7", "assistant", [normalized])
+                + [runFinished]
+        )
+        XCTAssertEqual(out.events, [
+            .openUiCardDelta(program: streamed),
+            .openUiCard(program: normalized, fallbackSummary: "统计"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
+    func testStreamTextCandidateFlushesBeforeToolCallFrames() {
+        // 工具交错：stream 文本块 END 后接 TOOL_CALL_START —— 候选先 flush（叙述文本不丢、顺序不乱）
+        let out = translate(
+            textBlock("stream-1", "assistant", ["我先搜一下"])
+                + [
+                    #"data: {"type":"TOOL_CALL_START","toolCallId":"act-11","toolCallName":"search_media"}"#,
+                    #"data: {"type":"TOOL_CALL_ARGS","toolCallId":"act-11","delta":"{\"query\":\"猫\"}"}"#,
+                    #"data: {"type":"TOOL_CALL_END","toolCallId":"act-11"}"#,
+                    runFinished,
+                ]
+        )
+        XCTAssertEqual(out.events, [
+            .assistantText("我先搜一下"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
+    func testEvtBlockWithoutStreamEmitsDirectly() {
+        // 无流式预览的终结块（旧服务端/非流式路径）直上屏，不经候选暂存
+        let out = translate(textBlock("evt-9", "assistant", ["直接答复"]) + [runFinished])
+        XCTAssertEqual(out.events, [
+            .assistantText("直接答复"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
+    // MARK: - done 性能装配（沿用 v1 CloudTurnEventMapper 口径）
+
+    func testPerformanceMapping() {
+        let perf = AgUiCloudTurnTranslator.performance(promptTokens: 100, completionTokens: 50, elapsedMs: 2000)
         XCTAssertEqual(perf?.promptLen, 100)
         XCTAssertEqual(perf?.decodeLen, 50)
-        XCTAssertEqual(perf?.prefillTimeMs, 0, "prefill=0 隐藏（DeepSeek 先例映射）")
-        XCTAssertEqual(perf?.decodeTimeMs, 2000, "decode=回合端到端耗时")
-        XCTAssertEqual(perf!.decodeSpeed, 25.0, accuracy: 0.01, "speed=completion/耗时*1000")
-    }
-
-    func testDonePerformanceNilWhenNoUsage() {
-        // 旧服务端无 usage（tokens 双 0/nil）→ nil，不装配全 0 指标行
-        XCTAssertNil(CloudTurnEventMapper.performance(promptTokens: nil, completionTokens: nil, elapsedMs: nil))
-        XCTAssertNil(CloudTurnEventMapper.performance(promptTokens: 0, completionTokens: 0, elapsedMs: 1200))
+        XCTAssertEqual(perf?.decodeTimeMs, 2000)
+        XCTAssertEqual(perf?.decodeSpeed ?? 0, 25, accuracy: 0.001)
+        XCTAssertNil(AgUiCloudTurnTranslator.performance(promptTokens: nil, completionTokens: nil, elapsedMs: nil))
+        XCTAssertNil(AgUiCloudTurnTranslator.performance(promptTokens: 0, completionTokens: 0, elapsedMs: 1200))
     }
 }

@@ -43,6 +43,8 @@ class CloudAgentChatViewModelTest {
         every { cloudAgentByokConsentFlow } answers { consentFlow }
         // send() 现读界面语言上报 X-App-Language（2026-11-22 OpenUI 多语言批次）
         every { appLanguageFlow } answers { MutableStateFlow(AppLanguage.SYSTEM) }
+        // AG-UI 回滚闸（2026-11-28 M2）：默认 true=优先 v2（FakeApi v2 默认路由缺失 → 回落 v1）
+        every { cloudAgUiEnabledFlow } answers { MutableStateFlow(true) }
     }
 
     /** 假客户端：记录调用，frames 脚本化。 */
@@ -86,6 +88,15 @@ class CloudAgentChatViewModelTest {
             framesScript(this, onFrame)
             return Result.success(Unit)
         }
+        override suspend fun postMessageV2(
+            token: String,
+            sessionId: String,
+            content: String,
+            byokApiKey: String?,
+            replyLanguage: String?,
+            onFrame: (com.mamba.picme.domain.chat.streaming.AgUiFrame) -> Unit,
+        ): Result<Unit> = Result.failure(RuntimeException("HTTP 404: Not Found")) // 默认模拟老服务端无 v2 路由 → 回落 v1
+
         override suspend fun postToolResult(token: String, sessionId: String, requestId: String, ok: Boolean, result: String): Result<Unit> {
             toolResults.add(Triple(requestId, ok, result))
             return Result.success(Unit)

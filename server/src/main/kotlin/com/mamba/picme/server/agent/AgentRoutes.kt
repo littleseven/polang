@@ -4,7 +4,6 @@ import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.reflect.asToolsByClass
 import com.mamba.picme.agent.core.model.context.openUiReplyLanguageRuleSegment
 import com.mamba.picme.agent.core.model.context.replyLanguageFromName
-import com.mamba.picme.domain.chat.openui.OpenUiContract
 import com.mamba.picme.server.auth.AccountService
 import com.mamba.picme.server.admin.SKILL_DEBUG_MODEL
 import com.mamba.picme.server.llm.ChannelRegistry
@@ -23,14 +22,12 @@ import io.ktor.server.response.respondTextWriter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 
 /** BYOK 透传头（ADR-018 决策 4：请求级透传，零留存）。 */
 const val BYOK_API_KEY_HEADER = "X-User-Api-Key"
@@ -79,6 +76,13 @@ private const val ROUND_RETRY_AFTER_S: Long = 15L
  *   `{"kind":"openui_delta","program":"<已到达前缀>"}` 帧——响应 content 流式增量的
  *   program 前缀旁路（瞬态预览，不落事件流）；端侧新旧版本混跑安全（旧端忽略未知
  *   kind），正式消息帧仍是唯一权威负载。
+ * - `POST /agent/v2/sessions/{id}/messages`：AG-UI 事件流端点（M1，spec
+ *   《2026-11-28-ag-ui-migration-design》）。与 v1 同一 runTurn 实现（鉴权/会话/
+ *   并发闸/配额/目标解析/超时安全网全单份），仅出站帧汇不同：RUN_STARTED 回合边界
+ *   + 事件映射（ACTION→TOOL_CALL_*、OBSERVATION→TOOL_CALL_RESULT、终结 Message
+ *   差分去重）+ 流式快照差分 TEXT_MESSAGE_* 真 delta + 设备工具桥 CUSTOM
+ *   (device_tool_request) + RUN_FINISHED(metadata 携 done 帧全量数据)/RUN_ERROR。
+ *   v1 端点逐字节保留，客户端探测 404 回落。
  * - `POST /agent/sessions/{id}/tool-results`：端侧工具结果上行（M2）。body
  *   `{"request_id","ok","result"}` → `200 {"accepted":true}` / `400 request_id_required` /
  *   `404 session_not_found`（他人会话同口径，不泄露存在性）/ `409 tool_request_not_pending`
@@ -240,7 +244,29 @@ fun Route.agentRoute(
             call.respond(buildJsonObject { put("accepted", true) })
         }
 
-        post("/sessions/{id}/messages") {
+        // AG-UI 迁移 M1（spec §3）：v1/v2 双端点共用同一回合实现，仅出站帧汇（sink）不同。
+        // v1 逐字节保留（客户端 404 回落兜底）；v2 = AG-UI 事件流
+        agentTurnMessages("/sessions/{id}/messages", runner, bridge, deviceTimeoutMs, roundGate, skillCenter) { writer, _ ->
+            LegacyKindFrameSink(writer)
+        }
+        agentTurnMessages("/v2/sessions/{id}/messages", runner, bridge, deviceTimeoutMs, roundGate, skillCenter) { writer, sessionId ->
+            AgUiFrameSink(writer, threadId = sessionId, runId = newRunId())
+        }
+    }
+}
+
+private fun newRunId(): String = "run-" + java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+
+private fun Route.agentTurnMessages(
+    path: String,
+    runner: AgentRunner,
+    bridge: AgentBridgeRegistry,
+    deviceTimeoutMs: Long,
+    roundGate: AgentRoundGate,
+    skillCenter: SkillCenter?,
+    sinkFactory: (java.io.Writer, String) -> TurnFrameSink,
+) {
+        post(path) {
             val tokenHash = call.attributes.getOrNull(TokenHashKey)
                 ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "unauthorized"))
             val session = findOwned(call.parameters["id"].orEmpty(), tokenHash)
@@ -309,8 +335,10 @@ fun Route.agentRoute(
                 }
 
                 call.respondTextWriter(ContentType.Text.EventStream) {
+                    val sink = sinkFactory(this, session.id)
+                    sink.onTurnStart()
                     val deviceTools = DeviceToolService(session.id, bridge, deviceTimeoutMs) { frame ->
-                        writeSseFrame(frame.toJson())
+                        sink.onToolRequest(frame)
                     }
                     // GenUI 唯一化（2026-11-06）：恒 turn-native，无发卡工具注册
                     // 分层 runtime M2：端侧工具集目录驱动（CloudAgentToolCatalog → CatalogBridgeTool）
@@ -344,40 +372,18 @@ fun Route.agentRoute(
                                 // openui 流式预览：program 前缀瞬态帧（不落事件流，与
                                 // event/done/error 共用同一 writer 保序；旧端忽略未知 kind）
                                 onOpenUiProgramDelta = { prefix ->
-                                    writeSseFrame(buildJsonObject {
-                                        put("kind", "openui_delta")
-                                        put("program", prefix)
-                                    })
+                                    sink.onProgramDelta(prefix)
                                 },
                                 onEvent = { event ->
-                                    writeSseFrame(buildJsonObject {
-                                        put("kind", "event")
-                                        put("event", eventJson(event))
-                                    })
+                                    sink.onAgentEvent(event)
                                 },
                             )
                         }
                         if (finishEvent != null) {
-                            writeSseFrame(buildJsonObject {
-                                put("kind", "done")
-                                put("session_status", AgentSessionStatus.RUNNING.wire)
-                                // 回合性能数据（端侧 LlmPerformance 数据源）：旧端忽略未知字段
-                                put("elapsed_ms", turnUsage.elapsedMs)
-                                put("usage", buildJsonObject {
-                                    put("prompt_tokens", turnUsage.promptTokens)
-                                    put("completion_tokens", turnUsage.completionTokens)
-                                })
-                                // OpenUI 语言协议版本（版本协商，shared 常量同源）：端侧落
-                                // MessagePart.OpenUiCard.langVersion，高于端侧版本时卡顶部
-                                // 提示升级；旧端忽略未知字段
-                                put("lang_version", OpenUiContract.LANG_VERSION)
-                            })
+                            sink.onDone(turnUsage)
                         } else {
                             // 超时取消：会话仍可用（不置 ERROR），配额已消耗（LLM 调用已发生，不回退）
-                            writeSseFrame(buildJsonObject {
-                                put("kind", "error")
-                                put("message", "round_timeout")
-                            })
+                            sink.onError("round_timeout", "round_timeout")
                         }
                     } catch (e: Throwable) {
                         // 端断线/取消：不置 ERROR（会话仍可用）、不回退配额（LLM 调用已发生）
@@ -386,10 +392,7 @@ fun Route.agentRoute(
                             if (gatewayQuotaCharged) AccountService.revertQuota(tokenHash)
                         }
                         try {
-                            writeSseFrame(buildJsonObject {
-                                put("kind", "error")
-                                put("message", e.message?.take(200) ?: "internal error")
-                            })
+                            sink.onError(e.message?.take(200) ?: "internal error", "internal_error")
                         } catch (_: Throwable) {
                             // 通道已关闭（端断线），无法写入错误帧——静默吞掉
                         }
@@ -403,14 +406,6 @@ fun Route.agentRoute(
                 roundGate.release(tokenHash)
             }
         }
-    }
-}
-
-private fun java.io.Writer.writeSseFrame(obj: JsonObject) {
-    write("data: ")
-    write(obj.toString())
-    write("\n\n")
-    flush()
 }
 
 private suspend fun findOwned(id: String, tokenHash: String): AgentSession? =
@@ -424,14 +419,4 @@ private fun sessionJson(s: AgentSession) = buildJsonObject {
     put("created_at", s.createdAt)
     put("updated_at", s.updatedAt)
     s.finishedAt?.let { put("finished_at", it) }
-}
-
-private fun eventJson(e: AgentEvent) = buildJsonObject {
-    put("id", e.id)
-    put("type", e.type.wire)
-    put("source", e.source.wire)
-    put("role", e.role.wire)
-    e.parentId?.let { put("parent_id", it) }
-    put("payload", AgentEventPayloadCodec.encodeToElement(e.payload) as JsonElement)
-    put("created_at", e.createdAt)
 }

@@ -2443,7 +2443,15 @@ class ChatViewModel(
         cards: CloudTurnCardFlush,
         replyLanguage: String,
         onServerError: (String) -> Unit,
-    ): Result<Unit> = runner.runTurn(token, session.sessionId, text, session.byokApiKey, replyLanguage) { event ->
+    ): Result<Unit> = runner.runTurn(
+        token,
+        session.sessionId,
+        text,
+        session.byokApiKey,
+        replyLanguage,
+        // AG-UI 回滚闸（spec《AG-UI 迁移》M2，默认 true=v2 端点；false=强制 v1 kind 帧链路）
+        agUiEnabled = userSettingsRepository.cloudAgUiEnabledFlow.first(),
+    ) { event ->
         when (event) {
             is CloudTurnEvent.AssistantText -> {
                 if (answer.isNotEmpty()) answer.append("\n\n")

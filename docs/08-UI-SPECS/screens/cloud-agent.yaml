@@ -82,14 +82,15 @@ network:
   common_headers: ["X-App-Token: <服务端登录 token>", "X-Platform: ios"]
   endpoints:
     create_session: { method: POST, path: "/agent/sessions", body: "{channel, model, byok_base_url}", response: "{session_id, status, channel, model}", errors: "byok 缺参 → 400 byok_base_url_required / model_required" }
-    post_message:   { method: POST, path: "/agent/sessions/{id}/messages", headers: ["+ X-User-Api-Key（仅 BYOK 通道且 key 非空）"], body: "{content}", response: "SSE 流（长连接，读超时=0）" }
+    post_message:   { method: POST, path: "/agent/v2/sessions/{id}/messages", headers: ["+ X-User-Api-Key（仅 BYOK 通道且 key 非空）"], body: "{content}", response: "SSE 流（AG-UI 事件流，长连接，读超时=0；2026-11-28 AG-UI 迁移 M3，v1 kind 帧链路已退役）" }
     post_tool_result: { method: POST, path: "/agent/sessions/{id}/tool-results", body: "{request_id, ok, result}", response: "200 {accepted:true} / 409 tool_request_not_pending" }
     finish_session: { method: POST, path: "/agent/sessions/{id}/finish", body: "{}", response: "200" }
-  sse_frames:                                # `\n\n` 分块，取 data: 行 JSON，按 kind 分发，未知 kind 容错忽略
-    event:        "下行 | {id, type, source, role, payload, created_at} | 只上屏 type==message && role==assistant 的 payload.content"
-    tool_request: "下行 | {request_id, tool, args, timeout_ms=120000} | 端执行不阻塞收帧（并发执行，完成即上行）"
-    done:         "下行 | {session_status, elapsed_ms, usage{prompt_tokens, completion_tokens}} | 清 inFlight；usage/elapsed_ms 为回合性能数据（2026-11-01 起，旧服务端无此字段端侧 null 容错）"
-    error:        "下行 | {message} | 追加 ERROR 消息 + 清 inFlight"
+  sse_frames:                                # AG-UI v2：`\n\n` 分块，取 data: 行 JSON，按 type 分发（shared AgUiSseParser），未知 type 容错忽略；帧→事件映射 = AgUiCloudTurnTranslator（对位 Android 同名翻译器子集）
+    TEXT_MESSAGE_*:  "下行 | 块聚合整条后 looksLikeProgram 嗅探 → assistant 文本行 / 程序卡行（调试页 render_ui_openui(len=N) 摘要行）；role=user 跳过"
+    TOOL_CALL_*:     "下行 | render_ui_openui 的 END 全量 args 解析出程序卡行；其余工具仅参数累计（iOS 无步骤时间线）"
+    CUSTOM:          "下行 | name=device_tool_request，value={request_id, tool, args, timeout_ms} | 端执行不阻塞收帧（并发执行，完成即上行）"
+    RUN_FINISHED:    "下行 | metadata={session_status, elapsed_ms, prompt_tokens, completion_tokens, openui_lang_version} | 清 inFlight（性能数据缺省 nil 容错）"
+    RUN_ERROR:       "下行 | {message, code} | 追加 ERROR 消息 + 清 inFlight"
   tool_execution:                            # 端侧工具三件套——本体在 shared commonMain ChatToolService，iOS 经 SKIE 直调
     tools:
       - { name: get_gallery_summary, args: "无" }
@@ -106,6 +107,9 @@ platform_differences:
   transport:
     android: "OkHttp readTimeout=0 + byteStream 手工 \\n\\n 分帧"
     ios: "URLSession bytes(for:) AsyncSequence 行解析（全仓首个 SSE 客户端，无 EventSource 先例）"
+  ag_ui_protocol:
+    android: "v2 优先 + 404/406 回落 v1（线上存量兼容；DataStore cloud_ag_ui_enabled 回滚闸，默认开）"
+    ios: "仅 v2（无线上存量，2026-11-28 M3；解码 = shared AgUiSseParser 经 SharedKit 导出，单一解码源）"
   consent_storage:
     android: "DataStore cloud_agent_byok_consent"
     ios: "UserDefaults cloud_agent_byok_consent"

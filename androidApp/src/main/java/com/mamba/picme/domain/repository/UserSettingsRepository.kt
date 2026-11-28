@@ -220,6 +220,11 @@ interface UserSettingsRepository {
     val localTurnOpenUiEnabledFlow: Flow<Boolean>
     suspend fun updateLocalTurnOpenUiEnabled(enabled: Boolean)
 
+    // ── 云端回合 AG-UI(v2) 回滚闸（spec《AG-UI 迁移》M2） ──
+    /** 云端回合走 AG-UI v2 端点（默认 true；false = 强制 v1 kind 帧链路回滚位）。 */
+    val cloudAgUiEnabledFlow: Flow<Boolean>
+    suspend fun updateCloudAgUiEnabled(enabled: Boolean)
+
     // ── 服务端邮箱认证 ──────────────────────────────────────────
     val serverAuthTokenFlow: Flow<String>
     val serverAuthEmailFlow: Flow<String>
