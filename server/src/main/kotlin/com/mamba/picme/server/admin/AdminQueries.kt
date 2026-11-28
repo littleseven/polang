@@ -567,7 +567,9 @@ object AdminQueries {
                 apiTokenMasked = maskToken(a[Accounts.tokenPlain]),
                 hasToken = a[Accounts.tokenPlain].isNotEmpty(),
                 deviceIdMasked = lastDeviceId[id]?.let { maskDeviceId(it) } ?: "—",
-                lastPlatform = lastPlatform[id] ?: "—",
+                // 优先账号维度「最后所见平台」（覆盖云端 Agent 用户——该路径不写 llm_call_log）；
+                // llm_call_log 推导值作未迁移老数据的兜底
+                lastPlatform = a[Accounts.lastPlatform] ?: lastPlatform[id] ?: "—",
             )
         }
     }

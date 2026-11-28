@@ -167,6 +167,11 @@ fun Application.module(config: AppConfig) {
             // 有效账号 token → 存 hash + email 供下游额度校验与白名单判定
             authResult.tokenHash?.let { call.attributes.put(TokenHashKey, it) }
             authResult.email?.let { call.attributes.put(EmailKey, it) }
+            // 账号维度「最后所见平台」自愈更新（值变化才落库）：云端 Agent 路径不写 llm_call_log，
+            // 后台用户列表平台列无法从调用流水推导，故在此全局收口点维护
+            if (platform != null && authResult.tokenHash != null) {
+                AccountService.touchLastPlatform(authResult.tokenHash, platform)
+            }
             // 注册用户请求若带 X-Device-Id,亦存 DeviceIdKey 供后台 device 维度展示(device_id 列)
             call.request.headers[DEVICE_ID_HEADER]?.takeIf { it.isNotBlank() }?.let {
                 call.attributes.put(DeviceIdKey, it)
