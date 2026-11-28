@@ -39,15 +39,20 @@ object GuestService {
                 GuestQuotaResult(true, (limit - 1).coerceAtLeast(0))
             } else {
                 val used = row[AnonymousDevices.llmCallsUsed]
+                // platform 只在建行时写入：老数据/老客户端（无 X-Platform 头）建的行永远 NULL，
+                // 这里对 NULL 行顺手回填一次（自愈），已有值不覆盖
+                val backfillPlatform = platform != null && row[AnonymousDevices.platform] == null
                 if (used >= limit) {
                     AnonymousDevices.update({ AnonymousDevices.id eq row[AnonymousDevices.id] }) {
                         it[AnonymousDevices.lastSeenAt] = now
+                        if (backfillPlatform) it[AnonymousDevices.platform] = platform
                     }
                     GuestQuotaResult(false, 0)
                 } else {
                     AnonymousDevices.update({ AnonymousDevices.id eq row[AnonymousDevices.id] }) {
                         with(SqlExpressionBuilder) { it[llmCallsUsed] = llmCallsUsed + 1 }
                         it[AnonymousDevices.lastSeenAt] = now
+                        if (backfillPlatform) it[AnonymousDevices.platform] = platform
                     }
                     GuestQuotaResult(true, (limit - used - 1).coerceAtLeast(0))
                 }

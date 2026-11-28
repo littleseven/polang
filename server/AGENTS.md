@@ -74,7 +74,7 @@ server/
 │   │   ├── AppTokenAuth.kt       # X-App-Token 认证插件
 │   │   ├── EmailService.kt       # 验证码发送（Resend API，按 lang 渲染五语模板，缺省中英双语）
 │   │   ├── EmailLanguage.kt      # 邮件语言枚举（EN/zh-CN/zh-TW/ES/FR + 双语缺省）+ BCP-47 标签归一化
-│   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理
+│   │   ├── GuestService.kt       # 访客设备（anonymous_device）额度管理；platform 建行写入 + NULL 行请求级自愈回填（2026-11-28，不覆盖已有值）
 │   │   └── AiEngineerWhitelistService.kt # AI 工程师交付白名单
 │   ├── admin/
 │   │   ├── AdminRoutes.kt        # /admin/** 路由注册（含 /admin/diagnosis 问题诊断页 + M2 推理追溯三路由：/admin/llm/calls、/admin/agent/sessions[/{id}] + /admin/telemetry/downloads 下载遥测）
