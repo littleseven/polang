@@ -256,6 +256,47 @@ data class FunnelRow(
     val conversionFromPrev: Double?,
 )
 
+/** 漏斗阶段全集（顺序即漏斗顺序）；钻取路由的 stage 白名单同源 */
+internal val FUNNEL_STAGES = listOf("download", "ready", "scan_started", "scan_completed")
+internal val FUNNEL_STAGE_LABELS = listOf("开始下载模型", "必备模型就绪", "扫描启动", "扫描完成")
+
+/** 漏斗下钻页：某级转化摘要 + 分地区明细 + 设备清单（第一级=到达设备，其余=相对上级的流失设备） */
+data class FunnelDrillRow(
+    val stage: String,
+    val label: String,
+    val prevStage: String?,          // null = 第一级（无上级转化语义）
+    val prevLabel: String?,
+    val reachedPrev: Long,           // 第一级时等于 reachedThis
+    val reachedThis: Long,
+    val byRegion: List<FunnelDrillRegionRow>,
+    val devices: List<FunnelDrillDeviceRow>,
+    val devicesTruncated: Boolean,   // 设备清单超过上限被截断
+) {
+    /** 级间转化率；第一级或上级为 0 时 null */
+    val conversion: Double?
+        get() = if (prevStage == null || reachedPrev == 0L) null else reachedThis.toDouble() / reachedPrev
+}
+
+/** 下钻分地区行：地区 = 设备最近一次 model_download 事件的 region；无 download 事件归 unknown */
+data class FunnelDrillRegionRow(
+    val region: String,
+    val reachedPrev: Long,
+    val reachedThis: Long,
+) {
+    val conversionFromPrev: Double?
+        get() = if (reachedPrev == 0L) null else reachedThis.toDouble() / reachedPrev
+    val dropped: Long get() = reachedPrev - reachedThis
+}
+
+/** 下钻设备行（device_id 已脱敏）；models = 窗口内观测到的下载模型集合 */
+data class FunnelDrillDeviceRow(
+    val deviceIdMasked: String,
+    val region: String,
+    val models: List<String>,
+    val appVersion: String,
+    val lastEventAt: Long,
+)
+
 /** 分地区×分模型聚合行（2026-11-22）：定位「哪个模型在哪个地区卡下载」 */
 data class DownloadModelStatRow(
     val modelId: String,
@@ -803,18 +844,125 @@ object AdminQueries {
                         }
                     }
                 }
-            val counts = listOf("download", "ready", "scan_started", "scan_completed")
+            val counts = FUNNEL_STAGES
                 .map { stage -> deviceStages.values.count { stage in it }.toLong() }
-            val labels = listOf("开始下载模型", "必备模型就绪", "扫描启动", "扫描完成")
             counts.mapIndexed { i, n ->
                 FunnelRow(
-                    stage = listOf("download", "ready", "scan_started", "scan_completed")[i],
-                    label = labels[i],
+                    stage = FUNNEL_STAGES[i],
+                    label = FUNNEL_STAGE_LABELS[i],
                     devices = n,
                     conversionFromPrev = if (i == 0 || counts[i - 1] == 0L) null else n.toDouble() / counts[i - 1],
                 )
             }
         }
+
+    /**
+     * 漏斗下钻（2026-11-28）：某级的分地区转化明细 + 设备清单。
+     * 第一级（download）设备清单 = 到达设备；其余级 = 到达上级但未到达本级的流失设备。
+     * 地区/App 版本归因：设备最近一次 model_download 事件的 region/appVersion；无 download 事件归 unknown/空。
+     * 与 [telemetryFunnel] 同口径（到达过即计入，不严格按时序）；stage 非法返回 null（路由层 404）。
+     */
+    suspend fun telemetryFunnelDrill(
+        stage: String,
+        days: Int = 30,
+        now: Long = System.currentTimeMillis(),
+        deviceLimit: Int = 200,
+    ): FunnelDrillRow? = newSuspendedTransaction(Dispatchers.IO, Db.instance) {
+        val stageIdx = FUNNEL_STAGES.indexOf(stage)
+        if (stageIdx < 0) return@newSuspendedTransaction null
+        val prevStage = FUNNEL_STAGES.getOrNull(stageIdx - 1)
+
+        val since = now - days * DAY_MS
+        val devices = mutableMapOf<String, DeviceFunnelAcc>()
+        TelemetryEvents.selectAll()
+            .where {
+                (TelemetryEvents.type inList listOf(
+                    TELEMETRY_TYPE_MODEL_DOWNLOAD, TELEMETRY_TYPE_MODELS_READY, TELEMETRY_TYPE_GALLERY_SCAN,
+                )) and (TelemetryEvents.createdAt greaterEq since) and (TelemetryEvents.deviceId.isNotNull())
+            }
+            .forEach { row ->
+                val deviceId = row[TelemetryEvents.deviceId] ?: return@forEach
+                val acc = devices.getOrPut(deviceId) { DeviceFunnelAcc() }
+                val at = row[TelemetryEvents.createdAt]
+                if (at > acc.lastEventAt) acc.lastEventAt = at
+                when (row[TelemetryEvents.type]) {
+                    TELEMETRY_TYPE_MODEL_DOWNLOAD -> {
+                        acc.stages.add("download")
+                        parseModelDownloadEvent(row[TelemetryEvents.payloadJson])?.let { ev ->
+                            acc.models.add(ev.modelId)
+                            if (at >= acc.attributedAt) {
+                                acc.attributedAt = at
+                                acc.region = ev.region
+                                acc.appVersion = ev.appVersion
+                            }
+                        }
+                    }
+                    TELEMETRY_TYPE_MODELS_READY -> acc.stages.add("ready")
+                    TELEMETRY_TYPE_GALLERY_SCAN -> {
+                        when (scanPhaseOf(row[TelemetryEvents.payloadJson])) {
+                            "started" -> acc.stages.add("scan_started")
+                            "completed" -> acc.stages.add("scan_completed")
+                        }
+                    }
+                }
+            }
+
+        fun reached(s: String, d: DeviceFunnelAcc) = s in d.stages
+        val reachedThis = devices.values.count { reached(stage, it) }.toLong()
+        val reachedPrev = prevStage?.let { p -> devices.values.count { reached(p, it) }.toLong() } ?: reachedThis
+
+        // 分地区：到达上级（第一级=到达本级）的设备按归因地区聚合两级到达数
+        data class RegionAcc(var prev: Long = 0L, var cur: Long = 0L)
+        val byRegionAcc = mutableMapOf<String, RegionAcc>()
+        devices.values.forEach { d ->
+            val inScope = if (prevStage == null) reached(stage, d) else reached(prevStage, d)
+            if (!inScope) return@forEach
+            val acc = byRegionAcc.getOrPut(d.region ?: "unknown") { RegionAcc() }
+            acc.prev++
+            if (reached(stage, d)) acc.cur++
+        }
+        val byRegion = byRegionAcc.entries
+            .map { (region, a) -> FunnelDrillRegionRow(region, a.prev, a.cur) }
+            .sortedByDescending { it.reachedPrev }
+
+        // 设备清单：第一级=到达本级；其余=到达上级未达本级（流失）。按最后事件倒序截断
+        val drilled = devices.entries
+            .filter { (_, d) ->
+                if (prevStage == null) reached(stage, d) else reached(prevStage, d) && !reached(stage, d)
+            }
+            .sortedByDescending { it.value.lastEventAt }
+        val deviceRows = drilled.take(deviceLimit).map { (id, d) ->
+            FunnelDrillDeviceRow(
+                deviceIdMasked = maskDeviceId(id),
+                region = d.region ?: "unknown",
+                models = d.models.toList(),
+                appVersion = d.appVersion,
+                lastEventAt = d.lastEventAt,
+            )
+        }
+
+        FunnelDrillRow(
+            stage = stage,
+            label = FUNNEL_STAGE_LABELS[stageIdx],
+            prevStage = prevStage,
+            prevLabel = prevStage?.let { FUNNEL_STAGE_LABELS[stageIdx - 1] },
+            reachedPrev = reachedPrev,
+            reachedThis = reachedThis,
+            byRegion = byRegion,
+            devices = deviceRows,
+            devicesTruncated = drilled.size > deviceLimit,
+        )
+    }
+
+    /** 漏斗下钻的设备侧累积器：阶段集合 + 最近一次 download 事件的归因（地区/版本）+ 模型集合 */
+    private class DeviceFunnelAcc {
+        val stages = mutableSetOf<String>()
+        val models = sortedSetOf<String>()
+        var region: String? = null
+        var appVersion: String = ""
+        var attributedAt = -1L
+        var lastEventAt = 0L
+    }
 
     /** 提取 gallery_scan 事件的 phase 字段；坏事件返回 null */
     private fun scanPhaseOf(payloadJson: String?): String? {

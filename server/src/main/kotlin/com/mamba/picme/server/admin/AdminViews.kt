@@ -2394,6 +2394,21 @@ object AdminViews {
                         .btn{padding:10px 20px;background:var(--c-primary);color:var(--c-surface);border:none;border-radius:var(--r-sm);font-size:var(--fs-md);cursor:pointer;transition:all .2s;font-weight:500;height:40px;line-height:20px}
                         .btn:hover{background:var(--c-primary-hover);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,110,255,.25)}
                         .chart{display:block;width:100%;max-width:800px;height:auto;margin:16px auto;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);padding:16px;box-shadow:var(--shadow-sm)}
+                        /* 下载遥测漏斗图（纯 SSR 水平漏斗条，零 JS） */
+                        .funnel{max-width:800px;margin:16px auto;padding:20px 24px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm)}
+                        .funnel-row{display:flex;align-items:center;gap:14px;padding:8px 10px;text-decoration:none;color:inherit;border-radius:var(--r-sm);transition:background .2s}
+                        .funnel-row:hover{background:#f5f7fa}
+                        .funnel-label{width:110px;flex-shrink:0;font-size:var(--fs-md);color:var(--c-text);font-weight:500}
+                        .funnel-track{flex:1;height:30px;background:var(--c-bg);border-radius:6px;overflow:hidden}
+                        .funnel-fill{display:flex;align-items:center;justify-content:flex-end;min-width:34px;height:100%;padding-right:8px;background:linear-gradient(90deg,var(--c-primary),#5b9bff);border-radius:6px;color:#fff;font-size:var(--fs-xs);font-weight:600;font-variant-numeric:tabular-nums}
+                        .funnel-stats{width:190px;flex-shrink:0;text-align:right;font-size:var(--fs-xs);line-height:1.5}
+                        .funnel-conv{display:block;font-weight:600;color:var(--c-text)}
+                        .funnel-overall{display:block;color:var(--c-text-3)}
+                        .funnel-hint{margin:12px 0 0;font-size:var(--fs-xs);color:var(--c-text-3);text-align:center}
+                        .funnel-summary{max-width:800px;margin:16px auto;padding:20px 24px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);display:flex;gap:32px;flex-wrap:wrap}
+                        .funnel-summary .fs-item{min-width:120px}
+                        .funnel-summary .fs-num{font-size:24px;font-weight:700;color:var(--c-text);font-variant-numeric:tabular-nums}
+                        .funnel-summary .fs-cap{font-size:var(--fs-xs);color:var(--c-text-3);margin-top:4px}
                         .chan-form{max-width:640px;margin:24px auto;padding:0 24px}
                         .chan-form p{margin:12px 0}
                         .chan-form label{display:block;font-size:var(--fs-sm);color:var(--c-text-2);margin-bottom:6px;font-weight:500}
@@ -2762,19 +2777,39 @@ object AdminViews {
             if (funnel.all { it.devices == 0L }) {
                 div("empty-state") { +"暂无漏斗数据（客户端上报 model_download/models_ready/gallery_scan 事件后可见）" }
             } else {
-                table {
-                    tr {
-                        th { +"阶段" }
-                        th { +"到达设备数" }
-                        th { +"级间转化率" }
-                    }
-                    funnel.forEach { f ->
-                        tr {
-                            td { +f.label }
-                            td { +f.devices.toString() }
-                            td { +(f.conversionFromPrev?.let { "%.1f%%".format(it * 100) } ?: "—") }
+                val firstDevices = funnel.first().devices
+                div("funnel") {
+                    funnel.forEachIndexed { i, f ->
+                        val widthPct = if (firstDevices == 0L) 0.0 else f.devices.toDouble() / firstDevices * 100
+                        val dropped = if (i == 0) 0L else funnel[i - 1].devices - f.devices
+                        a(href = "/admin/telemetry/downloads/funnel/${f.stage}?days=$days", classes = "funnel-row") {
+                            span("funnel-label") { +f.label }
+                            span("funnel-track") {
+                                span("funnel-fill") {
+                                    attributes["style"] =
+                                        "width:${"%.1f".format(widthPct.coerceAtLeast(if (f.devices > 0) 4.0 else 0.0))}%"
+                                    +f.devices.toString()
+                                }
+                            }
+                            span("funnel-stats") {
+                                span("funnel-conv") {
+                                    if (f.conversionFromPrev != null) {
+                                        +"级间 %.1f%%（流失 %d）".format(f.conversionFromPrev * 100, dropped)
+                                    } else {
+                                        +"入口"
+                                    }
+                                }
+                                span("funnel-overall") {
+                                    +(
+                                        f.conversionFromPrev?.let {
+                                            "整体 %.1f%%".format(f.devices.toDouble() / firstDevices * 100)
+                                        } ?: "整体 100%"
+                                        )
+                                }
+                            }
                         }
                     }
+                    p("funnel-hint") { +"点击任一阶段下钻：分地区转化明细 + 流失设备清单" }
                 }
             }
             h2 { +"分地区下载成功率" }
@@ -2843,6 +2878,123 @@ object AdminViews {
                             }
                             td { +if (r.avgDurationMs > 0) "%.1f s".format(r.avgDurationMs / 1000.0) else "—" }
                             td { +if (r.avgSpeedKbps > 0) "%.0f KB/s".format(r.avgSpeedKbps) else "—" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** 漏斗下钻页（2026-11-28）：某级的转化摘要 + 分地区明细 + 设备清单（第一级=到达设备，其余=流失设备） */
+    fun funnelDrillPage(drill: FunnelDrillRow, days: Int): String = createHTML().html {
+        adminHead("漏斗下钻 · ${drill.label} · PoLang 管理后台")
+        body {
+            navBar()
+            h1 { +"漏斗下钻：${drill.label}" }
+            p("meta") {
+                a("/admin/telemetry/downloads?days=$days") { +"← 返回下载遥测" }
+                +" · 近 $days 天 · 地区 = 设备最近一次下载事件的 region"
+            }
+
+            // ── 转化摘要卡 ──
+            div("funnel-summary") {
+                if (drill.prevStage == null) {
+                    div("fs-item") {
+                        div("fs-num") { +drill.reachedThis.toString() }
+                        div("fs-cap") { +"到达设备（漏斗入口）" }
+                    }
+                } else {
+                    div("fs-item") {
+                        div("fs-num") { +drill.reachedPrev.toString() }
+                        div("fs-cap") { +"到达上级（${drill.prevLabel}）" }
+                    }
+                    div("fs-item") {
+                        div("fs-num") { +drill.reachedThis.toString() }
+                        div("fs-cap") { +"到达本级（${drill.label}）" }
+                    }
+                    div("fs-item") {
+                        div("fs-num") {
+                            +(drill.conversion?.let { "%.1f%%".format(it * 100) } ?: "—")
+                        }
+                        div("fs-cap") { +"级间转化率" }
+                    }
+                    div("fs-item") {
+                        div("fs-num") { +(drill.reachedPrev - drill.reachedThis).toString() }
+                        div("fs-cap") { +"流失设备" }
+                    }
+                }
+            }
+
+            // ── 分地区明细 ──
+            h2 { +"分地区明细" }
+            if (drill.byRegion.isEmpty()) {
+                div("empty-state") { +"本级暂无到达设备" }
+            } else {
+                table {
+                    tr {
+                        th { +"地区" }
+                        if (drill.prevStage != null) th { +"到达上级" }
+                        th { +"到达本级" }
+                        if (drill.prevStage != null) {
+                            th { +"级间转化" }
+                            th { +"流失" }
+                        } else {
+                            th { +"占比" }
+                        }
+                    }
+                    drill.byRegion.forEach { r ->
+                        tr {
+                            td { +r.region }
+                            if (drill.prevStage != null) td { +r.reachedPrev.toString() }
+                            td { +r.reachedThis.toString() }
+                            if (drill.prevStage != null) {
+                                td {
+                                    val conv = r.conversionFromPrev
+                                    if (conv == null) {
+                                        +"—"
+                                    } else {
+                                        span(if (conv < 0.9) "badge badge-revoked" else "badge badge-active") {
+                                            +"%.1f%%".format(conv * 100)
+                                        }
+                                    }
+                                }
+                                td { +r.dropped.toString() }
+                            } else {
+                                td {
+                                    +(
+                                        if (drill.reachedThis == 0L) "—"
+                                        else "%.1f%%".format(r.reachedThis.toDouble() / drill.reachedThis * 100)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── 设备清单 ──
+            h2 { +(if (drill.prevStage == null) "到达设备清单" else "流失设备清单（到达上级未达本级）") }
+            if (drill.devices.isEmpty()) {
+                div("empty-state") { +"无设备（本级转化 100% 或入口无到达）" }
+            } else {
+                if (drill.devicesTruncated) {
+                    p("meta") { +"仅显示最近 ${drill.devices.size} 台（按最后事件倒序截断）" }
+                }
+                table {
+                    tr {
+                        th { +"设备" }
+                        th { +"地区" }
+                        th { +"已下载模型" }
+                        th { +"App 版本" }
+                        th { +"最后事件" }
+                    }
+                    drill.devices.forEach { d ->
+                        tr {
+                            td { +d.deviceIdMasked }
+                            td { +d.region }
+                            td { +if (d.models.isNotEmpty()) d.models.joinToString(", ") else "—" }
+                            td { +d.appVersion.ifEmpty { "—" } }
+                            td { +fmtTs(d.lastEventAt) }
                         }
                     }
                 }

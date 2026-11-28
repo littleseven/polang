@@ -790,6 +790,15 @@ fun Route.adminRoute(
             )
         }
 
+        // 漏斗下钻（2026-11-28）：某级分地区转化明细 + 流失/到达设备清单；stage 白名单外 404
+        get("/telemetry/downloads/funnel/{stage}") {
+            if (!call.adminGuard(adminToken)) return@get
+            val days = call.request.queryParameters["days"]?.toIntOrNull()?.coerceIn(1, 90) ?: 30
+            val drill = AdminQueries.telemetryFunnelDrill(call.parameters["stage"].orEmpty(), days)
+                ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "unknown_funnel_stage"))
+            call.respondText(AdminViews.funnelDrillPage(drill, days), ContentType.Text.Html)
+        }
+
         get("/diagnosis") {
             if (!call.adminGuard(adminToken)) return@get
             val msg = call.request.queryParameters["msg"]
