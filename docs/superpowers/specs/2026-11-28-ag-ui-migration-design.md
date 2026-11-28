@@ -2,6 +2,7 @@
 
 > **日期**：2026-11-28
 > **状态**：在途（M1/M2/M3 已实施；M4 HITL/STATE 评估 + v1 下线待启动）
+> **2026-11-28 修复注记**：真机 v2 首回合双发卡 bug（服务端 stream 预览块 + evt 终结块各出一卡）——双端翻译器按 TurnFrameSink 双形态契约加「终结候选」暂存（stream-* END 暂存 / evt-* START 取代 / 其余帧 flush），恒单卡；契约口径已同步 `CHAT_PROTOCOL_TECH_SPEC.md` §2.9。
 > **上游**：ADR-016（parts 文档模型）、ADR-018（云端 Agent 事件溯源）、[AG-UI 协议](https://docs.ag-ui.com/concepts/events)
 > **下游同步**：`CHAT_PROTOCOL_TECH_SPEC.md` §2.9、`server/AGENTS.md` 路由清单（交付时同原子提交）
 

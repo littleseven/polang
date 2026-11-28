@@ -241,6 +241,9 @@ class CloudAgentTurnRunner(
  *   否则 AssistantText）；多块流式增量经 `looksLikeProgramPrefix` 门判出 OpenUiCardDelta
  *   （单 chunk 块 = 非流式整条消息，不出预览帧，对齐 v1 openui_delta 仅程序流产出的语义）；
  *   role=user 块整段跳过（用户消息本地已先上屏）；
+ * - **stream/evt 双块去重**（服务端 TurnFrameSink 契约）：流式预览块（`stream-*`）END 后事件
+ *   暂存 [pendingFinal]，终结块（`evt-*` assistant）START 到达则丢弃候选（改写场景 evt 携带
+ *   权威全文），任何其它帧到达先 flush 候选（等值场景无 evt 续帧）——两形态恒单卡；
  * - TOOL_CALL_START → StepStarted（toolCallId `act-{eventId}` 解析回服务端事件 id）；
  *   ARGS 累计到 END 全量解析（render_ui_openui → OpenUiCard，坏帧记日志容错同 v1）；
  * - TOOL_CALL_RESULT → StepFinished（`act-0` 孤儿帧跳过，同 v1 actionEventId=0 口径）；
@@ -256,11 +259,26 @@ private class AgUiCloudTurnTranslator {
     private val toolNames = mutableMapOf<String, String>()
     private val toolArgs = mutableMapOf<String, StringBuilder>()
 
+    /**
+     * 终结候选（服务端 stream/evt 去重契约，TurnFrameSink §双形态）：
+     * 流式预览块（stream-*）END 后暂存事件不上屏——随后 evt-*（assistant）START 到达
+     * = ensureValidProgram 改写场景，evt 携带权威全文取代候选（防双卡）；
+     * 任何其它帧到达 = 等值场景（无 evt 续帧），候选 flush 转正上屏。
+     */
+    private var pendingFinal: CloudTurnEvent? = null
+
     fun onFrame(
         frame: AgUiFrame,
         onEvent: (CloudTurnEvent) -> Unit,
         onToolRequest: (requestId: String, tool: String, args: JSONObject) -> Unit,
     ) {
+        if (frame is AgUiFrame.TextMessageStart && frame.isFinalAssistantBlock) {
+            // 改写场景：evt 块到达，丢弃 stream 候选（权威全文在 evt 块内）
+            pendingFinal = null
+        } else {
+            // 等值场景/工具交错：候选转正（evt assistant START 之外的一切帧都先 flush）
+            flushPendingFinal(onEvent)
+        }
         when (frame) {
             is AgUiFrame.RunStarted -> Unit // 回合边界信号（v1 无对应物），暂不上屏
             is AgUiFrame.TextMessageStart -> textBlocks[frame.messageId] =
@@ -278,15 +296,19 @@ private class AgUiCloudTurnTranslator {
             is AgUiFrame.TextMessageEnd -> textBlocks.remove(frame.messageId)?.let { block ->
                 if (block.role != "assistant") return@let
                 val content = block.buf.toString()
-                if (OpenUiProgramSummary.looksLikeProgram(content)) {
-                    onEvent(
-                        CloudTurnEvent.OpenUiCard(
-                            program = content,
-                            fallbackSummary = OpenUiProgramSummary.extractFallbackSummary(content),
-                        ),
+                val event = if (OpenUiProgramSummary.looksLikeProgram(content)) {
+                    CloudTurnEvent.OpenUiCard(
+                        program = content,
+                        fallbackSummary = OpenUiProgramSummary.extractFallbackSummary(content),
                     )
                 } else {
-                    onEvent(CloudTurnEvent.AssistantText(content))
+                    CloudTurnEvent.AssistantText(content)
+                }
+                // stream-* = 流式预览块：暂存候选等 evt 续帧裁决；evt-*（及旧服务端整条块）直上屏
+                if (frame.messageId.startsWith(STREAM_MESSAGE_PREFIX)) {
+                    pendingFinal = event
+                } else {
+                    onEvent(event)
                 }
             }
             is AgUiFrame.ToolCallStart -> {
@@ -343,11 +365,27 @@ private class AgUiCloudTurnTranslator {
         }
     }
 
+    /** evt-*（assistant）START = 服务端终结块（权威全文）到达信号。 */
+    private val AgUiFrame.TextMessageStart.isFinalAssistantBlock: Boolean
+        get() = messageId.startsWith(FINAL_MESSAGE_PREFIX) && role == "assistant"
+
+    /** 暂存的终结候选转正上屏（等值场景/回合收尾/工具交错前调用）。 */
+    private fun flushPendingFinal(onEvent: (CloudTurnEvent) -> Unit) {
+        pendingFinal?.let { onEvent(it) }
+        pendingFinal = null
+    }
+
     private fun parseActEventId(toolCallId: String): Long? =
         toolCallId.removePrefix("act-").toLongOrNull()
 
     companion object {
         private const val TAG = "CloudAgent"
         private const val CUSTOM_DEVICE_TOOL_REQUEST = "device_tool_request"
+
+        /** 服务端流式预览块 messageId 前缀（TurnFrameSink `stream-{N}`）。 */
+        private const val STREAM_MESSAGE_PREFIX = "stream-"
+
+        /** 服务端终结块 messageId 前缀（TurnFrameSink `evt-{eventId}`）。 */
+        private const val FINAL_MESSAGE_PREFIX = "evt-"
     }
 }

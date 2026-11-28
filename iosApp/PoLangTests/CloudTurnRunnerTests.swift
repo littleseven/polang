@@ -173,6 +173,49 @@ final class CloudTurnRunnerTests: XCTestCase {
         ])
     }
 
+    func testRewrittenStreamBlockReplacedByEvtFinalBlockSingleCard() {
+        // 改写场景（ensureValidProgram normalize 改写过）：stream 预览块 END 暂存候选，
+        // evt 终结块 START 丢弃候选 —— 只有 evt 权威全文出一张卡
+        let streamed = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        let normalized = "// summary: 统计\nroot = Card([Text(\"hi\"), Text(\"v2\")])"
+        let out = translate(
+            textBlock("stream-1", "assistant", ["// summary: 统计\nroot = Card([", "Text(\"hi\")])"])
+                + textBlock("evt-7", "assistant", [normalized])
+                + [runFinished]
+        )
+        XCTAssertEqual(out.events, [
+            .openUiCardDelta(program: streamed),
+            .openUiCard(program: normalized, fallbackSummary: "统计"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
+    func testStreamTextCandidateFlushesBeforeToolCallFrames() {
+        // 工具交错：stream 文本块 END 后接 TOOL_CALL_START —— 候选先 flush（叙述文本不丢、顺序不乱）
+        let out = translate(
+            textBlock("stream-1", "assistant", ["我先搜一下"])
+                + [
+                    #"data: {"type":"TOOL_CALL_START","toolCallId":"act-11","toolCallName":"search_media"}"#,
+                    #"data: {"type":"TOOL_CALL_ARGS","toolCallId":"act-11","delta":"{\"query\":\"猫\"}"}"#,
+                    #"data: {"type":"TOOL_CALL_END","toolCallId":"act-11"}"#,
+                    runFinished,
+                ]
+        )
+        XCTAssertEqual(out.events, [
+            .assistantText("我先搜一下"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
+    func testEvtBlockWithoutStreamEmitsDirectly() {
+        // 无流式预览的终结块（旧服务端/非流式路径）直上屏，不经候选暂存
+        let out = translate(textBlock("evt-9", "assistant", ["直接答复"]) + [runFinished])
+        XCTAssertEqual(out.events, [
+            .assistantText("直接答复"),
+            .done(promptTokens: nil, completionTokens: nil, elapsedMs: nil, langVersion: nil),
+        ])
+    }
+
     // MARK: - done 性能装配（沿用 v1 CloudTurnEventMapper 口径）
 
     func testPerformanceMapping() {

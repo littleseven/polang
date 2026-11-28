@@ -68,6 +68,8 @@ final class CloudFramePipe: @unchecked Sendable {
 // - TEXT_MESSAGE_* 聚合整条后同一 looksLikeProgram 嗅探 → OpenUiCard 或 AssistantText；
 //   多 chunk 流式块经 looksLikeProgramPrefix 门判出 OpenUiCardDelta（单 chunk=非流式整条不出预览）；
 //   role=user 块整段跳过（本地已先上屏）；
+// - stream/evt 双块去重（服务端 TurnFrameSink 契约）：stream-* 块 END 暂存候选，evt-*（assistant）
+//   START 到达丢弃候选（改写场景 evt 权威全文），其余帧到达先 flush 候选（等值场景）——恒单卡；
 // - TOOL_CALL_END 全量 args 解析 render_ui_openui → OpenUiCard（坏帧容错忽略不拖垮整回合）；
 // - CUSTOM(device_tool_request) → onToolRequest 回调（端执行通道直驱，不经事件流）；
 // - RUN_FINISHED metadata → done；RUN_ERROR → error；RUN_STARTED 仅回合边界信号。
@@ -97,12 +99,26 @@ final class AgUiCloudTurnTranslator {
     private var toolNames: [String: String] = [:]
     private var toolArgs: [String: String] = [:]
 
+    /// 终结候选（服务端 stream/evt 去重契约，TurnFrameSink §双形态，对位 Android pendingFinal）：
+    /// 流式预览块（stream-*）END 后暂存事件不上屏——随后 evt-*（assistant）START 到达
+    /// = ensureValidProgram 改写场景，evt 携带权威全文取代候选（防双卡）；
+    /// 任何其它帧到达 = 等值场景（无 evt 续帧），候选 flush 转正上屏。
+    private var pendingFinal: CloudTurnEvent?
+
     /// 翻译一帧；事件经 onEvent、设备工具桥请求经 onToolRequest 分流（同 Android 口径）。
     func onFrame(
         _ frame: AgUiFrame,
         onEvent: (CloudTurnEvent) -> Void,
         onToolRequest: (_ requestId: String, _ tool: String, _ args: [String: String]) -> Void
     ) {
+        if let start = frame as? AgUiFrameTextMessageStart,
+           start.messageId.hasPrefix(Self.finalMessagePrefix), start.role == "assistant" {
+            // 改写场景：evt 块到达，丢弃 stream 候选（权威全文在 evt 块内）
+            pendingFinal = nil
+        } else {
+            // 等值场景/工具交错：候选转正（evt assistant START 之外的一切帧都先 flush）
+            flushPendingFinal(onEvent)
+        }
         switch frame {
         case is AgUiFrameRunStarted:
             break // 回合边界信号（v1 无对应物），不上屏
@@ -122,12 +138,19 @@ final class AgUiCloudTurnTranslator {
             guard let block = textBlocks.removeValue(forKey: f.messageId),
                   block.role == "assistant" else { break }
             let content = block.buf
+            let event: CloudTurnEvent
             if OpenUiProgramSummary.shared.looksLikeProgram(content: content) {
-                onEvent(.openUiCard(
+                event = .openUiCard(
                     program: content,
-                    fallbackSummary: OpenUiProgramSummary.shared.extractFallbackSummary(program: content)))
+                    fallbackSummary: OpenUiProgramSummary.shared.extractFallbackSummary(program: content))
             } else {
-                onEvent(.assistantText(content))
+                event = .assistantText(content)
+            }
+            // stream-* = 流式预览块：暂存候选等 evt 续帧裁决；evt-*（及旧服务端整条块）直上屏
+            if f.messageId.hasPrefix(Self.streamMessagePrefix) {
+                pendingFinal = event
+            } else {
+                onEvent(event)
             }
         case let f as AgUiFrameToolCallStart:
             toolNames[f.toolCallId] = f.toolCallName
@@ -214,6 +237,16 @@ final class AgUiCloudTurnTranslator {
             usedSandbox: false)
     }
 
+    /// 暂存的终结候选转正上屏（等值场景/回合收尾/工具交错前调用，对位 Android flushPendingFinal）。
+    private func flushPendingFinal(_ onEvent: (CloudTurnEvent) -> Void) {
+        if let event = pendingFinal { onEvent(event) }
+        pendingFinal = nil
+    }
+
     private static let renderUiOpenUiTool = "render_ui_openui"
     private static let customDeviceToolRequest = "device_tool_request"
+    /// 服务端流式预览块 messageId 前缀（TurnFrameSink `stream-{N}`）。
+    private static let streamMessagePrefix = "stream-"
+    /// 服务端终结块 messageId 前缀（TurnFrameSink `evt-{eventId}`）。
+    private static let finalMessagePrefix = "evt-"
 }

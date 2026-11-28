@@ -299,6 +299,77 @@ class CloudAgentTurnRunnerAgUiTest {
     }
 
     @Test
+    fun `v2 rewritten stream block is replaced by evt final block single card`() = runTest {
+        // 改写场景（ensureValidProgram normalize 改写过）：stream 预览块 END 暂存候选，
+        // evt 终结块 START 丢弃候选 —— 只有 evt 权威全文出一张卡
+        val api = FakeApi()
+        val streamed = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        val normalized = "// summary: 统计\nroot = Card([Text(\"hi\"), Text(\"v2\")])"
+        api.v2FramesScript = { onFrame ->
+            onFrame(AgUiFrame.RunStarted("s_1", "run-abc"))
+            v2TextBlock("stream-1", "assistant", "// summary: 统计\nroot = Card([", "Text(\"hi\")])").forEach(onFrame)
+            v2TextBlock("evt-7", "assistant", normalized).forEach(onFrame)
+            onFrame(v2RunFinished())
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
+        assertEquals(
+            listOf(
+                CloudTurnEvent.OpenUiCardDelta(streamed),
+                CloudTurnEvent.OpenUiCard(normalized, "统计"),
+                CloudTurnEvent.Done(),
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `v2 equal stream block candidate flushes at run finished single card`() = runTest {
+        // 等值场景（未改写，无 evt 续帧）：stream 候选在 RUN_FINISHED 前 flush 转正，恒单卡
+        val api = FakeApi()
+        val program = "// summary: 统计\nroot = Card([Text(\"hi\")])"
+        api.v2FramesScript = { onFrame ->
+            v2TextBlock("stream-1", "assistant", "// summary: 统计\nroot = Card([", "Text(\"hi\")])").forEach(onFrame)
+            onFrame(v2RunFinished())
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "画个图", null) { events.add(it) }
+        assertEquals(
+            listOf(
+                CloudTurnEvent.OpenUiCardDelta(program),
+                CloudTurnEvent.OpenUiCard(program, "统计"),
+                CloudTurnEvent.Done(),
+            ),
+            events,
+        )
+    }
+
+    @Test
+    fun `v2 stream text candidate flushes before tool call frames`() = runTest {
+        // 工具交错：stream 文本块 END 后接 TOOL_CALL_START —— 候选先 flush（叙述文本不丢、顺序不乱）
+        val api = FakeApi()
+        api.v2FramesScript = { onFrame ->
+            v2TextBlock("stream-1", "assistant", "我先搜一下").forEach(onFrame)
+            onFrame(AgUiFrame.ToolCallStart("act-11", "search_media"))
+            onFrame(AgUiFrame.ToolCallArgs("act-11", "{\"query\":\"猫\"}"))
+            onFrame(AgUiFrame.ToolCallEnd("act-11"))
+            onFrame(AgUiFrame.ToolCallResult("act-11-result", "act-11", "找到 3 张"))
+            onFrame(v2RunFinished())
+        }
+        val events = mutableListOf<CloudTurnEvent>()
+        newRunner(api).runTurn("token", "s_1", "搜照片", null) { events.add(it) }
+        assertEquals(
+            listOf(
+                CloudTurnEvent.AssistantText("我先搜一下"),
+                CloudTurnEvent.StepStarted(11L, "search_media"),
+                CloudTurnEvent.StepFinished(11L, true),
+                CloudTurnEvent.Done(),
+            ),
+            events,
+        )
+    }
+
+    @Test
     fun `v2 route missing falls back to v1 and marks endpoint unsupported`() = runTest {
         val api = FakeApi()
         api.framesScript = { onFrame ->
