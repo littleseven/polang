@@ -2773,7 +2773,10 @@ object AdminViews {
             p("meta") {
                 +"近 $days 天 · 地区 = 端侧 Locale.country（网络出口代理指标）· 成功率分母 = 完成+失败（用户主动取消不计入）"
             }
-            h2 { +"转化漏斗（按设备）" }
+            h2 { +"转化漏斗（按设备 · 累计全部时间）" }
+            p("meta") {
+                +"用户里程碑口径：到达过该级即计入（独立设备，全部时间）——读作「多少用户下载了模型 → 多少就绪 → 多少扫描了」；不受上方 days 窗口影响"
+            }
             if (funnel.all { it.devices == 0L }) {
                 div("empty-state") { +"暂无漏斗数据（客户端上报 model_download/models_ready/gallery_scan 事件后可见）" }
             } else {
@@ -2893,7 +2896,7 @@ object AdminViews {
             h1 { +"漏斗下钻：${drill.label}" }
             p("meta") {
                 a("/admin/telemetry/downloads?days=$days") { +"← 返回下载遥测" }
-                +" · 近 $days 天 · 地区 = 设备最近一次下载事件的 region"
+                +" · 累计全部时间 · 地区 = 设备最近一次下载事件的 region"
             }
 
             // ── 转化摘要卡 ──

@@ -148,7 +148,7 @@ class DownloadStatsTest {
         // 无 deviceId 的历史行不参与漏斗
         insert(now, """{"modelId":"a","outcome":"completed"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD)
 
-        val funnel = AdminQueries.telemetryFunnel(days = 30, now = now)
+        val funnel = AdminQueries.telemetryFunnel()
         assertEquals(4, funnel.size)
         assertEquals(3L, funnel[0].devices)   // download
         assertEquals(null, funnel[0].conversionFromPrev)
@@ -170,7 +170,7 @@ class DownloadStatsTest {
         insert(now, """{"modelId":"b","outcome":"completed","region":"CN","appVersion":"0.9.53"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD, deviceId = "dev-3")
         insert(now, """{"requiredCount":7}""", type = TELEMETRY_TYPE_MODELS_READY, deviceId = "dev-3")
 
-        val drill = AdminQueries.telemetryFunnelDrill("ready", days = 30, now = now)!!
+        val drill = AdminQueries.telemetryFunnelDrill("ready")!!
         assertEquals("ready", drill.stage)
         assertEquals("download", drill.prevStage)
         assertEquals(3L, drill.reachedPrev)
@@ -197,13 +197,13 @@ class DownloadStatsTest {
         TestDb.init(TelemetryEvents)
         insert(now, """{"modelId":"a","outcome":"completed","region":"CN"}""", type = TELEMETRY_TYPE_MODEL_DOWNLOAD, deviceId = "dev-1")
 
-        val drill = AdminQueries.telemetryFunnelDrill("download", days = 30, now = now)!!
+        val drill = AdminQueries.telemetryFunnelDrill("download")!!
         assertNull(drill.prevStage)
         assertNull(drill.conversion)
         assertEquals(1L, drill.reachedThis)
         assertEquals(1, drill.devices.size) // 第一级清单 = 到达设备
 
-        assertNull(AdminQueries.telemetryFunnelDrill("bogus", days = 30, now = now))
+        assertNull(AdminQueries.telemetryFunnelDrill("bogus"))
     }
 
     @Test

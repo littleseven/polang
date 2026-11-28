@@ -817,19 +817,20 @@ object AdminQueries {
     }
 
     /**
-     * 转化漏斗：装机后「模型下载 → 必备模型就绪 → 扫描启动 → 扫描完成」的按设备到达数。
+     * 转化漏斗（2026-11-28 起累计口径）：装机后「模型下载 → 必备模型就绪 → 扫描启动 → 扫描完成」
+     * 的按设备到达数——用户里程碑语义「多少人达成过该级」，统计全部时间，不受 days 窗口影响
+     * （窗口口径下老设备的就绪事件落在窗口外，级间转化会出现 >100% 倒挂，与里程碑语义不符）。
      * 设备串联靠 telemetry_event.device_id（X-Device-Id）；无 deviceId 的历史行不参与。
      * 漏斗读数口径：到达过该级即计入（不严格按时序——events 按设备聚合后时序噪声不影响级间差值结论）。
      */
-    suspend fun telemetryFunnel(days: Int = 30, now: Long = System.currentTimeMillis()): List<FunnelRow> =
+    suspend fun telemetryFunnel(): List<FunnelRow> =
         newSuspendedTransaction(Dispatchers.IO, Db.instance) {
-            val since = now - days * DAY_MS
             val deviceStages = mutableMapOf<String, MutableSet<String>>()
             TelemetryEvents.selectAll()
                 .where {
                     (TelemetryEvents.type inList listOf(
                         TELEMETRY_TYPE_MODEL_DOWNLOAD, TELEMETRY_TYPE_MODELS_READY, TELEMETRY_TYPE_GALLERY_SCAN,
-                    )) and (TelemetryEvents.createdAt greaterEq since) and (TelemetryEvents.deviceId.isNotNull())
+                    )) and (TelemetryEvents.deviceId.isNotNull())
                 }
                 .forEach { row ->
                     val device = row[TelemetryEvents.deviceId] ?: return@forEach
@@ -857,28 +858,26 @@ object AdminQueries {
         }
 
     /**
-     * 漏斗下钻（2026-11-28）：某级的分地区转化明细 + 设备清单。
+     * 漏斗下钻（2026-11-28）：某级的分地区转化明细 + 设备清单。与 [telemetryFunnel] 同累计口径
+     * （全部时间、到达过即计入、不严格按时序）。
      * 第一级（download）设备清单 = 到达设备；其余级 = 到达上级但未到达本级的流失设备。
      * 地区/App 版本归因：设备最近一次 model_download 事件的 region/appVersion；无 download 事件归 unknown/空。
-     * 与 [telemetryFunnel] 同口径（到达过即计入，不严格按时序）；stage 非法返回 null（路由层 404）。
+     * stage 非法返回 null（路由层 404）。
      */
     suspend fun telemetryFunnelDrill(
         stage: String,
-        days: Int = 30,
-        now: Long = System.currentTimeMillis(),
         deviceLimit: Int = 200,
     ): FunnelDrillRow? = newSuspendedTransaction(Dispatchers.IO, Db.instance) {
         val stageIdx = FUNNEL_STAGES.indexOf(stage)
         if (stageIdx < 0) return@newSuspendedTransaction null
         val prevStage = FUNNEL_STAGES.getOrNull(stageIdx - 1)
 
-        val since = now - days * DAY_MS
         val devices = mutableMapOf<String, DeviceFunnelAcc>()
         TelemetryEvents.selectAll()
             .where {
                 (TelemetryEvents.type inList listOf(
                     TELEMETRY_TYPE_MODEL_DOWNLOAD, TELEMETRY_TYPE_MODELS_READY, TELEMETRY_TYPE_GALLERY_SCAN,
-                )) and (TelemetryEvents.createdAt greaterEq since) and (TelemetryEvents.deviceId.isNotNull())
+                )) and (TelemetryEvents.deviceId.isNotNull())
             }
             .forEach { row ->
                 val deviceId = row[TelemetryEvents.deviceId] ?: return@forEach
